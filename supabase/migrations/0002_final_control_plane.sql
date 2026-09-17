@@ -95,7 +95,7 @@ create table public.recommendations (
 create table public.approvals (
   id uuid primary key default gen_random_uuid(),
   recommendation_id uuid not null references public.recommendations(id) on delete cascade,
-  actor_id uuid not null references auth.users(id),
+  actor_id uuid references auth.users(id) on delete set null,
   decision text not null check (decision in ('approved','rejected','deferred')),
   note text,
   created_at timestamptz not null default now()
@@ -113,8 +113,10 @@ alter table public.approvals enable row level security;
 
 create policy "organization members read organizations" on public.organizations for select to authenticated
 using (exists (select 1 from public.organization_members m where m.organization_id=id and m.user_id=(select auth.uid())));
-create policy "members read organization memberships" on public.organization_members for select to authenticated
-using (exists (select 1 from public.organization_members self where self.organization_id=organization_id and self.user_id=(select auth.uid())));
+-- A member reads only their own membership rows. This avoids a self-referential RLS policy
+-- on organization_members while still allowing the organizations membership predicate above.
+create policy "members read own organization memberships" on public.organization_members for select to authenticated
+using (user_id=(select auth.uid()));
 create policy "site members read environments" on public.environments for select to authenticated
 using (exists (select 1 from public.site_members m where m.site_id=environments.site_id and m.user_id=(select auth.uid())));
 create policy "site members read connectors" on public.connectors for select to authenticated
@@ -128,6 +130,9 @@ using (exists (select 1 from public.site_members m where m.site_id=recommendatio
 create policy "site members read approvals" on public.approvals for select to authenticated
 using (exists (select 1 from public.recommendations r join public.site_members m on m.site_id=r.site_id where r.id=approvals.recommendation_id and m.user_id=(select auth.uid())));
 
--- connector_nonces deliberately has no client policy: server/service operations only.
+-- Client access is read-only for the control-plane tables; all mutations go through
+-- server-side authorization and audited service operations.
+revoke all on public.organizations, public.organization_members, public.environments, public.connectors, public.plans, public.entitlements, public.recommendations, public.approvals from anon, authenticated;
 grant select on public.organizations, public.organization_members, public.environments, public.connectors, public.plans, public.entitlements, public.recommendations, public.approvals to authenticated;
+-- connector_nonces is deliberately service-only.
 revoke all on public.connector_nonces from anon, authenticated;
