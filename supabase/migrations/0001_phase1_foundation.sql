@@ -39,7 +39,7 @@ create table public.feature_controls (
   feature_key text not null,
   state public.feature_state not null default 'enabled',
   reason text,
-  updated_by uuid not null references public.profiles(id),
+  updated_by uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   unique(site_id,feature_key)
 );
@@ -61,7 +61,7 @@ create table public.jobs (
 
 create table public.audit_events (
   id uuid primary key default gen_random_uuid(),
-  actor_id uuid references public.profiles(id),
+  actor_id uuid references public.profiles(id) on delete set null,
   site_id uuid references public.sites(id) on delete set null,
   action text not null,
   resource_type text not null,
@@ -79,9 +79,17 @@ create table public.ai_budgets (
   model text not null,
   monthly_limit_usd numeric(12,2) not null default 0,
   spent_usd numeric(12,4) not null default 0,
-  enabled boolean not null default true,
-  unique(site_id,provider,model)
+  enabled boolean not null default true
 );
+
+-- PostgreSQL treats NULL values as distinct in a normal UNIQUE constraint.
+-- Split global and per-site uniqueness so one authoritative budget exists per scope/model.
+create unique index ai_budgets_site_provider_model_uidx
+  on public.ai_budgets(site_id, provider, model)
+  where site_id is not null;
+create unique index ai_budgets_global_provider_model_uidx
+  on public.ai_budgets(provider, model)
+  where site_id is null;
 
 alter table public.profiles enable row level security;
 alter table public.sites enable row level security;
@@ -92,11 +100,11 @@ alter table public.audit_events enable row level security;
 alter table public.ai_budgets enable row level security;
 
 -- Server-side authorization is mandatory. Service-role operations must remain server-only.
-create policy "users read own profile" on public.profiles for select using (auth.uid() = id);
-create policy "members read sites" on public.sites for select using (
-  exists (select 1 from public.site_members sm where sm.site_id = sites.id and sm.user_id = auth.uid())
+create policy "users read own profile" on public.profiles for select to authenticated using ((select auth.uid()) = id);
+create policy "members read sites" on public.sites for select to authenticated using (
+  exists (select 1 from public.site_members sm where sm.site_id = sites.id and sm.user_id = (select auth.uid()))
 );
-create policy "members read memberships" on public.site_members for select using (user_id = auth.uid());
-create policy "members read feature controls" on public.feature_controls for select using (
-  exists (select 1 from public.site_members sm where sm.site_id = feature_controls.site_id and sm.user_id = auth.uid())
+create policy "members read memberships" on public.site_members for select to authenticated using (user_id = (select auth.uid()));
+create policy "members read feature controls" on public.feature_controls for select to authenticated using (
+  exists (select 1 from public.site_members sm where sm.site_id = feature_controls.site_id and sm.user_id = (select auth.uid()))
 );
