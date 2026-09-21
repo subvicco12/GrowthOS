@@ -90,9 +90,13 @@ create table public.recommendations (
   effort smallint not null check (effort between 1 and 5),
   recurring_cost_usd numeric(12,2) not null default 0 check (recurring_cost_usd >= 0),
   risk smallint not null check (risk between 1 and 5),
+  score numeric(12,2) not null default 0 check (score >= 0),
+  approval_class text not null default 'amber' check (approval_class in ('green','amber','red')),
   status text not null default 'proposed' check (status in ('proposed','approved','rejected','deferred','implemented','verified')),
   created_at timestamptz not null default now()
 );
+
+create index recommendations_site_status_score_idx on public.recommendations(site_id,status,score desc);
 
 create table public.approvals (
   id uuid primary key default gen_random_uuid(),
@@ -100,7 +104,8 @@ create table public.approvals (
   actor_id uuid references auth.users(id) on delete set null,
   decision text not null check (decision in ('approved','rejected','deferred')),
   note text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique(recommendation_id,actor_id,decision)
 );
 
 alter table public.organizations enable row level security;
