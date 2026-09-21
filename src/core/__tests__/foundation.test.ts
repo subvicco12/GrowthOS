@@ -208,3 +208,19 @@ test('connector envelope rejects oversized identifiers, malformed signatures and
   assert.equal(connectorEnvelopeSchema.safeParse({...base,signature:'z'.repeat(64)}).success,false);
   assert.equal(connectorEnvelopeSchema.safeParse({...base,unexpected:true}).success,false);
 });
+
+test('job retry policy caps backoff and permanent failures never retry', async () => {
+  assert.equal(retryDelayMs(0),60_000);
+  assert.equal(retryDelayMs(20),30*60_000);
+  const calls:any[]=[];
+  const store={claim:async()=>({id:'j',siteId:'s',type:'x',status:'running' as const,payload:{},attempts:0,maxAttempts:3,runAfter:new Date().toISOString()}),succeed:async()=>{},fail:async(...args:any[])=>{calls.push(args)}};
+  await new JobRunner(store,{x:async()=>{throw new PermanentJobError('bad input')}}).runOne('w');
+  assert.equal(calls[0][2],undefined);
+});
+
+test('job error persistence redacts common credential material', () => {
+  const message=sanitizeJobError(new Error('token=abc123 password:secret api_key=xyz'));
+  assert.equal(message.includes('abc123'),false);
+  assert.equal(message.includes('secret'),false);
+  assert.equal(message.includes('xyz'),false);
+});
