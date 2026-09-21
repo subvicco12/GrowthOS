@@ -12,6 +12,7 @@ import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignat
 import { createHmac } from 'node:crypto';
 import type { Entitlement } from '../types';
 import { recordFeatureChange, type AuditSink } from '../audit';
+import { JobRunner, PermanentJobError, retryDelayMs, sanitizeJobError } from '../jobs';
 
 const entitlement: Entitlement = {
   siteId: 'site',
