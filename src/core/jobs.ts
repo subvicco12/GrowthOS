@@ -2,8 +2,8 @@ import type { Job } from './types';
 
 export interface JobStore {
   claim(workerId:string,leaseSeconds:number):Promise<Job|null>;
-  succeed(jobId:string,result:unknown):Promise<void>;
-  fail(jobId:string,error:string,retryAt?:Date):Promise<void>;
+  succeed(jobId:string,result:unknown,workerId?:string):Promise<void>;
+  fail(jobId:string,error:string,retryAt?:Date,workerId?:string):Promise<void>;
   extendLease?(jobId:string,workerId:string,leaseSeconds:number):Promise<boolean>;
 }
 export type JobHandler=(job:Job,signal:AbortSignal)=>Promise<unknown>;
@@ -21,7 +21,7 @@ export class JobRunner {
     const job=await this.store.claim(workerId,leaseSeconds);
     if(!job)return'idle';
     const handler=this.handlers[job.type];
-    if(!handler){await this.store.fail(job.id,`UNKNOWN_JOB_TYPE:${job.type}`);return'failed';}
+    if(!handler){await this.store.fail(job.id,`UNKNOWN_JOB_TYPE:${job.type}`,undefined,workerId);return'failed';}
     const controller=new AbortController();
     const timeoutMs=this.options.timeoutMs ?? 90_000;
     const timeout=setTimeout(()=>controller.abort(new Error('JOB_TIMEOUT')),timeoutMs);
@@ -29,11 +29,11 @@ export class JobRunner {
     const heartbeat=this.store.extendLease?setInterval(()=>{void this.store.extendLease!(job.id,workerId,leaseSeconds).catch(()=>false);},heartbeatMs):undefined;
     try {
       const result=await Promise.race([handler(job,controller.signal),new Promise<never>((_,reject)=>controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true}))]);
-      await this.store.succeed(job.id,result);return'succeeded';
+      await this.store.succeed(job.id,result,workerId);return'succeeded';
     }
     catch(error){
       const retry=!(error instanceof PermanentJobError)&&job.attempts+1<job.maxAttempts;
-      await this.store.fail(job.id,sanitizeJobError(error),retry?new Date(Date.now()+retryDelayMs(job.attempts)):undefined);
+      await this.store.fail(job.id,sanitizeJobError(error),retry?new Date(Date.now()+retryDelayMs(job.attempts)):undefined,workerId);
       return'failed';
     } finally {
       clearTimeout(timeout);
