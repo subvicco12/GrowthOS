@@ -69,7 +69,7 @@ test('connector rejects stale timestamps before nonce consumption', async () => 
   let consumed=false;
   const nonces:NonceStore={consume:async()=>{consumed=true;return true;}};
   const envelope={siteId:'11111111-1111-4111-8111-111111111111',timestamp:new Date(Date.now()-10*60*1000).toISOString(),nonce:'nonce-stale-123456',requestId:'22222222-2222-4222-8222-222222222222',signature:'0'.repeat(64)};
-  await assert.rejects(()=>authenticateConnector(envelope,'{}','secret',nonces),/STALE_CONNECTOR_REQUEST/);
+  await assert.rejects(()=>authenticateConnector(envelope,'{}','s'.repeat(32),nonces),/STALE_CONNECTOR_REQUEST/);
   assert.equal(consumed,false);
 });
 
@@ -78,9 +78,9 @@ test('connector nonce store blocks replay after valid signature', async () => {
   const nonces:NonceStore={consume:async(siteId,nonce)=>{const key=`${siteId}:${nonce}`;if(seen.has(key))return false;seen.add(key);return true;}};
   const base={siteId:'11111111-1111-4111-8111-111111111111',timestamp:new Date().toISOString(),nonce:'nonce-replay-123456',requestId:'22222222-2222-4222-8222-222222222222'};
   const body='{}';
-  const signature=createHmac('sha256','secret').update(canonicalConnectorPayload(base,body)).digest('hex');
+  const signature=createHmac('sha256','s'.repeat(32)).update(canonicalConnectorPayload(base,body)).digest('hex');
   const envelope={...base,signature};
-  await authenticateConnector(envelope,body,'secret',nonces);
+  await authenticateConnector(envelope,body,'s'.repeat(32),nonces);
   await assert.rejects(()=>authenticateConnector(envelope,body,'secret',nonces),/CONNECTOR_REPLAY_DETECTED/);
 });
 
