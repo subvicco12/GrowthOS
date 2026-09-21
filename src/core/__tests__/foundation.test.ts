@@ -298,3 +298,18 @@ test('website discovery deduplicates feature names and technology evidence', asy
   const snapshot=buildWebsiteSnapshot({siteId:'site-1',url:'https://example.com',capturedAt:new Date(0).toISOString(),featureNames:['QR Generator',' QR  Generator ','Analytics'],technologies:['React','React',' PostgreSQL ']});
   assert.equal(snapshot.features.length,2); assert.deepEqual(snapshot.technologies,['React','PostgreSQL']);
 });
+
+test('packaging intelligence finds tier gaps only from sufficiently similar competitors', async()=>{
+ const {comparePackages,validateCompetitor}=await import('../competitive-intelligence');
+ const ours={product:'ours',capturedAt:'2026-01-01T00:00:00Z',features:[{key:'analytics',name:'Analytics',plans:{free:false,pro:true,business:true}}]};
+ const competitor=(name:string,similarity:number)=>({name,domain:name+'.com',similarity,evidence:['pricing page'],inventory:{product:name,capturedAt:'2026-01-01T00:00:00Z',evidenceUrl:'https://'+name+'.com/pricing',features:[{key:'bulk-export',name:'Bulk Export',plans:{free:false,pro:true,business:true}},{key:'analytics',name:'Analytics',plans:{free:true,pro:true,business:true}}]}});
+ const gaps=comparePackages(ours as any,[competitor('close',.9) as any,competitor('irrelevant',.2) as any]);
+ assert.equal(gaps.find((g:any)=>g.featureKey==='bulk-export')?.competitors,1); assert.equal(gaps.find((g:any)=>g.featureKey==='bulk-export')?.opportunity,'business_upgrade'); assert.equal(gaps.find((g:any)=>g.featureKey==='analytics')?.opportunity,'consider_free');
+ assert.deepEqual(validateCompetitor(competitor('close',.9) as any),[]);
+});
+
+test('competitor intelligence requires package evidence and valid similarity', async()=>{
+ const {validateCompetitor}=await import('../competitive-intelligence');
+ const issues=validateCompetitor({name:'x',domain:'x.test',similarity:2,evidence:[],inventory:{product:'x',capturedAt:'2026-01-01T00:00:00Z',features:[]}} as any);
+ assert.deepEqual(issues,['INVALID_SIMILARITY','EVIDENCE_REQUIRED','PACKAGE_EVIDENCE_URL_REQUIRED']);
+});
