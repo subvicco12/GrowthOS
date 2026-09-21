@@ -81,7 +81,7 @@ test('connector nonce store blocks replay after valid signature', async () => {
   const signature=createHmac('sha256','s'.repeat(32)).update(canonicalConnectorPayload(base,body)).digest('hex');
   const envelope={...base,signature};
   await authenticateConnector(envelope,body,'s'.repeat(32),nonces);
-  await assert.rejects(()=>authenticateConnector(envelope,body,'secret',nonces),/CONNECTOR_REPLAY_DETECTED/);
+  await assert.rejects(()=>authenticateConnector(envelope,body,'s'.repeat(32),nonces),/CONNECTOR_REPLAY_DETECTED/);
 });
 
 test('unknown job types fail closed without executing work', async () => {
