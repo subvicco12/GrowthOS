@@ -284,3 +284,17 @@ test('transactional feature audit redacts sensitive values while preserving reas
   await changeFeatureControl(context,{siteId:context.siteId,featureKey:'exports',mode:'off',reason:'security response'},repo);
   assert.equal(event.before.apiKey,'[REDACTED]'); assert.equal(event.after.token,'[REDACTED]'); assert.equal(event.reason,'security response'); assert.equal(event.after.reason,'security response');
 });
+
+test('website discovery normalizes evidence and QA fails closed on missing inventory', async()=>{
+  const {buildWebsiteSnapshot,validateSnapshot,summarizeQa}=await import('../discovery');
+  const snapshot=buildWebsiteSnapshot({siteId:'site-1',url:'http://example.com',capturedAt:new Date(0).toISOString(),routes:[' /pricing ','/pricing',' /tools '],featureNames:[]});
+  assert.deepEqual(snapshot.routes,['/pricing','/tools']);
+  const findings=validateSnapshot(snapshot); assert.equal(findings.some((f:any)=>f.id==='https-required'),true); assert.equal(findings.some((f:any)=>f.id==='no-features'),true);
+  const summary=summarizeQa(findings); assert.equal(summary.total,2); assert.equal(summary.critical,1); assert.equal(summary.medium,1); assert.equal(summary.score,64);
+});
+
+test('website discovery deduplicates feature names and technology evidence', async()=>{
+  const {buildWebsiteSnapshot}=await import('../discovery');
+  const snapshot=buildWebsiteSnapshot({siteId:'site-1',url:'https://example.com',capturedAt:new Date(0).toISOString(),featureNames:['QR Generator',' QR  Generator ','Analytics'],technologies:['React','React',' PostgreSQL ']});
+  assert.equal(snapshot.features.length,2); assert.deepEqual(snapshot.technologies,['React','PostgreSQL']);
+});
