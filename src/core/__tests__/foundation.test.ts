@@ -265,3 +265,14 @@ test('job runner aborts handler when lease heartbeat loses ownership', async()=>
   const runner=new JobRunner(store,{work:async(_job,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>{aborted=true;reject(signal.reason);},{once:true}))},{leaseSeconds:1,heartbeatMs:5,timeoutMs:100});
   assert.equal(await runner.runOne('worker-lost'),'failed'); assert.equal(aborted,true); assert.match(failure,/JOB_LEASE_LOST/);
 });
+
+test('connector authentication rejects weak secrets oversized bodies and future timestamps before nonce use', async()=>{
+  let consumed=0; const nonces={consume:async()=>{consumed++;return true;}};
+  const siteId='00000000-0000-4000-8000-000000000001'; const secret='s'.repeat(32); const body='{}';
+  const future=new Date(Date.now()+60_000).toISOString(); const base={siteId,timestamp:future,nonce:'nonce-1234567890123456',requestId:'request-12345678'};
+  const signature=createHmac('sha256',secret).update(canonicalConnectorPayload(base,body)).digest('hex');
+  await assert.rejects(()=>authenticateConnector({...base,signature},body,secret,nonces),/FUTURE_CONNECTOR_REQUEST/);
+  await assert.rejects(()=>authenticateConnector({...base,timestamp:new Date().toISOString(),signature},body,'short',nonces),/INVALID_CONNECTOR_SECRET/);
+  await assert.rejects(()=>authenticateConnector({...base,timestamp:new Date().toISOString(),signature},'x'.repeat(1_048_577),secret,nonces),/CONNECTOR_BODY_TOO_LARGE/);
+  assert.equal(consumed,0);
+});
