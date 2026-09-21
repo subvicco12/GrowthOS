@@ -71,6 +71,7 @@ create table public.audit_events (
   action text not null,
   resource_type text not null,
   resource_id text,
+  reason text,
   before_data jsonb,
   after_data jsonb,
   ip_hash text,
