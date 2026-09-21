@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { hasMinimumRole } from '../authorization';
 import { changeFeatureControl } from '../control-plane';
 import { growthSites, growthWorkspaces } from '../portfolio';
+import { loadPortfolio } from '../site-registry';
 import { decideFeatureAccess, decideOnEntitlementFailure } from '../feature-gates';
 import { chooseAiModel } from '../ai-router';
 import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignature, type NonceStore } from '../connector-security';
@@ -148,4 +149,24 @@ test('portfolio registry contains six unique production domains and final worksp
   assert.equal(new Set(growthWorkspaces.map(workspace=>workspace.key)).size,12);
   assert.ok(growthWorkspaces.some(workspace=>workspace.key==='approvals'));
   assert.ok(growthWorkspaces.some(workspace=>workspace.key==='engineering'));
+});
+
+test('site registry prefers valid database rows and falls back safely', async () => {
+  const dbSites=[{name:'Example',domain:'example.com',status:'connected' as const}];
+  assert.deepEqual(await loadPortfolio({list:async()=>dbSites},growthSites),{sites:dbSites,source:'database'});
+  const empty=await loadPortfolio({list:async()=>[]},growthSites);
+  assert.equal(empty.source,'fallback');
+  assert.equal(empty.sites.length,6);
+  const failed=await loadPortfolio({list:async()=>{throw new Error('DB_DOWN');}},growthSites);
+  assert.equal(failed.source,'fallback');
+});
+
+test('site registry rejects duplicate database domains and uses fallback', async () => {
+  const duplicate=[
+    {name:'A',domain:'same.com',status:'connected' as const},
+    {name:'B',domain:'SAME.COM',status:'connected' as const},
+  ];
+  const loaded=await loadPortfolio({list:async()=>duplicate},growthSites);
+  assert.equal(loaded.source,'fallback');
+  assert.equal(loaded.sites.length,6);
 });
