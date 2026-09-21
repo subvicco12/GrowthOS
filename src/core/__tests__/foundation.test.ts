@@ -235,3 +235,18 @@ test('feature beta mode fails closed without explicit eligibility',()=>{
   assert.equal(decideFeatureAccess({role:'viewer',requiredRole:'viewer',siteStatus:'active',plan:'pro',entitlement:beta,usage:0,rolloutBucket:0,betaEligible:true}).allowed,true);
   assert.equal(decideFeatureAccess({role:'admin',requiredRole:'viewer',siteStatus:'active',plan:'pro',entitlement:beta,usage:0,rolloutBucket:0}).allowed,true);
 });
+
+test('job runner times out work and exposes cancellation signal', async()=>{
+  let sawAbort=false; let failure='';
+  const store={claim:async()=>({id:'job-timeout',type:'slow',status:'running' as const,idempotencyKey:'idem-timeout',attempts:0,maxAttempts:1,createdAt:new Date(0).toISOString()}),succeed:async()=>{},fail:async(_id:string,error:string)=>{failure=error;}};
+  const runner=new JobRunner(store,{slow:async(_job,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>{sawAbort=true;reject(signal.reason);},{once:true}))},{timeoutMs:10});
+  assert.equal(await runner.runOne('worker-1'),'failed');
+  assert.equal(sawAbort,true); assert.match(failure,/JOB_TIMEOUT/);
+});
+
+test('job runner heartbeats renewable leases during work', async()=>{
+  let extensions=0;
+  const store={claim:async()=>({id:'job-heartbeat',type:'work',status:'running' as const,idempotencyKey:'idem-heartbeat',attempts:0,maxAttempts:2,createdAt:new Date(0).toISOString()}),succeed:async()=>{},fail:async()=>{},extendLease:async()=>{extensions++;return true;}};
+  const runner=new JobRunner(store,{work:async()=>{await new Promise(resolve=>setTimeout(resolve,25));return 'ok';}},{leaseSeconds:1,heartbeatMs:5,timeoutMs:100});
+  assert.equal(await runner.runOne('worker-1'),'succeeded'); assert.ok(extensions>=1);
+});
