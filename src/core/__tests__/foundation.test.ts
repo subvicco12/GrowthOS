@@ -258,3 +258,10 @@ test('job runner binds completion to claiming worker id', async()=>{
   const failStore={claim:async()=>({id:'job-owner-fail',type:'bad',status:'running' as const,idempotencyKey:'idem-owner-fail',attempts:1,maxAttempts:2,createdAt:new Date(0).toISOString()}),succeed:async()=>{},fail:async(_id:string,_error:string,_retry?:Date,workerId?:string)=>{failedBy=workerId??'';}};
   assert.equal(await new JobRunner(failStore,{bad:async()=>{throw new PermanentJobError('bad');}}).runOne('worker-fail'),'failed'); assert.equal(failedBy,'worker-fail');
 });
+
+test('job runner aborts handler when lease heartbeat loses ownership', async()=>{
+  let aborted=false; let failure='';
+  const store={claim:async()=>({id:'job-lost',type:'work',status:'running' as const,idempotencyKey:'idem-lost',attempts:0,maxAttempts:2,createdAt:new Date(0).toISOString()}),succeed:async()=>{throw new Error('SHOULD_NOT_SUCCEED');},fail:async(_id:string,error:string)=>{failure=error;},extendLease:async()=>false};
+  const runner=new JobRunner(store,{work:async(_job,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>{aborted=true;reject(signal.reason);},{once:true}))},{leaseSeconds:1,heartbeatMs:5,timeoutMs:100});
+  assert.equal(await runner.runOne('worker-lost'),'failed'); assert.equal(aborted,true); assert.match(failure,/JOB_LEASE_LOST/);
+});
