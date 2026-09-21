@@ -55,3 +55,10 @@ test('invalid override expiry and quota fail closed to base entitlement',()=>{
   assert.equal(applyEntitlementOverride(base,'pro',{quotaOverride:-1}).quotaPro,base.quotaPro);
   assert.equal(applyEntitlementOverride(base,'pro',{quotaOverride:1.5}).quotaPro,base.quotaPro);
 });
+
+test('beta mode requires explicit eligibility but permits admins',()=>{
+  const beta={...base,mode:'beta' as const};
+  assert.equal(decideEntitlement(beta,{plan:'pro',isAdmin:false,stableRolloutBucket:0,usage:0}).reason,'BETA_NOT_ELIGIBLE');
+  assert.equal(decideEntitlement(beta,{plan:'pro',isAdmin:false,betaEligible:true,stableRolloutBucket:0,usage:0}).allowed,true);
+  assert.equal(decideEntitlement(beta,{plan:'pro',isAdmin:true,stableRolloutBucket:0,usage:0}).allowed,true);
+});
