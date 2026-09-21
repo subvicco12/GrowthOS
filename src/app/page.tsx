@@ -1,6 +1,11 @@
 import { growthSites as sites, growthWorkspaces } from '../core/portfolio';
 
 const workspaces = growthWorkspaces.map(workspace => workspace.label);
+const engineGroups=[
+  {name:'Product Intelligence',engines:['Website Discovery','Automated QA','Uptime & Synthetic Monitoring','Security & Dependency Intelligence','Competitor Intelligence','Packaging Intelligence']},
+  {name:'Growth Intelligence',engines:['Technical SEO','Search & AI Visibility','Content Intelligence','CRO & Experimentation','Social Automation','Email & Lifecycle','Organic Promotion','Reputation Intelligence']},
+  {name:'Revenue & Operations',engines:['Monetization & Paid Growth','Retention & Referral','Revenue Attribution','Business Growth Intelligence','GitHub Engineering Agent','Governance & Cost Control']},
+];
 
 export default function Dashboard() {
   return (
@@ -60,6 +65,11 @@ export default function Dashboard() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="panel" id="engine-map">
+          <div className="panelHead"><div><h2>Automation engine map</h2><p>Twenty GrowthOS engines are grouped into three operational lanes. Website Registry and Feature/Entitlement Control remain central control-plane services.</p></div><span className="engineCount">20 engines</span></div>
+          <div className="engineGroups">{engineGroups.map(group=><article className="engineGroup" key={group.name}><h3>{group.name}</h3>{group.engines.map(engine=><div className="engine" key={engine}><span>{engine}</span><small>Ready for connector</small></div>)}</article>)}</div>
         </section>
 
         <section className="panel">
