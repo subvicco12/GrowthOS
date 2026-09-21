@@ -227,3 +227,10 @@ test('job error persistence redacts common credential material', () => {
   assert.equal(message.includes('secret'),false);
   assert.equal(message.includes('xyz'),false);
 });
+
+test('feature beta mode fails closed without explicit eligibility',()=>{
+  const beta={...entitlement,mode:'beta' as const};
+  assert.equal(decideFeatureAccess({role:'viewer',requiredRole:'viewer',siteStatus:'active',plan:'pro',entitlement:beta,usage:0,rolloutBucket:0}).reason,'BETA_NOT_ELIGIBLE');
+  assert.equal(decideFeatureAccess({role:'viewer',requiredRole:'viewer',siteStatus:'active',plan:'pro',entitlement:beta,usage:0,rolloutBucket:0,betaEligible:true}).allowed,true);
+  assert.equal(decideFeatureAccess({role:'admin',requiredRole:'viewer',siteStatus:'active',plan:'pro',entitlement:beta,usage:0,rolloutBucket:0}).allowed,true);
+});
