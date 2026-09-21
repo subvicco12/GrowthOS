@@ -36,3 +36,39 @@ export function decideEntitlement(e: Entitlement, c: EntitlementContext): Entitl
   if (quota!=null&&c.usage>=quota) return {allowed:false,readOnly:false,reason:'QUOTA',remaining:0,...message};
   return {allowed:true,readOnly:false,reason:'ALLOWED',remaining:quota==null?null:Math.max(0,quota-c.usage),...message};
 }
+
+export interface EntitlementOverride {
+  mode?: FeatureMode | null;
+  accessOverride?: boolean | null;
+  quotaOverride?: number | null;
+  expiresAt?: string | null;
+}
+
+export function applyEntitlementOverride(
+  base: Entitlement,
+  plan: PlanCode,
+  override?: EntitlementOverride | null,
+  now = new Date(),
+): Entitlement {
+  if (!override) return base;
+  if (override.expiresAt && Date.parse(override.expiresAt) <= now.getTime()) return base;
+
+  const next: Entitlement = {
+    ...base,
+    mode: override.mode ?? base.mode,
+  };
+
+  if (override.accessOverride != null) {
+    if (plan === 'free') next.freeAccess = override.accessOverride;
+    else if (plan === 'pro') next.proAccess = override.accessOverride;
+    else next.businessAccess = override.accessOverride;
+  }
+
+  if (override.quotaOverride !== undefined) {
+    if (plan === 'free') next.quotaFree = override.quotaOverride;
+    else if (plan === 'pro') next.quotaPro = override.quotaOverride;
+    else next.quotaBusiness = override.quotaOverride;
+  }
+
+  return next;
+}
