@@ -214,7 +214,7 @@ test('job retry policy caps backoff and permanent failures never retry', async (
   assert.equal(retryDelayMs(0),60_000);
   assert.equal(retryDelayMs(20),30*60_000);
   const calls:any[]=[];
-  const store={claim:async()=>({id:'j',siteId:'s',type:'x',status:'running' as const,payload:{},attempts:0,maxAttempts:3,runAfter:new Date().toISOString()}),succeed:async()=>{},fail:async(...args:any[])=>{calls.push(args)}};
+  const store={claim:async()=>({id:'j',siteId:'s',type:'x',status:'running' as const,payload:{},idempotencyKey:'job-j',attempts:0,maxAttempts:3,runAfter:new Date().toISOString(),createdAt:new Date().toISOString()}),succeed:async()=>{},fail:async(...args:any[])=>{calls.push(args)}};
   await new JobRunner(store,{x:async()=>{throw new PermanentJobError('bad input')}}).runOne('w');
   assert.equal(calls[0][2],undefined);
 });
