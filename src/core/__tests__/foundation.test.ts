@@ -76,3 +76,32 @@ test('connector nonce store blocks replay after valid signature', async () => {
   await authenticateConnector(envelope,body,'secret',nonces);
   await assert.rejects(()=>authenticateConnector(envelope,body,'secret',nonces),/CONNECTOR_REPLAY_DETECTED/);
 });
+
+test('unknown job types fail closed without executing work', async () => {
+  const { JobRunner } = await import('../jobs');
+  let failure='';
+  const store={
+    claim:async()=>({id:'job-1',type:'unknown',status:'queued' as const,idempotencyKey:'idem-1',attempts:0,maxAttempts:3,createdAt:new Date(0).toISOString()}),
+    succeed:async()=>{throw new Error('SHOULD_NOT_SUCCEED');},
+    fail:async(_id:string,error:string)=>{failure=error;},
+  };
+  const runner=new JobRunner(store,{});
+  assert.equal(await runner.runOne('worker-1'),'failed');
+  assert.equal(failure,'UNKNOWN_JOB_TYPE:unknown');
+});
+
+test('job retry uses bounded exponential backoff before max attempts', async () => {
+  const { JobRunner } = await import('../jobs');
+  let retryAt:Date|undefined;
+  const before=Date.now();
+  const store={
+    claim:async()=>({id:'job-2',type:'scan',status:'queued' as const,idempotencyKey:'idem-2',attempts:1,maxAttempts:3,createdAt:new Date(0).toISOString()}),
+    succeed:async()=>{},
+    fail:async(_id:string,_error:string,retry?:Date)=>{retryAt=retry;},
+  };
+  const runner=new JobRunner(store,{scan:async()=>{throw new Error('TRANSIENT');}});
+  assert.equal(await runner.runOne('worker-1'),'failed');
+  assert.ok(retryAt);
+  const delay=retryAt!.getTime()-before;
+  assert.ok(delay>=119000&&delay<=121000);
+});
