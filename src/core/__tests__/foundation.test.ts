@@ -4,6 +4,7 @@ import { hasMinimumRole } from '../authorization';
 import { changeFeatureControl } from '../control-plane';
 import { growthSites, growthWorkspaces } from '../portfolio';
 import { loadPortfolio } from '../site-registry';
+import { DatabaseSiteRegistryRepository } from '../site-registry-db';
 import { decideFeatureAccess, decideOnEntitlementFailure } from '../feature-gates';
 import { chooseAiModel } from '../ai-router';
 import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignature, type NonceStore } from '../connector-security';
@@ -169,4 +170,17 @@ test('site registry rejects duplicate database domains and uses fallback', async
   const loaded=await loadPortfolio({list:async()=>duplicate},growthSites);
   assert.equal(loaded.source,'fallback');
   assert.equal(loaded.sites.length,6);
+});
+
+test('database registry adapter normalizes site records', async () => {
+  const repository=new DatabaseSiteRegistryRepository({listSites:async()=>[
+    {name:' Example ',domain:'EXAMPLE.COM ',status:'active'},
+    {name:'Paused',domain:'paused.com',status:'paused'},
+    {name:'Maintenance',domain:'maintenance.com',status:'maintenance'},
+    {name:'Offline',domain:'offline.com',status:'disconnected'},
+  ]});
+  const sites=await repository.list();
+  assert.deepEqual(sites.map(site=>site.status),['connected','disabled','degraded','ready_to_connect']);
+  assert.equal(sites[0].name,'Example');
+  assert.equal(sites[0].domain,'example.com');
 });
