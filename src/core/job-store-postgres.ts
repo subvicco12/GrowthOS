@@ -14,7 +14,7 @@ export class PostgresJobStore {
       with candidate as (
         select id from public.jobs
         where (status='queued' and run_after<=now())
-           or (status='running' and locked_until<now())
+           or (status='running' and locked_until<now() and attempts<max_attempts)
         order by run_after,created_at
         for update skip locked limit 1
       )
@@ -24,12 +24,16 @@ export class PostgresJobStore {
     `,[workerId,leaseSeconds]);
     return rows[0]?mapJob(rows[0]):null;
   }
-  async succeed(jobId:string,result:unknown):Promise<void>{
-    await this.db.query(`update public.jobs set status='succeeded',result=$2::jsonb,locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'`,[jobId,JSON.stringify(result??null)]);
+  async succeed(jobId:string,result:unknown,workerId?:string):Promise<void>{
+    const ownership=workerId?' and locked_by=$3':'';
+    const {rows}=await this.db.query<{id:string}>(`update public.jobs set status='succeeded',result=$2::jsonb,locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'${ownership} returning id`,workerId?[jobId,JSON.stringify(result??null),workerId]:[jobId,JSON.stringify(result??null)]);
+    if(rows.length!==1) throw new Error('JOB_LEASE_LOST');
   }
-  async fail(jobId:string,error:string,retryAt?:Date):Promise<void>{
-    const status=retryAt?'queued':'failed';
-    await this.db.query(`update public.jobs set status=$2::public.job_status,result=jsonb_build_object('error',$3::text),run_after=coalesce($4::timestamptz,run_after),locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'`,[jobId,status,error,retryAt?.toISOString()??null]);
+  async fail(jobId:string,error:string,retryAt?:Date,workerId?:string):Promise<void>{
+    const status=retryAt?'queued':'failed'; const ownership=workerId?' and locked_by=$5':'';
+    const params=workerId?[jobId,status,error,retryAt?.toISOString()??null,workerId]:[jobId,status,error,retryAt?.toISOString()??null];
+    const {rows}=await this.db.query<{id:string}>(`update public.jobs set status=$2::public.job_status,result=jsonb_build_object('error',$3::text),run_after=coalesce($4::timestamptz,run_after),locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'${ownership} returning id`,params);
+    if(rows.length!==1) throw new Error('JOB_LEASE_LOST');
   }
   async extendLease(jobId:string,workerId:string,leaseSeconds:number):Promise<boolean>{
     const {rows}=await this.db.query<{id:string}>(`update public.jobs set locked_until=now()+($3 * interval '1 second'),updated_at=now() where id=$1 and status='running' and locked_by=$2 returning id`,[jobId,workerId,leaseSeconds]);
