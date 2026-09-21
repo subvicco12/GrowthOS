@@ -8,12 +8,13 @@ export interface EntitlementContext {
   isAdmin: boolean;
   stableRolloutBucket: number;
   usage: number;
+  betaEligible?: boolean;
 }
 
 export interface EntitlementDecision {
   allowed: boolean;
   readOnly: boolean;
-  reason: 'ALLOWED'|'KILL_SWITCH'|'OFF'|'MAINTENANCE'|'ADMIN_ONLY'|'PLAN_DENIED'|'ROLLOUT'|'QUOTA';
+  reason: 'ALLOWED'|'KILL_SWITCH'|'OFF'|'MAINTENANCE'|'ADMIN_ONLY'|'BETA_NOT_ELIGIBLE'|'PLAN_DENIED'|'ROLLOUT'|'QUOTA';
   remaining: number|null;
   customerMessage?: string;
 }
@@ -29,6 +30,7 @@ export function decideEntitlement(e: Entitlement, c: EntitlementContext): Entitl
   if (e.mode==='off') return {allowed:false,readOnly:false,reason:'OFF',remaining:0,...message};
   if (e.mode==='maintenance') return {allowed:e.failSafe==='allow_read_only',readOnly:e.failSafe==='allow_read_only',reason:'MAINTENANCE',remaining:null,...message};
   if (e.mode==='admin_only'&&!c.isAdmin) return {allowed:false,readOnly:false,reason:'ADMIN_ONLY',remaining:0,...message};
+  if (e.mode==='beta'&&!c.isAdmin&&!c.betaEligible) return {allowed:false,readOnly:false,reason:'BETA_NOT_ELIGIBLE',remaining:0,...message};
   const access=c.plan==='free'?e.freeAccess:c.plan==='pro'?e.proAccess:e.businessAccess;
   if (!access) return {allowed:false,readOnly:false,reason:'PLAN_DENIED',remaining:0,...message};
   if (c.stableRolloutBucket<0||c.stableRolloutBucket>99||c.stableRolloutBucket>=e.rolloutPercent) return {allowed:false,readOnly:false,reason:'ROLLOUT',remaining:0,...message};
