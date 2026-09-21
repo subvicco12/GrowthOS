@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { AuditEvent } from './types';
 import { assertPermission, assertSameSite, type AuthorizationContext } from './authorization';
 import type { FeatureMode } from './types';
@@ -16,7 +17,7 @@ export interface TransactionalFeatureControlRepository extends FeatureControlRep
   transaction<T>(operation:(tx:FeatureControlTransaction)=>Promise<T>):Promise<T>;
 }
 function auditEvent(context:AuthorizationContext,change:FeatureControlChange,before:unknown,after:unknown):AuditEvent {
-  return {id:crypto.randomUUID(),actorId:context.actorId,siteId:change.siteId,action:'feature_control.changed',resourceType:'feature_control',resourceId:change.featureKey,before,after:{...(typeof after==='object'&&after?after as Record<string,unknown>:{value:after}),reason:change.reason},createdAt:new Date().toISOString()};
+  return {id:randomUUID(),actorId:context.actorId,siteId:change.siteId,action:'feature_control.changed',resourceType:'feature_control',resourceId:change.featureKey,before,after:{...(typeof after==='object'&&after?after as Record<string,unknown>:{value:after}),reason:change.reason},createdAt:new Date().toISOString()};
 }
 export async function changeFeatureControl(context:AuthorizationContext,change:FeatureControlChange,repository:TransactionalFeatureControlRepository):Promise<unknown> {
   assertPermission(context,'changeFeatureState'); assertSameSite(context,change.siteId);
