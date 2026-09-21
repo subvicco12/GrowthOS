@@ -5,6 +5,7 @@ import { changeFeatureControl } from '../control-plane';
 import { growthSites, growthWorkspaces } from '../portfolio';
 import { loadPortfolio } from '../site-registry';
 import { DatabaseSiteRegistryRepository } from '../site-registry-db';
+import { connectorEnvelopeSchema } from '../connector';
 import { decideFeatureAccess, decideOnEntitlementFailure } from '../feature-gates';
 import { chooseAiModel } from '../ai-router';
 import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignature, type NonceStore } from '../connector-security';
@@ -199,4 +200,11 @@ test('maintenance read-only fallback is honored by central feature gate', () => 
 test('connector signature verifier rejects malformed non-hex input without throwing', () => {
   assert.equal(verifyConnectorSignature('payload','😀'.repeat(32),'secret'),false);
   assert.equal(verifyConnectorSignature('payload','z'.repeat(64),'secret'),false);
+});
+
+test('connector envelope rejects oversized identifiers, malformed signatures and unknown fields', () => {
+  const base={siteId:'00000000-0000-4000-8000-000000000000',timestamp:new Date().toISOString(),nonce:'n'.repeat(16),requestId:'request1',signature:'a'.repeat(64)};
+  assert.equal(connectorEnvelopeSchema.safeParse({...base,nonce:'n'.repeat(129)}).success,false);
+  assert.equal(connectorEnvelopeSchema.safeParse({...base,signature:'z'.repeat(64)}).success,false);
+  assert.equal(connectorEnvelopeSchema.safeParse({...base,unexpected:true}).success,false);
 });
