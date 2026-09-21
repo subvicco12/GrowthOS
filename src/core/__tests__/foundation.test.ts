@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { hasMinimumRole } from '../authorization';
 import { changeFeatureControl } from '../control-plane';
+import { growthSites, growthWorkspaces } from '../portfolio';
 import { decideFeatureAccess, decideOnEntitlementFailure } from '../feature-gates';
 import { chooseAiModel } from '../ai-router';
 import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignature, type NonceStore } from '../connector-security';
@@ -138,4 +139,13 @@ test('authorized feature-control service writes then audits', async () => {
   const result=await changeFeatureControl({actorId:'owner',siteId:'site-a',role:'owner'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'Emergency disable'},repository,audit);
   assert.deepEqual(result,{mode:'off'});
   assert.deepEqual(sequence,['read','write','audit']);
+});
+
+test('portfolio registry contains six unique production domains and final workspaces', () => {
+  assert.equal(growthSites.length,6);
+  assert.equal(new Set(growthSites.map(site=>site.domain)).size,6);
+  assert.equal(growthWorkspaces.length,12);
+  assert.equal(new Set(growthWorkspaces.map(workspace=>workspace.key)).size,12);
+  assert.ok(growthWorkspaces.some(workspace=>workspace.key==='approvals'));
+  assert.ok(growthWorkspaces.some(workspace=>workspace.key==='engineering'));
 });
