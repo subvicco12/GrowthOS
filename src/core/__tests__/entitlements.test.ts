@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { decideEntitlement, stableRolloutBucket } from '../entitlements';
+import { applyEntitlementOverride, decideEntitlement, stableRolloutBucket } from '../entitlements';
 import type { Entitlement } from '../types';
 
 const base:Entitlement={siteId:'site-1',featureKey:'export',mode:'on',freeAccess:true,proAccess:true,businessAccess:true,quotaFree:5,quotaPro:50,quotaBusiness:null,rolloutPercent:100,emergencyKill:false,failSafe:'deny',updatedAt:new Date(0).toISOString()};
@@ -34,4 +34,18 @@ test('maintenance defaults closed and can explicitly fail safe read-only',()=>{
   assert.equal(decision.allowed,true);
   assert.equal(decision.readOnly,true);
   assert.equal(decision.customerMessage,'Temporarily read-only');
+});
+
+test('account override can change one tier without mutating defaults',()=>{
+  const overridden=applyEntitlementOverride(base,'pro',{accessOverride:false,quotaOverride:3});
+  assert.equal(overridden.freeAccess,true);
+  assert.equal(overridden.proAccess,false);
+  assert.equal(overridden.businessAccess,true);
+  assert.equal(overridden.quotaPro,3);
+  assert.equal(base.proAccess,true);
+});
+
+test('expired account override is ignored',()=>{
+  const overridden=applyEntitlementOverride(base,'pro',{accessOverride:false,expiresAt:'2020-01-01T00:00:00.000Z'},new Date('2026-01-01T00:00:00.000Z'));
+  assert.equal(overridden.proAccess,true);
 });
