@@ -27,18 +27,20 @@ create table public.environments (
   base_url text not null,
   is_production boolean not null default false,
   created_at timestamptz not null default now(),
-  unique(site_id,name)
+  unique(site_id,name),
+  unique(id,site_id)
 );
 
 create table public.connectors (
   id uuid primary key default gen_random_uuid(),
   site_id uuid not null references public.sites(id) on delete cascade,
-  environment_id uuid references public.environments(id) on delete cascade,
+  environment_id uuid,
   kind text not null,
   status text not null default 'needs_connection' check (status in ('needs_connection','connected','degraded','disabled')),
   secret_fingerprint text,
   last_seen_at timestamptz,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  foreign key (environment_id,site_id) references public.environments(id,site_id) on delete cascade
 );
 
 create table public.plans (
