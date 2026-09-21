@@ -13,7 +13,7 @@ export class PostgresJobStore {
     const {rows}=await this.db.query<JobRow>(`
       with candidate as (
         select id from public.jobs
-        where (status='queued' and run_after<=now())
+        where (status='queued' and run_after<=now() and attempts<max_attempts)
            or (status='running' and locked_until<now() and attempts<max_attempts)
         order by run_after,created_at
         for update skip locked limit 1
@@ -36,7 +36,8 @@ export class PostgresJobStore {
     if(rows.length!==1) throw new Error('JOB_LEASE_LOST');
   }
   async extendLease(jobId:string,workerId:string,leaseSeconds:number):Promise<boolean>{
-    const {rows}=await this.db.query<{id:string}>(`update public.jobs set locked_until=now()+($3 * interval '1 second'),updated_at=now() where id=$1 and status='running' and locked_by=$2 returning id`,[jobId,workerId,leaseSeconds]);
+    if(!workerId.trim()||!Number.isSafeInteger(leaseSeconds)||leaseSeconds<1||leaseSeconds>3600) return false;
+    const {rows}=await this.db.query<{id:string}>(`update public.jobs set locked_until=now()+($3 * interval '1 second'),updated_at=now() where id=$1 and status='running' and locked_by=$2 and locked_until>=now() returning id`,[jobId,workerId,leaseSeconds]);
     return rows.length===1;
   }
 }
