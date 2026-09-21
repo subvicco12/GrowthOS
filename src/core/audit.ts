@@ -30,6 +30,7 @@ export async function recordFeatureChange(sink: AuditSink, input: FeatureChangeA
     action: 'feature_control.changed',
     resourceType: 'feature_control',
     resourceId: input.featureKey,
+    reason: input.reason,
     before: input.before,
     after: {...(typeof input.after === 'object' && input.after ? input.after as Record<string,unknown> : {value:input.after}), reason:input.reason},
   });
