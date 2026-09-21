@@ -50,6 +50,7 @@ export interface AuditEvent {
   action: string;
   resourceType: string;
   resourceId?: string;
+  reason?: string;
   before?: unknown;
   after?: unknown;
   createdAt: string;
