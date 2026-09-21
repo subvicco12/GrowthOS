@@ -136,3 +136,46 @@ revoke all on public.organizations, public.organization_members, public.environm
 grant select on public.organizations, public.organization_members, public.environments, public.connectors, public.plans, public.entitlements, public.recommendations, public.approvals to authenticated;
 -- connector_nonces is deliberately service-only.
 revoke all on public.connector_nonces from anon, authenticated;
+
+
+-- GrowthOS account-level entitlement overrides.
+-- Optional per-account controls can tighten or expand a site's default entitlement.
+-- Mutations remain server-authorized and audited.
+
+create table public.entitlement_overrides (
+  id uuid primary key default gen_random_uuid(),
+  site_id uuid not null references public.sites(id) on delete cascade,
+  account_id uuid not null references auth.users(id) on delete cascade,
+  feature_key text not null,
+  mode public.growthos_feature_mode,
+  access_override boolean,
+  quota_override bigint check (quota_override is null or quota_override >= 0),
+  expires_at timestamptz,
+  reason text,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  unique(site_id,account_id,feature_key)
+);
+
+alter table public.entitlement_overrides enable row level security;
+
+create policy "site members read entitlement overrides" on public.entitlement_overrides for select to authenticated
+using (
+  account_id=(select auth.uid())
+  or exists (
+    select 1 from public.site_members m
+    where m.site_id=entitlement_overrides.site_id
+      and m.user_id=(select auth.uid())
+      and m.role in ('owner','admin')
+  )
+);
+
+revoke all on public.entitlement_overrides from anon, authenticated;
+grant select on public.entitlement_overrides to authenticated;
+
+create index entitlement_overrides_account_site_idx
+  on public.entitlement_overrides(account_id,site_id);
+
+create index entitlement_overrides_expiry_idx
+  on public.entitlement_overrides(expires_at)
+  where expires_at is not null;
