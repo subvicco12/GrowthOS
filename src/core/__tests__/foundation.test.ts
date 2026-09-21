@@ -250,3 +250,11 @@ test('job runner heartbeats renewable leases during work', async()=>{
   const runner=new JobRunner(store,{work:async()=>{await new Promise(resolve=>setTimeout(resolve,25));return 'ok';}},{leaseSeconds:1,heartbeatMs:5,timeoutMs:100});
   assert.equal(await runner.runOne('worker-1'),'succeeded'); assert.ok(extensions>=1);
 });
+
+test('job runner binds completion to claiming worker id', async()=>{
+  let succeededBy=''; let failedBy='';
+  const successStore={claim:async()=>({id:'job-owner',type:'ok',status:'running' as const,idempotencyKey:'idem-owner',attempts:0,maxAttempts:2,createdAt:new Date(0).toISOString()}),succeed:async(_id:string,_result:unknown,workerId?:string)=>{succeededBy=workerId??'';},fail:async()=>{}};
+  assert.equal(await new JobRunner(successStore,{ok:async()=>true}).runOne('worker-owner'),'succeeded'); assert.equal(succeededBy,'worker-owner');
+  const failStore={claim:async()=>({id:'job-owner-fail',type:'bad',status:'running' as const,idempotencyKey:'idem-owner-fail',attempts:1,maxAttempts:2,createdAt:new Date(0).toISOString()}),succeed:async()=>{},fail:async(_id:string,_error:string,_retry?:Date,workerId?:string)=>{failedBy=workerId??'';}};
+  assert.equal(await new JobRunner(failStore,{bad:async()=>{throw new PermanentJobError('bad');}}).runOne('worker-fail'),'failed'); assert.equal(failedBy,'worker-fail');
+});
