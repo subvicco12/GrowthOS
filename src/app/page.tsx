@@ -1,26 +1,6 @@
-const sites = [
-  { name: 'BarcodeQRHub', domain: 'barcodeqrhub.com', status: 'Ready to connect' },
-  { name: 'PriceInsight360', domain: 'priceinsight360.com', status: 'Ready to connect' },
-  { name: 'BusinessStartTools', domain: 'businessstarttools.com', status: 'Ready to connect' },
-  { name: 'AI Tool Stores', domain: 'aitoolstores.com', status: 'Ready to connect' },
-  { name: 'PDF Image Tools', domain: 'pdfimagetools.online', status: 'Ready to connect' },
-  { name: 'CalcuMint', domain: 'calcumint.com', status: 'Ready to connect' },
-] as const;
+import { growthSites as sites, growthWorkspaces } from '../core/portfolio';
 
-const workspaces = [
-  'Portfolio',
-  'Website Overview',
-  'Features',
-  'Competitors',
-  'Plans',
-  'QA',
-  'SEO',
-  'Growth',
-  'Revenue',
-  'Engineering',
-  'Approvals',
-  'Settings',
-] as const;
+const workspaces = growthWorkspaces.map(workspace => workspace.label);
 
 export default function Dashboard() {
   return (
