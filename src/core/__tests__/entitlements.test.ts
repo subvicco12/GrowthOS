@@ -49,3 +49,9 @@ test('expired account override is ignored',()=>{
   const overridden=applyEntitlementOverride(base,'pro',{accessOverride:false,expiresAt:'2020-01-01T00:00:00.000Z'},new Date('2026-01-01T00:00:00.000Z'));
   assert.equal(overridden.proAccess,true);
 });
+
+test('invalid override expiry and quota fail closed to base entitlement',()=>{
+  assert.equal(applyEntitlementOverride(base,'pro',{accessOverride:false,expiresAt:'not-a-date'}).proAccess,true);
+  assert.equal(applyEntitlementOverride(base,'pro',{quotaOverride:-1}).quotaPro,base.quotaPro);
+  assert.equal(applyEntitlementOverride(base,'pro',{quotaOverride:1.5}).quotaPro,base.quotaPro);
+});
