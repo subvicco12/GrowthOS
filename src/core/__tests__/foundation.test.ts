@@ -276,3 +276,11 @@ test('connector authentication rejects weak secrets oversized bodies and future 
   await assert.rejects(()=>authenticateConnector({...base,timestamp:new Date().toISOString(),signature},'x'.repeat(1_048_577),secret,nonces),/CONNECTOR_BODY_TOO_LARGE/);
   assert.equal(consumed,0);
 });
+
+test('transactional feature audit redacts sensitive values while preserving reason', async()=>{
+  let event:any;
+  const repo={get:async()=>({apiKey:'before-secret'}),set:async()=>({token:'after-secret',mode:'off'}),transaction:async(operation:any)=>operation({get:async()=>({apiKey:'before-secret'}),set:async()=>({token:'after-secret',mode:'off'}),appendAudit:async(e:any)=>{event=e;}})};
+  const context={actorId:'11111111-1111-4111-8111-111111111111',siteId:'22222222-2222-4222-8222-222222222222',role:'owner' as const};
+  await changeFeatureControl(context,{siteId:context.siteId,featureKey:'exports',mode:'off',reason:'security response'},repo);
+  assert.equal(event.before.apiKey,'[REDACTED]'); assert.equal(event.after.token,'[REDACTED]'); assert.equal(event.reason,'security response'); assert.equal(event.after.reason,'security response');
+});
