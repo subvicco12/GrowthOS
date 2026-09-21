@@ -325,3 +325,15 @@ test('opportunity ranking clamps invalid scoring inputs and never creates negati
  const {rankOpportunity}=await import('../opportunities'); const row=rankOpportunity({siteId:'s',category:'qa',title:'x',evidence:[],impact:99,confidence:0,effort:-2,recurringCostUsd:-50,risk:99});
  assert.equal(row.impact,5); assert.equal(row.confidence,1); assert.equal(row.effort,1); assert.equal(row.risk,5); assert.equal(row.recurringCostUsd,0); assert.equal(row.approvalClass,'red');
 });
+
+test('recommendation execution enforces green amber and red approval policy', async()=>{
+ const {executionFor}=await import('../recommendations'); const base={id:'r1',siteId:'s1',category:'qa',title:'Run QA',evidence:['x'],impact:3,confidence:4,effort:1,recurringCostUsd:0,risk:1,score:6,createdAt:'2026-01-01T00:00:00Z'};
+ assert.equal(executionFor({...base,approvalClass:'green',status:'proposed'} as any).jobType,'recommendation.qa');
+ assert.throws(()=>executionFor({...base,approvalClass:'amber',status:'proposed'} as any),/RECOMMENDATION_APPROVAL_REQUIRED/);
+ assert.throws(()=>executionFor({...base,approvalClass:'red',status:'proposed'} as any),/RECOMMENDATION_APPROVAL_REQUIRED/);
+ assert.equal(executionFor({...base,approvalClass:'red',status:'approved'} as any).payload.approvalClass,'red');
+});
+
+test('recommendation lifecycle blocks unsafe or duplicate state transitions', async()=>{
+ const {assertApprovalTransition}=await import('../recommendations'); assert.doesNotThrow(()=>assertApprovalTransition('proposed','approved')); assert.doesNotThrow(()=>assertApprovalTransition('approved','implemented')); assert.doesNotThrow(()=>assertApprovalTransition('implemented','verified')); assert.throws(()=>assertApprovalTransition('proposed','implemented'),/INVALID_RECOMMENDATION_TRANSITION/); assert.throws(()=>assertApprovalTransition('verified','approved'),/INVALID_RECOMMENDATION_TRANSITION/);
+});
