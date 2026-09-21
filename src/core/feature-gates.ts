@@ -3,7 +3,7 @@ import { hasMinimumRole } from './authorization';
 
 export interface FeatureDecisionInput {
   role: UserRole; requiredRole: UserRole; siteStatus: SiteStatus; plan: PlanCode;
-  entitlement: Entitlement; usage?: number; rolloutBucket?: number; readOnlyRequest?: boolean;
+  entitlement: Entitlement; usage?: number; rolloutBucket?: number; readOnlyRequest?: boolean; betaEligible?: boolean;
 }
 export interface FeatureDecision { allowed:boolean; reason?:string; customerMessage?:string; }
 function planAllowed(plan:PlanCode,e:Entitlement){return plan==='free'?e.freeAccess:plan==='pro'?e.proAccess:e.businessAccess;}
@@ -22,6 +22,7 @@ export function decideFeatureAccess(input:FeatureDecisionInput):FeatureDecision 
     return {allowed:false,reason:'FEATURE_MAINTENANCE',customerMessage:e.customerMessage};
   }
   if(e.mode==='admin_only'&&!hasMinimumRole(input.role,'admin')) return {allowed:false,reason:'ADMIN_ONLY'};
+  if(e.mode==='beta'&&!hasMinimumRole(input.role,'admin')&&!input.betaEligible) return {allowed:false,reason:'BETA_NOT_ELIGIBLE',customerMessage:e.customerMessage};
   if(!planAllowed(input.plan,e)) return {allowed:false,reason:'PLAN_NOT_ENTITLED'};
 
   if(e.rolloutPercent>0 && e.rolloutPercent<100 && input.rolloutBucket==null) return {allowed:false,reason:'ROLLOUT_BUCKET_REQUIRED'};
