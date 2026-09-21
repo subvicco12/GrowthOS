@@ -184,3 +184,19 @@ test('database registry adapter normalizes site records', async () => {
   assert.equal(sites[0].name,'Example');
   assert.equal(sites[0].domain,'example.com');
 });
+
+test('feature gate fails closed when finite quota usage or partial rollout bucket is missing', () => {
+  const e={siteId:'s',featureKey:'f',mode:'on' as const,freeAccess:true,proAccess:true,businessAccess:true,quotaFree:5,rolloutPercent:50,emergencyKill:false,failSafe:'deny' as const,updatedAt:new Date().toISOString()};
+  assert.equal(decideFeatureAccess({role:'viewer',requiredRole:'viewer',siteStatus:'active',plan:'free',entitlement:e,rolloutBucket:1}).reason,'USAGE_REQUIRED');
+  assert.equal(decideFeatureAccess({role:'viewer',requiredRole:'viewer',siteStatus:'active',plan:'free',entitlement:e,usage:0}).reason,'ROLLOUT_BUCKET_REQUIRED');
+});
+
+test('maintenance read-only fallback is honored by central feature gate', () => {
+  const e={siteId:'s',featureKey:'f',mode:'maintenance' as const,freeAccess:true,proAccess:true,businessAccess:true,rolloutPercent:100,emergencyKill:false,failSafe:'allow_read_only' as const,updatedAt:new Date().toISOString()};
+  assert.equal(decideFeatureAccess({role:'viewer',requiredRole:'viewer',siteStatus:'active',plan:'free',entitlement:e,readOnlyRequest:true}).allowed,true);
+});
+
+test('connector signature verifier rejects malformed non-hex input without throwing', () => {
+  assert.equal(verifyConnectorSignature('payload','😀'.repeat(32),'secret'),false);
+  assert.equal(verifyConnectorSignature('payload','z'.repeat(64),'secret'),false);
+});
