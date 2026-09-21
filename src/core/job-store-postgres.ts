@@ -26,13 +26,13 @@ export class PostgresJobStore {
   }
   async succeed(jobId:string,result:unknown,workerId?:string):Promise<void>{
     const ownership=workerId?' and locked_by=$3':'';
-    const {rows}=await this.db.query<{id:string}>(`update public.jobs set status='succeeded',result=$2::jsonb,locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'${ownership} returning id`,workerId?[jobId,JSON.stringify(result??null),workerId]:[jobId,JSON.stringify(result??null)]);
+    const {rows}=await this.db.query<{id:string}>(`update public.jobs set status='succeeded',result=$2::jsonb,last_error=null,locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'${ownership} returning id`,workerId?[jobId,JSON.stringify(result??null),workerId]:[jobId,JSON.stringify(result??null)]);
     if(rows.length!==1) throw new Error('JOB_LEASE_LOST');
   }
   async fail(jobId:string,error:string,retryAt?:Date,workerId?:string):Promise<void>{
     const status=retryAt?'queued':'failed'; const ownership=workerId?' and locked_by=$5':'';
     const params=workerId?[jobId,status,error,retryAt?.toISOString()??null,workerId]:[jobId,status,error,retryAt?.toISOString()??null];
-    const {rows}=await this.db.query<{id:string}>(`update public.jobs set status=$2::public.job_status,result=jsonb_build_object('error',$3::text),run_after=coalesce($4::timestamptz,run_after),locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'${ownership} returning id`,params);
+    const {rows}=await this.db.query<{id:string}>(`update public.jobs set status=$2::public.job_status,result=null,last_error=$3::text,run_after=coalesce($4::timestamptz,run_after),locked_by=null,locked_until=null,updated_at=now() where id=$1 and status='running'${ownership} returning id`,params);
     if(rows.length!==1) throw new Error('JOB_LEASE_LOST');
   }
   async extendLease(jobId:string,workerId:string,leaseSeconds:number):Promise<boolean>{
