@@ -51,7 +51,11 @@ export function applyEntitlementOverride(
   now = new Date(),
 ): Entitlement {
   if (!override) return base;
-  if (override.expiresAt && Date.parse(override.expiresAt) <= now.getTime()) return base;
+  if (override.expiresAt) {
+    const expiresAt = Date.parse(override.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= now.getTime()) return base;
+  }
+  if (override.quotaOverride !== undefined && override.quotaOverride !== null && (!Number.isSafeInteger(override.quotaOverride) || override.quotaOverride < 0)) return base;
 
   const next: Entitlement = {
     ...base,
