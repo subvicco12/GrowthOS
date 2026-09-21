@@ -6,6 +6,7 @@ import { chooseAiModel } from '../ai-router';
 import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignature, type NonceStore } from '../connector-security';
 import { createHmac } from 'node:crypto';
 import type { Entitlement } from '../types';
+import { recordFeatureChange, type AuditSink } from '../audit';
 
 const entitlement: Entitlement = {
   siteId: 'site',
@@ -104,4 +105,17 @@ test('job retry uses bounded exponential backoff before max attempts', async () 
   assert.ok(retryAt);
   const delay=retryAt!.getTime()-before;
   assert.ok(delay>=119000&&delay<=121000);
+});
+
+test('feature changes require a reason and redact sensitive before/after values', async () => {
+  const events:unknown[]=[];
+  const sink:AuditSink={append:async event=>{events.push(event);}};
+  await assert.rejects(()=>recordFeatureChange(sink,{siteId:'site',featureKey:'export',reason:'   ',before:{mode:'on'},after:{mode:'off'}}),/FEATURE_CHANGE_REASON_REQUIRED/);
+  await recordFeatureChange(sink,{actorId:'actor',siteId:'site',featureKey:'export',reason:'Emergency disable',before:{mode:'on',apiKey:'secret-value'},after:{mode:'off',token:'secret-token'}});
+  const event=events[0] as {action:string;resourceId:string;before:Record<string,unknown>;after:Record<string,unknown>};
+  assert.equal(event.action,'feature_control.changed');
+  assert.equal(event.resourceId,'export');
+  assert.equal(event.before.apiKey,'[REDACTED]');
+  assert.equal(event.after.token,'[REDACTED]');
+  assert.equal(event.after.reason,'Emergency disable');
 });
