@@ -53,16 +53,18 @@ create table public.jobs (
   result jsonb,
   idempotency_key text not null unique,
   attempts integer not null default 0,
-  max_attempts integer not null default 3,
+  max_attempts integer not null default 3 check (max_attempts between 1 and 100),
   run_after timestamptz not null default now(),
   locked_by text,
   locked_until timestamptz,
+  last_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index jobs_claim_idx on public.jobs(status,run_after,locked_until);
 create index jobs_lease_idx on public.jobs(locked_until) where status='running';
+create index jobs_site_status_idx on public.jobs(site_id,status,run_after);
 
 create table public.audit_events (
   id uuid primary key default gen_random_uuid(),
