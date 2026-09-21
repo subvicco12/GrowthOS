@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { hasMinimumRole } from '../authorization';
+import { changeFeatureControl } from '../control-plane';
 import { decideFeatureAccess, decideOnEntitlementFailure } from '../feature-gates';
 import { chooseAiModel } from '../ai-router';
 import { authenticateConnector, canonicalConnectorPayload, verifyConnectorSignature, type NonceStore } from '../connector-security';
@@ -118,4 +119,23 @@ test('feature changes require a reason and redact sensitive before/after values'
   assert.equal(event.before.apiKey,'[REDACTED]');
   assert.equal(event.after.token,'[REDACTED]');
   assert.equal(event.after.reason,'Emergency disable');
+});
+
+test('feature-control service denies cross-site and underprivileged mutations', async () => {
+  const repository={get:async()=>({mode:'on'}),set:async()=>({mode:'off'})};
+  const audit:AuditSink={append:async()=>{}};
+  await assert.rejects(()=>changeFeatureControl({actorId:'user',siteId:'site-a',role:'operator'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'test'},repository,audit),/FORBIDDEN/);
+  await assert.rejects(()=>changeFeatureControl({actorId:'user',siteId:'site-a',role:'admin'},{siteId:'site-b',featureKey:'export',mode:'off',reason:'test'},repository,audit),/CROSS_SITE_ACCESS_DENIED/);
+});
+
+test('authorized feature-control service writes then audits', async () => {
+  const sequence:string[]=[];
+  const repository={
+    get:async()=>{sequence.push('read');return {mode:'on'};},
+    set:async()=>{sequence.push('write');return {mode:'off'};},
+  };
+  const audit:AuditSink={append:async()=>{sequence.push('audit');}};
+  const result=await changeFeatureControl({actorId:'owner',siteId:'site-a',role:'owner'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'Emergency disable'},repository,audit);
+  assert.deepEqual(result,{mode:'off'});
+  assert.deepEqual(sequence,['read','write','audit']);
 });
