@@ -127,22 +127,24 @@ test('feature changes require a reason and redact sensitive before/after values'
 });
 
 test('feature-control service denies cross-site and underprivileged mutations', async () => {
-  const repository={get:async()=>({mode:'on'}),set:async()=>({mode:'off'})};
-  const audit:AuditSink={append:async()=>{}};
-  await assert.rejects(()=>changeFeatureControl({actorId:'user',siteId:'site-a',role:'operator'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'test'},repository,audit),/FORBIDDEN/);
-  await assert.rejects(()=>changeFeatureControl({actorId:'user',siteId:'site-a',role:'admin'},{siteId:'site-b',featureKey:'export',mode:'off',reason:'test'},repository,audit),/CROSS_SITE_ACCESS_DENIED/);
+  const repository={get:async()=>({mode:'on'}),set:async()=>({mode:'off'}),transaction:async(operation:any)=>operation({get:async()=>({mode:'on'}),set:async()=>({mode:'off'}),appendAudit:async()=>{}})};
+  await assert.rejects(()=>changeFeatureControl({actorId:'user',siteId:'site-a',role:'operator'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'test'},repository),/FORBIDDEN/);
+  await assert.rejects(()=>changeFeatureControl({actorId:'user',siteId:'site-a',role:'admin'},{siteId:'site-b',featureKey:'export',mode:'off',reason:'test'},repository),/CROSS_SITE_ACCESS_DENIED/);
 });
 
-test('authorized feature-control service writes then audits', async () => {
+test('authorized feature-control mutation and audit share one transaction', async () => {
   const sequence:string[]=[];
   const repository={
-    get:async()=>{sequence.push('read');return {mode:'on'};},
-    set:async()=>{sequence.push('write');return {mode:'off'};},
+    get:async()=>({mode:'on'}),set:async()=>({mode:'off'}),
+    transaction:async(operation:any)=>{sequence.push('begin');const result=await operation({
+      get:async()=>{sequence.push('read');return {mode:'on'};},
+      set:async()=>{sequence.push('write');return {mode:'off'};},
+      appendAudit:async()=>{sequence.push('audit');},
+    });sequence.push('commit');return result;},
   };
-  const audit:AuditSink={append:async()=>{sequence.push('audit');}};
-  const result=await changeFeatureControl({actorId:'owner',siteId:'site-a',role:'owner'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'Emergency disable'},repository,audit);
+  const result=await changeFeatureControl({actorId:'owner',siteId:'site-a',role:'owner'},{siteId:'site-a',featureKey:'export',mode:'off',reason:'Emergency disable'},repository);
   assert.deepEqual(result,{mode:'off'});
-  assert.deepEqual(sequence,['read','write','audit']);
+  assert.deepEqual(sequence,['begin','read','write','audit','commit']);
 });
 
 test('portfolio registry contains six unique production domains and final workspaces', () => {
