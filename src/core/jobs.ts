@@ -26,9 +26,11 @@ export class JobRunner {
     const timeoutMs=this.options.timeoutMs ?? 90_000;
     const timeout=setTimeout(()=>controller.abort(new Error('JOB_TIMEOUT')),timeoutMs);
     const heartbeatMs=this.options.heartbeatMs ?? Math.max(5_000,Math.floor(leaseSeconds*1000/3));
-    const heartbeat=this.store.extendLease?setInterval(()=>{void this.store.extendLease!(job.id,workerId,leaseSeconds).catch(()=>false);},heartbeatMs):undefined;
+    let leaseLost=false;
+    const heartbeat=this.store.extendLease?setInterval(()=>{void this.store.extendLease!(job.id,workerId,leaseSeconds).then(ok=>{if(!ok){leaseLost=true;controller.abort(new Error('JOB_LEASE_LOST'));}}).catch(()=>{leaseLost=true;controller.abort(new Error('JOB_LEASE_LOST'));});},heartbeatMs):undefined;
     try {
       const result=await Promise.race([handler(job,controller.signal),new Promise<never>((_,reject)=>controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true}))]);
+      if(leaseLost) throw new PermanentJobError('JOB_LEASE_LOST');
       await this.store.succeed(job.id,result,workerId);return'succeeded';
     }
     catch(error){
