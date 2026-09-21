@@ -1,6 +1,8 @@
 export type SiteStatus = 'active' | 'paused' | 'maintenance' | 'disconnected';
 export type UserRole = 'owner' | 'admin' | 'operator' | 'analyst' | 'viewer';
-export type FeatureState = 'enabled' | 'disabled' | 'maintenance';
+export type PlanCode = 'free' | 'pro' | 'business';
+export type FeatureMode = 'on' | 'off' | 'maintenance' | 'beta' | 'admin_only';
+export type FailSafeMode = 'deny' | 'allow_read_only';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface Site {
@@ -13,19 +15,37 @@ export interface Site {
   lastSeenAt?: string;
 }
 
+export interface Entitlement {
+  siteId: string;
+  featureKey: string;
+  mode: FeatureMode;
+  freeAccess: boolean;
+  proAccess: boolean;
+  businessAccess: boolean;
+  quotaFree?: number | null;
+  quotaPro?: number | null;
+  quotaBusiness?: number | null;
+  rolloutPercent: number;
+  emergencyKill: boolean;
+  customerMessage?: string;
+  failSafe: FailSafeMode;
+  updatedAt: string;
+}
+
 export interface FeatureControl {
   id: string;
   siteId: string;
   featureKey: string;
-  state: FeatureState;
+  mode: FeatureMode;
   reason?: string;
-  updatedBy: string;
+  customerMessage?: string;
+  updatedBy?: string;
   updatedAt: string;
 }
 
 export interface AuditEvent {
   id: string;
-  actorId: string;
+  actorId?: string;
   siteId?: string;
   action: string;
   resourceType: string;
