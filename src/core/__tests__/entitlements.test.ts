@@ -1,8 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { decideEntitlement, type Entitlement } from '../entitlements';
+import { decideEntitlement, stableRolloutBucket } from '../entitlements';
+import type { Entitlement } from '../types';
 
-const base:Entitlement={mode:'on',freeAccess:true,proAccess:true,businessAccess:true,quotaFree:5,quotaPro:50,quotaBusiness:null,rolloutPercent:100,emergencyKill:false,failSafe:'deny'};
+const base:Entitlement={siteId:'site-1',featureKey:'export',mode:'on',freeAccess:true,proAccess:true,businessAccess:true,quotaFree:5,quotaPro:50,quotaBusiness:null,rolloutPercent:100,emergencyKill:false,failSafe:'deny',updatedAt:new Date(0).toISOString()};
 
 test('emergency kill switch overrides every tier',()=>{
   assert.equal(decideEntitlement({...base,emergencyKill:true},{plan:'business',isAdmin:true,stableRolloutBucket:0,usage:0}).reason,'KILL_SWITCH');
@@ -17,11 +18,20 @@ test('quota is enforced and business can be unlimited',()=>{
   assert.equal(decideEntitlement(base,{plan:'business',isAdmin:false,stableRolloutBucket:0,usage:5000}).allowed,true);
 });
 
-test('percentage rollout uses stable bucket',()=>{
-  assert.equal(decideEntitlement({...base,rolloutPercent:10},{plan:'pro',isAdmin:false,stableRolloutBucket:10,usage:0}).reason,'ROLLOUT');
-  assert.equal(decideEntitlement({...base,rolloutPercent:10},{plan:'pro',isAdmin:false,stableRolloutBucket:9,usage:0}).allowed,true);
+test('percentage rollout uses deterministic stable bucket',()=>{
+  const first=stableRolloutBucket('account-123',base.siteId,base.featureKey);
+  const second=stableRolloutBucket('account-123',base.siteId,base.featureKey);
+  const otherFeature=stableRolloutBucket('account-123',base.siteId,'other-feature');
+  assert.equal(first,second);
+  assert.ok(first>=0&&first<=99);
+  assert.ok(otherFeature>=0&&otherFeature<=99);
+  assert.equal(decideEntitlement({...base,rolloutPercent:first},{plan:'pro',isAdmin:false,stableRolloutBucket:first,usage:0}).reason,'ROLLOUT');
 });
 
-test('maintenance defaults closed',()=>{
+test('maintenance defaults closed and can explicitly fail safe read-only',()=>{
   assert.equal(decideEntitlement({...base,mode:'maintenance'},{plan:'pro',isAdmin:false,stableRolloutBucket:0,usage:0}).allowed,false);
+  const decision=decideEntitlement({...base,mode:'maintenance',failSafe:'allow_read_only',customerMessage:'Temporarily read-only'},{plan:'pro',isAdmin:false,stableRolloutBucket:0,usage:0});
+  assert.equal(decision.allowed,true);
+  assert.equal(decision.readOnly,true);
+  assert.equal(decision.customerMessage,'Temporarily read-only');
 });
