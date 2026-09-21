@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { AuditEvent } from './types';
 
 export interface AuditSink { append(event: AuditEvent): Promise<void>; }
@@ -5,8 +6,32 @@ export interface AuditSink { append(event: AuditEvent): Promise<void>; }
 export async function recordAudit(sink: AuditSink, event: Omit<AuditEvent,'id'|'createdAt'>): Promise<void> {
   await sink.append({
     ...event,
-    id: crypto.randomUUID(),
+    before: redactAuditValue(event.before),
+    after: redactAuditValue(event.after),
+    id: randomUUID(),
     createdAt: new Date().toISOString(),
+  });
+}
+
+export interface FeatureChangeAuditInput {
+  actorId?: string;
+  siteId: string;
+  featureKey: string;
+  reason: string;
+  before: unknown;
+  after: unknown;
+}
+
+export async function recordFeatureChange(sink: AuditSink, input: FeatureChangeAuditInput): Promise<void> {
+  if (!input.reason.trim()) throw new Error('FEATURE_CHANGE_REASON_REQUIRED');
+  await recordAudit(sink, {
+    actorId: input.actorId,
+    siteId: input.siteId,
+    action: 'feature_control.changed',
+    resourceType: 'feature_control',
+    resourceId: input.featureKey,
+    before: input.before,
+    after: {...(typeof input.after === 'object' && input.after ? input.after as Record<string,unknown> : {value:input.after}), reason:input.reason},
   });
 }
 
