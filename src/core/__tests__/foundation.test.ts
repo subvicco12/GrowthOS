@@ -313,3 +313,15 @@ test('competitor intelligence requires package evidence and valid similarity', a
  const issues=validateCompetitor({name:'x',domain:'x.test',similarity:2,evidence:[],inventory:{product:'x',capturedAt:'2026-01-01T00:00:00Z',features:[]}} as any);
  assert.deepEqual(issues,['INVALID_SIMILARITY','EVIDENCE_REQUIRED','PACKAGE_EVIDENCE_URL_REQUIRED']);
 });
+
+test('opportunity ranking converts package gaps into approval-gated recommendations', async()=>{
+ const {packageGapsToOpportunities,rankOpportunity}=await import('../opportunities');
+ const gaps=[{featureKey:'bulk',featureName:'Bulk Export',competitors:3,ours:{free:false,pro:false,business:false},competitorPlans:['pro','business'],opportunity:'business_upgrade'}];
+ const rows=packageGapsToOpportunities('site-1',gaps as any); assert.equal(rows.length,1); assert.equal(rows[0].approvalClass,'amber'); assert.equal(rows[0].category,'packaging'); assert.equal(rows[0].evidence.length,2); assert.ok(rows[0].score>0);
+ const revenue=rankOpportunity({siteId:'site-1',category:'revenue',title:'Change pricing',evidence:['approved research'],impact:5,confidence:5,effort:1,recurringCostUsd:0,risk:3}); assert.equal(revenue.approvalClass,'red');
+});
+
+test('opportunity ranking clamps invalid scoring inputs and never creates negative cost', async()=>{
+ const {rankOpportunity}=await import('../opportunities'); const row=rankOpportunity({siteId:'s',category:'qa',title:'x',evidence:[],impact:99,confidence:0,effort:-2,recurringCostUsd:-50,risk:99});
+ assert.equal(row.impact,5); assert.equal(row.confidence,1); assert.equal(row.effort,1); assert.equal(row.risk,5); assert.equal(row.recurringCostUsd,0); assert.equal(row.approvalClass,'red');
+});
