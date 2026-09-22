@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/executions',['methods'=>'GET','callback'=>[self::class,'executions'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/execution-queue',['methods'=>'GET','callback'=>[self::class,'execution_queue'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/portfolio-actions',['methods'=>'GET','callback'=>[self::class,'portfolio_actions'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/portfolio-health',['methods'=>'GET','callback'=>[self::class,'portfolio_health'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -67,6 +68,9 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function executions(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$p=$wpdb->prefix.'growthos_';$site=(int)$request->get_param('site_id');$where=$site?$wpdb->prepare("WHERE e.site_id=%d",$site):'';$rows=$wpdb->get_results("SELECT e.*,r.title,r.category,r.score,s.name site_name,s.domain FROM {$p}executions e JOIN {$p}recommendations r ON r.id=e.recommendation_id JOIN {$p}sites s ON s.id=e.site_id $where ORDER BY e.updated_at DESC,e.id DESC LIMIT 100",ARRAY_A);return new WP_REST_Response(['items'=>$rows,'count'=>count($rows)],200);
  }
  public static function execution_queue(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$p=$wpdb->prefix.'growthos_';$rows=$wpdb->get_results("SELECT r.id,r.site_id,r.category,r.title,r.score,r.approval_class,r.status,s.name site_name,s.domain,(SELECT a.decision FROM {$p}approvals a WHERE a.recommendation_id=r.id ORDER BY a.id DESC LIMIT 1) decision,(SELECT a.created_at FROM {$p}approvals a WHERE a.recommendation_id=r.id ORDER BY a.id DESC LIMIT 1) decided_at FROM {$p}recommendations r JOIN {$p}sites s ON s.id=r.site_id WHERE r.status='approved' ORDER BY r.score DESC,r.id DESC LIMIT 50",ARRAY_A);return new WP_REST_Response(['items'=>$rows,'count'=>count($rows)],200);
