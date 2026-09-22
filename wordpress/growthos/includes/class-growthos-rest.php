@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/health-score',['methods'=>'GET','callback'=>[self::class,'health_score'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/discoveries',['methods'=>'GET','callback'=>[self::class,'discoveries'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/audit',['methods'=>'GET','callback'=>[self::class,'audit'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/jobs',['methods'=>'GET','callback'=>[self::class,'jobs'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -47,6 +48,15 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function health_score(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
+  $d=$wpdb->prefix.'growthos_discoveries';$r=$wpdb->prefix.'growthos_recommendations';
+  $pages=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT url) FROM $d WHERE site_id=%d",$site));
+  $rows=$wpdb->get_results($wpdb->prepare("SELECT category,score FROM $r WHERE site_id=%d AND status='proposed' AND category IN ('seo','qa')",$site),ARRAY_A);
+  $pen=['seo'=>0,'qa'=>0];$cnt=['seo'=>0,'qa'=>0];foreach($rows as $x){$k=$x['category'];$pen[$k]+=min(25,max(1,(float)$x['score']/10));$cnt[$k]++;}
+  $seo=max(0,round(100-min(100,$pen['seo'])));$qa=max(0,round(100-min(100,$pen['qa'])));$overall=round(($seo+$qa)/2);
+  return new WP_REST_Response(['site_id'=>$site,'pages'=>$pages,'scores'=>['overall'=>$overall,'seo'=>$seo,'qa'=>$qa],'open_findings'=>$cnt],200);
  }
  public static function discoveries(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
