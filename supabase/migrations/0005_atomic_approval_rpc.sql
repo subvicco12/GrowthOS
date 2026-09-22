@@ -18,6 +18,7 @@ begin
   if p_actor_id is null or p_idempotency_key is null or btrim(p_idempotency_key)='' then raise exception 'APPROVAL_INPUT_INVALID'; end if;
   if p_decision not in ('approved','rejected','deferred') then raise exception 'APPROVAL_DECISION_INVALID'; end if;
   if not exists (select 1 from public.profiles where id=p_actor_id and role in ('owner','admin')) then raise exception 'APPROVAL_ACTOR_FORBIDDEN'; end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_idempotency_key,0));
   select * into prior from public.approvals where idempotency_key=p_idempotency_key;
   if found then
     if prior.recommendation_id<>p_recommendation_id or prior.actor_id is distinct from p_actor_id or prior.decision<>p_decision then raise exception 'APPROVAL_IDEMPOTENCY_CONFLICT'; end if;
