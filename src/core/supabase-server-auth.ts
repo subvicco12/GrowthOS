@@ -9,7 +9,9 @@ export async function authenticateSupabaseRequest(request:Request):Promise<Serve
  const bearer=header?.startsWith('Bearer ')?header.slice(7).trim():'';
  const cookie=request.headers.get('cookie')||'';
  const cookieToken=/sb-access-token=([^;]+)/.exec(cookie)?.[1];
- const token=bearer||cookieToken?decodeURIComponent(bearer||cookieToken!):''; if(!token)return null;
+ let token=bearer;
+ if(!token&&cookieToken){ try{token=decodeURIComponent(cookieToken);}catch{return null;} }
+ if(!token)return null;
  const admin=createClient(config.url,config.serviceRoleKey,{auth:{persistSession:false,autoRefreshToken:false}});
  const {data,error}=await admin.auth.getUser(token); if(error||!data.user)return null;
  const {data:profile,error:profileError}=await admin.from('profiles').select('role').eq('id',data.user.id).single();
