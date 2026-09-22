@@ -1,6 +1,8 @@
 import { growthSites as sites, growthWorkspaces } from '../core/portfolio';
 
 const workspaces = growthWorkspaces.map(workspace => workspace.label);
+
+const operationalItems=[['Needs approval','needsApproval'],['In development','inDevelopment'],['In production','inProduction'],['QA failed','qaFailed'],['Ready for review','readyForReview'],['Ready for listing','readyForListing'],['Ready to publish','readyToPublish'],['Live','live'],['Exceptions','exceptions']];
 const engineGroups=[
   {name:'Product Intelligence',engines:['Website Discovery','Automated QA','Uptime & Synthetic Monitoring','Security & Dependency Intelligence','Competitor Intelligence','Packaging Intelligence']},
   {name:'Growth Intelligence',engines:['Technical SEO','Search & AI Visibility','Content Intelligence','CRO & Experimentation','Social Automation','Email & Lifecycle','Organic Promotion','Reputation Intelligence']},
@@ -36,6 +38,13 @@ export default function Dashboard() {
           <article><span>Active jobs</span><strong>0</strong><small>safe by default</small></article>
           <article><span>AI spend</span><strong>$0</strong><small>budget controlled</small></article>
         </div>
+
+        <section className="panel" aria-labelledby="operations-title">
+          <div className="panelHead"><div><h2 id="operations-title">Operations at a glance</h2><p>Summary and action signals stay separate from detailed review.</p></div><span className="engineCount">Control plane</span></div>
+          <div className="workspaceGrid">
+            {operationalItems.map(([label,key])=><article className="workspace" key={key}><strong>{label}</strong><span>0</span></article>)}
+          </div>
+        </section>
 
         <section className="panel" id="portfolio">
           <div className="panelHead">
