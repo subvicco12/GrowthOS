@@ -1,0 +1,15 @@
+<?php
+if (!defined('ABSPATH')) exit;
+final class GrowthOS_DB {
+ public static function activate(): void {
+  global $wpdb; require_once ABSPATH.'wp-admin/includes/upgrade.php';
+  $c=$wpdb->get_charset_collate(); $p=$wpdb->prefix.'growthos_';
+  dbDelta("CREATE TABLE {$p}sites (id bigint unsigned NOT NULL AUTO_INCREMENT, name varchar(190) NOT NULL, domain varchar(255) NOT NULL, status varchar(32) NOT NULL DEFAULT 'active', created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), UNIQUE KEY domain(domain)) $c;");
+  dbDelta("CREATE TABLE {$p}recommendations (id bigint unsigned NOT NULL AUTO_INCREMENT, site_id bigint unsigned NOT NULL, category varchar(64) NOT NULL, title text NOT NULL, evidence longtext NULL, score decimal(8,2) NOT NULL DEFAULT 0, approval_class varchar(16) NOT NULL DEFAULT 'green', status varchar(32) NOT NULL DEFAULT 'proposed', created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), KEY site_status(site_id,status)) $c;");
+  dbDelta("CREATE TABLE {$p}approvals (id bigint unsigned NOT NULL AUTO_INCREMENT, recommendation_id bigint unsigned NOT NULL, actor_id bigint unsigned NOT NULL, decision varchar(16) NOT NULL, note text NULL, idempotency_key varchar(190) NOT NULL, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), UNIQUE KEY idempotency_key(idempotency_key)) $c;");
+  dbDelta("CREATE TABLE {$p}audit_events (id bigint unsigned NOT NULL AUTO_INCREMENT, actor_id bigint unsigned NULL, site_id bigint unsigned NULL, action varchar(190) NOT NULL, object_type varchar(64) NOT NULL, object_id varchar(190) NULL, before_data longtext NULL, after_data longtext NULL, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), KEY site_created(site_id,created_at)) $c;");
+  $admin=get_role('administrator'); if($admin){$admin->add_cap('growthos_access');$admin->add_cap('growthos_approve');$admin->add_cap('growthos_manage');}
+  update_option('growthos_db_version',GROWTHOS_DB_VERSION);
+  flush_rewrite_rules();
+ }
+}
