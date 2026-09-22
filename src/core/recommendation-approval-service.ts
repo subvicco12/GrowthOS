@@ -25,7 +25,7 @@ export class PostgresRecommendationApprovalService {
     await this.db.query('commit'); return mapRecommendation(r);
    }
    const updated=await this.db.query<any>('update public.recommendations set status=$2 where id=$1 returning *',[input.recommendationId,input.decision]);
-   await this.db.query(`insert into public.audit_events(id,actor_id,site_id,action,resource_type,resource_id,reason,before,after,created_at) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,now())`,[randomUUID(),input.actorId,r.site_id,'recommendation.decision','recommendation',input.recommendationId,input.note??input.decision,JSON.stringify({status:r.status}),JSON.stringify({status:input.decision})]);
+   await this.db.query(`insert into public.audit_events(id,actor_id,site_id,action,resource_type,resource_id,reason,before_data,after_data,created_at) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,now())`,[randomUUID(),input.actorId,r.site_id,'recommendation.decision','recommendation',input.recommendationId,input.note??input.decision,JSON.stringify({status:r.status}),JSON.stringify({status:input.decision})]);
    await this.db.query('commit'); return mapRecommendation(updated.rows[0]);
   }catch(error){await this.db.query('rollback');throw error;}
  }
