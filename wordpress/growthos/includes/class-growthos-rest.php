@@ -11,6 +11,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/jobs',['methods'=>'GET','callback'=>[self::class,'jobs'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/jobs',['methods'=>'POST','callback'=>[self::class,'create_job'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/recommendations',['methods'=>'GET','callback'=>[self::class,'recommendations'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/features',['methods'=>'POST','callback'=>[self::class,'create_feature'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/features',['methods'=>'GET','callback'=>[self::class,'features'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/features/(?P<id>\\d+)',['methods'=>'POST','callback'=>[self::class,'update_feature'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/recommendations/(?P<id>\\d+)/decision',['methods'=>'POST','callback'=>[self::class,'decide'],'permission_callback'=>fn()=>current_user_can('growthos_approve')]);
@@ -64,6 +65,13 @@ final class GrowthOS_REST {
   $sql="SELECT * FROM $t".($where?' WHERE '.implode(' AND ',$where):'').' ORDER BY score DESC,id DESC LIMIT 100';
   if($args)$sql=$wpdb->prepare($sql,...$args);
   return new WP_REST_Response(['recommendations'=>$wpdb->get_results($sql,ARRAY_A)],200);
+ }
+ public static function create_feature(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$key=sanitize_key((string)$request->get_param('feature_key'));$name=sanitize_text_field((string)$request->get_param('name'));
+  if(!$site||$key===''||$name==='')return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_INPUT_INVALID'],400);
+  $t=$wpdb->prefix.'growthos_features';$data=['site_id'=>$site,'feature_key'=>$key,'name'=>$name,'state'=>'on','free_enabled'=>1,'pro_enabled'=>1,'business_enabled'=>1,'rollout_percent'=>100,'updated_at'=>current_time('mysql')];
+  if(false===$wpdb->insert($t,$data))return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_CREATE_FAILED'],409);$data['id']=$wpdb->insert_id;
+  return new WP_REST_Response(['ok'=>true,'feature'=>$data],201);
  }
  public static function features(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_features';
