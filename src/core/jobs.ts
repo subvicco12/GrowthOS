@@ -34,8 +34,8 @@ export class JobRunner {
       await this.store.succeed(job.id,result,workerId);return'succeeded';
     }
     catch(error){
-      const retry=!(error instanceof PermanentJobError)&&job.attempts+1<job.maxAttempts;
-      await this.store.fail(job.id,sanitizeJobError(error),retry?new Date(Date.now()+retryDelayMs(job.attempts)):undefined,workerId);
+      const retry=!(error instanceof PermanentJobError)&&job.attempts<job.maxAttempts;
+      await this.store.fail(job.id,sanitizeJobError(error),retry?new Date(Date.now()+retryDelayMs(Math.max(0,job.attempts-1))):undefined,workerId);
       return'failed';
     } finally {
       clearTimeout(timeout);
