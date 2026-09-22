@@ -6,9 +6,10 @@ final class GrowthOS_Jobs {
  public static function unschedule(): void { $t=wp_next_scheduled(self::HOOK);if($t)wp_unschedule_event($t,self::HOOK); }
  public static function run(): void {
   global $wpdb;$t=$wpdb->prefix.'growthos_jobs';
+  if(get_transient('growthos_worker_lock'))return;set_transient('growthos_worker_lock',1,240);
   $cutoff=gmdate('Y-m-d H:i:s',time()-900);$stale=$wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE status='running' AND updated_at<%s",$cutoff),ARRAY_A);foreach($stale as $s){$terminal=(int)$s['attempts']>=(int)$s['max_attempts'];$wpdb->update($t,['status'=>$terminal?'failed':'queued','error'=>'STALE_JOB_RECOVERED','updated_at'=>current_time('mysql')],['id'=>$s['id']]);}
   $jobs=$wpdb->get_results("SELECT j.* FROM $t j WHERE j.status='queued' AND j.attempts<j.max_attempts AND NOT EXISTS (SELECT 1 FROM $t p WHERE p.site_id=j.site_id AND JSON_UNQUOTE(JSON_EXTRACT(p.payload,'$.batch'))=JSON_UNQUOTE(JSON_EXTRACT(j.payload,'$.batch')) AND CAST(JSON_UNQUOTE(JSON_EXTRACT(p.payload,'$.sequence')) AS UNSIGNED)<CAST(JSON_UNQUOTE(JSON_EXTRACT(j.payload,'$.sequence')) AS UNSIGNED) AND p.status<>'completed') ORDER BY j.id ASC LIMIT 10",ARRAY_A);
-  foreach($jobs as $job)self::execute($job);
+  foreach($jobs as $job)self::execute($job);delete_transient('growthos_worker_lock');
  }
  private static function execute(array $job): void {
   global $wpdb;$t=$wpdb->prefix.'growthos_jobs';$id=(int)$job['id'];$attempt=(int)$job['attempts']+1;
