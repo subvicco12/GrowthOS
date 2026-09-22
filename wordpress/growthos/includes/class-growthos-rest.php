@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/retry-job/(?P<id>\\d+)',['methods'=>'POST','callback'=>[self::class,'retry_job'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/scan-status',['methods'=>'GET','callback'=>[self::class,'scan_status'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/scan',['methods'=>'POST','callback'=>[self::class,'scan'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/health-score',['methods'=>'GET','callback'=>[self::class,'health_score'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -50,6 +51,11 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function retry_job(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$id=(int)$request['id'];$t=$wpdb->prefix.'growthos_jobs';$job=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE id=%d",$id),ARRAY_A);if(!$job)return new WP_REST_Response(['ok'=>false,'code'=>'JOB_NOT_FOUND'],404);if($job['status']!=='failed')return new WP_REST_Response(['ok'=>false,'code'=>'JOB_NOT_FAILED'],409);
+  if(false===$wpdb->update($t,['status'=>'queued','attempts'=>0,'error'=>null,'updated_at'=>current_time('mysql')],['id'=>$id]))return new WP_REST_Response(['ok'=>false,'code'=>'JOB_RETRY_FAILED'],500);
+  return new WP_REST_Response(['ok'=>true,'job_id'=>$id],202);
  }
  public static function scan_status(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);$t=$wpdb->prefix.'growthos_jobs';
