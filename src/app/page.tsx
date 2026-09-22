@@ -1,5 +1,6 @@
 import { growthSites as sites, growthWorkspaces } from '../core/portfolio';
 import { siteScopeOptions } from '../core/site-scope';
+import { ApprovalInboxPanel } from './approval-inbox-panel';
 
 const workspaces = growthWorkspaces.map(workspace => workspace.label);
 
@@ -52,6 +53,8 @@ export default function Dashboard() {
             {operationalItems.map(([label,key])=><article className="workspace" key={key}><strong>{label}</strong><span>0</span></article>)}
           </div>
         </section>
+
+        <ApprovalInboxPanel items={[]} />
 
         <section className="panel" id="portfolio">
           <div className="panelHead">
