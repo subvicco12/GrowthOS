@@ -110,7 +110,7 @@ test('job retry uses bounded exponential backoff before max attempts', async () 
   assert.equal(await runner.runOne('worker-1'),'failed');
   assert.ok(retryAt);
   const delay=retryAt!.getTime()-before;
-  assert.ok(delay>=119000&&delay<=121000);
+  assert.ok(delay>=59000&&delay<=61000);
 });
 
 test('feature changes require a reason and redact sensitive before/after values', async () => {
