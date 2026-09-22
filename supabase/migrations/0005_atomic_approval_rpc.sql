@@ -8,7 +8,7 @@ create or replace function public.decide_recommendation(
 ) returns public.recommendations
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 declare
   r public.recommendations%rowtype;
@@ -17,6 +17,7 @@ declare
 begin
   if p_actor_id is null or p_idempotency_key is null or btrim(p_idempotency_key)='' then raise exception 'APPROVAL_INPUT_INVALID'; end if;
   if p_decision not in ('approved','rejected','deferred') then raise exception 'APPROVAL_DECISION_INVALID'; end if;
+  if not exists (select 1 from public.profiles where id=p_actor_id and role in ('owner','admin')) then raise exception 'APPROVAL_ACTOR_FORBIDDEN'; end if;
   select * into prior from public.approvals where idempotency_key=p_idempotency_key;
   if found then
     if prior.recommendation_id<>p_recommendation_id or prior.actor_id is distinct from p_actor_id or prior.decision<>p_decision then raise exception 'APPROVAL_IDEMPOTENCY_CONFLICT'; end if;
