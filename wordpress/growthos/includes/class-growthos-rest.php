@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/scan',['methods'=>'POST','callback'=>[self::class,'scan'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/health-score',['methods'=>'GET','callback'=>[self::class,'health_score'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/discoveries',['methods'=>'GET','callback'=>[self::class,'discoveries'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/audit',['methods'=>'GET','callback'=>[self::class,'audit'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -48,6 +49,12 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function scan(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
+  $sites=$wpdb->prefix.'growthos_sites';if(!$wpdb->get_var($wpdb->prepare("SELECT id FROM $sites WHERE id=%d",$site)))return new WP_REST_Response(['ok'=>false,'code'=>'SITE_NOT_FOUND'],404);
+  $jobs=$wpdb->prefix.'growthos_jobs';$batch=wp_generate_uuid4();$ids=[];foreach(['discovery_scan','qa_scan','seo_scan'] as $i=>$type){$key='fullscan:'.$site.':'.$batch.':'.$i;$wpdb->insert($jobs,['site_id'=>$site,'job_type'=>$type,'status'=>'queued','payload'=>wp_json_encode(['batch'=>$batch,'sequence'=>$i]),'attempts'=>0,'max_attempts'=>3,'idempotency_key'=>$key,'created_at'=>current_time('mysql'),'updated_at'=>current_time('mysql')]);$ids[]=$wpdb->insert_id;}
+  return new WP_REST_Response(['ok'=>true,'batch'=>$batch,'jobs'=>$ids],202);
  }
  public static function health_score(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
