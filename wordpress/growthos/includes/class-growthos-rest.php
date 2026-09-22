@@ -4,11 +4,30 @@ final class GrowthOS_REST {
  public static function register_routes(): void {
   register_rest_route('growthos/v1','/health',['methods'=>'GET','callback'=>fn()=>new WP_REST_Response(['ok'=>true,'version'=>GROWTHOS_VERSION,'host'=>GROWTHOS_PRODUCTION_HOST],200),'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/sites',['methods'=>'GET','callback'=>[self::class,'sites'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/features',['methods'=>'GET','callback'=>[self::class,'features'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/features/(?P<id>\\d+)',['methods'=>'POST','callback'=>[self::class,'update_feature'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/recommendations/(?P<id>\\d+)/decision',['methods'=>'POST','callback'=>[self::class,'decide'],'permission_callback'=>fn()=>current_user_can('growthos_approve')]);
  }
  public static function sites(): WP_REST_Response {
   global $wpdb; $table=$wpdb->prefix.'growthos_sites';
   return new WP_REST_Response(['sites'=>$wpdb->get_results("SELECT id,name,domain,status,created_at FROM $table ORDER BY id DESC",ARRAY_A)],200);
+ }
+ public static function features(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_features';
+  $rows=$site?$wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d ORDER BY name",$site),ARRAY_A):[];
+  return new WP_REST_Response(['features'=>$rows],200);
+ }
+ public static function update_feature(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$id=(int)$request['id'];$state=sanitize_key((string)$request->get_param('state'));
+  if(!in_array($state,['on','off','maintenance','beta','admin-only'],true))return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_STATE_INVALID'],400);
+  $t=$wpdb->prefix.'growthos_features';$e=$wpdb->prefix.'growthos_audit_events';$before=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE id=%d",$id),ARRAY_A);
+  if(!$before)return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_NOT_FOUND'],404);
+  $data=['state'=>$state,'updated_at'=>current_time('mysql')];
+  foreach(['free_enabled','pro_enabled','business_enabled'] as $k){if(null!==$request->get_param($k))$data[$k]=(int)(bool)$request->get_param($k);}
+  if(null!==$request->get_param('rollout_percent'))$data['rollout_percent']=max(0,min(100,(int)$request->get_param('rollout_percent')));
+  if(false===$wpdb->update($t,$data,['id'=>$id]))return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_UPDATE_FAILED'],500);
+  $wpdb->insert($e,['actor_id'=>get_current_user_id(),'site_id'=>$before['site_id'],'action'=>'feature.updated','object_type'=>'feature','object_id'=>(string)$id,'before_data'=>wp_json_encode($before),'after_data'=>wp_json_encode(array_merge($before,$data))]);
+  return new WP_REST_Response(['ok'=>true,'feature'=>array_merge($before,$data)],200);
  }
  public static function decide(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;
