@@ -337,3 +337,9 @@ test('recommendation execution enforces green amber and red approval policy', as
 test('recommendation lifecycle blocks unsafe or duplicate state transitions', async()=>{
  const {assertApprovalTransition}=await import('../recommendations'); assert.doesNotThrow(()=>assertApprovalTransition('proposed','approved')); assert.doesNotThrow(()=>assertApprovalTransition('approved','implemented')); assert.doesNotThrow(()=>assertApprovalTransition('implemented','verified')); assert.throws(()=>assertApprovalTransition('proposed','implemented'),/INVALID_RECOMMENDATION_TRANSITION/); assert.throws(()=>assertApprovalTransition('verified','approved'),/INVALID_RECOMMENDATION_TRANSITION/);
 });
+
+test('job runner retries after started attempts one and two but stops after attempt three', async()=>{
+ const {JobRunner}=await import('../jobs'); const retryFlags:boolean[]=[]; let attempt=1;
+ const store:any={claim:async()=>({id:'j',type:'x',status:'running',idempotencyKey:'k',attempts:attempt,maxAttempts:3,createdAt:'x'}),succeed:async()=>{},fail:async(_id:string,_err:string,retryAt?:Date)=>{retryFlags.push(Boolean(retryAt));}};
+ const runner=new JobRunner(store,{x:async()=>{throw new Error('transient')}}); await runner.runOne('w'); attempt=2; await runner.runOne('w'); attempt=3; await runner.runOne('w'); assert.deepEqual(retryFlags,[true,true,false]);
+});
