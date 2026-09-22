@@ -1,7 +1,7 @@
 import { normalizeApprovalCommand, type ApprovalCommandInput } from './approval-command';
 import { executeApprovalCommand, type ApprovalCommandService } from './approval-command-service';
 export interface ApprovalTransportResponse {ok:boolean;status:number;code?:string;data?:unknown;}
-const badRequest=new Set(['RECOMMENDATION_ID_REQUIRED','APPROVAL_ACTOR_REQUIRED','APPROVAL_IDEMPOTENCY_REQUIRED','APPROVAL_NOTE_TOO_LONG','APPROVAL_INPUT_INVALID','APPROVAL_DECISION_INVALID']);
+const badRequest=new Set(['RECOMMENDATION_ID_REQUIRED','APPROVAL_ACTOR_REQUIRED','APPROVAL_IDEMPOTENCY_REQUIRED','APPROVAL_NOTE_TOO_LONG','APPROVAL_INPUT_INVALID','APPROVAL_DECISION_INVALID','APPROVAL_ACTOR_FORBIDDEN']);
 const conflict=new Set(['APPROVAL_IDEMPOTENCY_CONFLICT','INVALID_RECOMMENDATION_TRANSITION','APPROVAL_RESULT_STATUS_MISMATCH']);
 export async function handleApprovalRequest(service:ApprovalCommandService,body:unknown):Promise<ApprovalTransportResponse>{
  try{
