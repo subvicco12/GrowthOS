@@ -1,6 +1,7 @@
 import type { ActionItem, ApprovalInboxItem } from './action-center';
 import { buildNextBestActions, buildApprovalInbox } from './action-center';
 import type { OperationalCounts, IntegrationHealth } from './operational-dashboard';
+import { integrationHealth, type ConnectorHealthRow } from './integration-health';
 export interface DashboardQuery {
  siteId?:string;
  recommendations:ActionItem[];
@@ -28,8 +29,9 @@ export class PostgresDashboardRepository {
   const where=siteId?' where site_id=$1 and status not in (\'rejected\',\'verified\')':' where status not in (\'rejected\',\'verified\')';
   const rec=await this.db.query<any>(`select id,site_id,category,title,score,approval_class,status,evidence,impact,confidence,effort,risk from public.recommendations${where} order by score desc`,params);
   const jobs=await this.db.query<{count:string}>(`select count(*)::text as count from public.jobs where status in ('queued','running')${siteId?' and site_id=$1':''}`,params);
+  const connectors=await this.db.query<ConnectorHealthRow>(`select name,enabled,last_success_at,last_error from public.connectors${siteId?' where site_id=$1':''} order by name`,params);
   const mapped=rec.rows.map(r=>({id:r.id,siteId:r.site_id,title:r.title,category:r.category,score:Number(r.score),approvalClass:r.approval_class,status:r.status,reason:r.title,evidence:r.evidence??[],impact:r.impact,confidence:r.confidence,effort:r.effort,risk:r.risk}));
   const counts={needsApproval:mapped.filter(x=>x.status==='proposed'&&x.approvalClass!=='green').length,inDevelopment:0,inProduction:0,qaFailed:0,readyForReview:0,readyForListing:0,readyToPublish:0,live:0,exceptions:0,activeJobs:Number(jobs.rows[0]?.count??0)};
-  return {recommendations:mapped,approvals:mapped.filter(x=>x.status==='proposed') as ApprovalInboxItem[],integrations:[],counts,activeJobs:counts.activeJobs};
+  return {recommendations:mapped,approvals:mapped.filter(x=>x.status==='proposed') as ApprovalInboxItem[],integrations:integrationHealth(connectors.rows),counts,activeJobs:counts.activeJobs};
  }
 }
