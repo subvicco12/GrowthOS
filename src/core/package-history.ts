@@ -9,5 +9,5 @@ export function comparePackageHistory(previous:PackageInventory,current:PackageI
 }
 export interface CompetitorChange { domain:string; changes:PackageChange[]; }
 export function compareCompetitorHistory(previous:CompetitorProfile[],current:CompetitorProfile[]):CompetitorChange[]{
- const A=new Map(previous.map(c=>[c.domain,c])); return current.flatMap(c=>{const old=A.get(c.domain);if(!old)return[{domain:c.domain,changes:c.inventory.features.map(f=>({kind:'feature_added' as const,key:f.key}))}];const changes=comparePackageHistory(old.inventory,c.inventory);return changes.length?[{domain:c.domain,changes}]:[];});
+ const A=new Map(previous.map(c=>[c.domain,c])); const out:CompetitorChange[]=[]; for(const c of current){const old=A.get(c.domain);const changes:PackageChange[]=old?comparePackageHistory(old.inventory,c.inventory):c.inventory.features.map(f=>({kind:'feature_added',key:f.key}));if(changes.length)out.push({domain:c.domain,changes});} return out;
 }
