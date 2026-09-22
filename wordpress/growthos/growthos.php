@@ -7,12 +7,13 @@
 if (!defined('ABSPATH')) exit;
 define('GROWTHOS_VERSION','1.0.0');
 define('GROWTHOS_PRODUCTION_HOST','growthos.converentis.com');
-define('GROWTHOS_DB_VERSION','2');
+define('GROWTHOS_DB_VERSION','3');
 require_once __DIR__.'/includes/class-growthos-db.php';
 require_once __DIR__.'/includes/class-growthos-rest.php';
 require_once __DIR__.'/includes/class-growthos-jobs.php';
 require_once __DIR__.'/includes/class-growthos-engines.php';
 register_activation_hook(__FILE__,function(){GrowthOS_DB::activate();GrowthOS_Jobs::schedule();});
+add_action('plugins_loaded',['GrowthOS_DB','maybe_upgrade']);
 register_deactivation_hook(__FILE__,['GrowthOS_Jobs','unschedule']);
 add_filter('cron_schedules',function($s){$s['growthos_five_minutes']=['interval'=>300,'display'=>'GrowthOS every five minutes'];return $s;});
 add_action(GrowthOS_Jobs::HOOK,['GrowthOS_Jobs','run']);
