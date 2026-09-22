@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/scan-status',['methods'=>'GET','callback'=>[self::class,'scan_status'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/scan',['methods'=>'POST','callback'=>[self::class,'scan'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/health-score',['methods'=>'GET','callback'=>[self::class,'health_score'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/discoveries',['methods'=>'GET','callback'=>[self::class,'discoveries'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -49,6 +50,12 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function scan_status(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);$t=$wpdb->prefix.'growthos_jobs';
+  $rows=$wpdb->get_results($wpdb->prepare("SELECT id,job_type,status,result,error,attempts,max_attempts,payload,updated_at FROM $t WHERE site_id=%d AND job_type IN ('discovery_scan','qa_scan','seo_scan') ORDER BY id DESC LIMIT 30",$site),ARRAY_A);
+  $batches=[];foreach($rows as $x){$p=json_decode($x['payload']?:'{}',true)?:[];$b=$p['batch']??'legacy';if(!isset($batches[$b]))$batches[$b]=[];unset($x['payload']);$batches[$b][]=$x;}
+  return new WP_REST_Response(['site_id'=>$site,'batches'=>$batches],200);
  }
  public static function scan(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
