@@ -1,0 +1,3 @@
+export type IntegrationState='healthy'|'attention'|'disabled';
+export interface ConnectorHealthRow {name:string;enabled:boolean;last_success_at:string|null;last_error:string|null;}
+export function integrationHealth(rows:ConnectorHealthRow[],now=new Date()){return rows.map(row=>{if(!row.enabled)return{name:row.name,status:'disabled' as const,detail:'Connector disabled'};if(row.last_error)return{name:row.name,status:'attention' as const,detail:row.last_error};if(!row.last_success_at)return{name:row.name,status:'attention' as const,detail:'No successful sync yet'};const age=now.getTime()-Date.parse(row.last_success_at);return{name:row.name,status:age>86400000?'attention' as const:'healthy' as const,detail:age>86400000?'Last successful sync is stale':'Healthy'};});}
