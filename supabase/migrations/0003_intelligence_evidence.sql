@@ -8,11 +8,12 @@ create table public.website_snapshots (
  captured_at timestamptz not null default now(),
  created_at timestamptz not null default now()
 );
+alter table public.website_snapshots add constraint website_snapshots_id_site_unique unique(id,site_id);
 create index website_snapshots_site_captured_idx on public.website_snapshots(site_id,captured_at desc);
 
 create table public.qa_findings (
  id uuid primary key default gen_random_uuid(),
- snapshot_id uuid not null references public.website_snapshots(id) on delete cascade,
+ snapshot_id uuid not null,
  site_id uuid not null references public.sites(id) on delete cascade,
  finding_key text not null,
  category text not null check(category in ('availability','content','navigation','security','performance','accessibility')),
@@ -20,7 +21,8 @@ create table public.qa_findings (
  title text not null,
  evidence text not null,
  created_at timestamptz not null default now(),
- unique(snapshot_id,finding_key)
+ unique(snapshot_id,finding_key),
+ constraint qa_findings_snapshot_site_fk foreign key(snapshot_id,site_id) references public.website_snapshots(id,site_id) on delete cascade
 );
 create index qa_findings_site_severity_idx on public.qa_findings(site_id,severity,created_at desc);
 
