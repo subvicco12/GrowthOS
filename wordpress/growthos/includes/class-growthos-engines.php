@@ -17,6 +17,11 @@ final class GrowthOS_Engines {
    if($engine==='seo'){if(trim((string)$page['title'])==='')$findings[]=['title'=>'Page is missing a title','score'=>95,'page'=>$page];if(trim((string)$page['meta_description'])==='')$findings[]=['title'=>'Page is missing a meta description','score'=>75,'page'=>$page];if((int)$page['h1_count']!==1)$findings[]=['title'=>'Page should have one primary H1','score'=>65,'page'=>$page];if(trim((string)$page['canonical'])==='')$findings[]=['title'=>'Page canonical was not detected','score'=>70,'page'=>$page];}
    if($engine==='qa'){if((int)$page['http_status']<200||(int)$page['http_status']>=400)$findings[]=['title'=>'Page returned an unhealthy HTTP status','score'=>100,'page'=>$page];if((int)$page['word_count']<100)$findings[]=['title'=>'Page has unusually little indexable text','score'=>55,'page'=>$page];}
   }
+  if($engine==='seo'){
+   $titles=[];$descs=[];foreach($pages as $p){$t=trim((string)$p['title']);$m=trim((string)$p['meta_description']);if($t!=='')$titles[$t][]=$p;if($m!=='')$descs[$m][]=$p;if($p['canonical']!==''&&!self::same_host((string)$p['canonical'],$site['domain']))$findings[]=['title'=>'Canonical points outside the registered domain','score'=>85,'page'=>$p];if(strlen($t)>60)$findings[]=['title'=>'Page title is unusually long','score'=>45,'page'=>$p];if(strlen($m)>160)$findings[]=['title'=>'Meta description is unusually long','score'=>35,'page'=>$p];}
+   foreach($titles as $group)if(count($group)>1)foreach($group as $p)$findings[]=['title'=>'Duplicate page title detected','score'=>70,'page'=>$p];
+   foreach($descs as $group)if(count($group)>1)foreach($group as $p)$findings[]=['title'=>'Duplicate meta description detected','score'=>55,'page'=>$p];
+  }
   foreach(array_slice($findings,0,100) as $x){$page=$x['page'];$title=$x['title'].' — '.$page['url'];$exists=$wpdb->get_var($wpdb->prepare("SELECT id FROM $r WHERE site_id=%d AND category=%s AND title=%s AND status='proposed' LIMIT 1",$site['id'],$engine,$title));if(!$exists)$wpdb->insert($r,['site_id'=>$site['id'],'category'=>$engine,'title'=>$title,'evidence'=>wp_json_encode(['discovery_id'=>$page['id'],'url'=>$page['url']]),'score'=>$x['score'],'approval_class'=>'amber','status'=>'proposed']);}
   return ['engine'=>$engine,'site_id'=>(int)$site['id'],'status'=>'completed','findings'=>count($findings)];
  }
