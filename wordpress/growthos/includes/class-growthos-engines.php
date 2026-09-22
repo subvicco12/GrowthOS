@@ -20,14 +20,17 @@ final class GrowthOS_Engines {
   return ['engine'=>$engine,'site_id'=>(int)$site['id'],'status'=>'completed','findings'=>count($findings)];
  }
  private static function discover(array $site): array {
-  global $wpdb;$url='https://'.$site['domain'];$response=wp_safe_remote_get($url,['timeout'=>12,'redirection'=>3,'user-agent'=>'GrowthOS/1.0']);
-  if(is_wp_error($response))throw new RuntimeException('DISCOVERY_FETCH_FAILED');
-  $status=(int)wp_remote_retrieve_response_code($response);$body=(string)wp_remote_retrieve_body($response);if($status<200||$status>=400)throw new RuntimeException('DISCOVERY_HTTP_'.$status);
-  $title='';$description='';$canonical='';$h1=0;$words=0;
-  if(class_exists('DOMDocument')){$dom=new DOMDocument();libxml_use_internal_errors(true);$dom->loadHTML($body);libxml_clear_errors();$titles=$dom->getElementsByTagName('title');if($titles->length)$title=trim($titles->item(0)->textContent);$h1=$dom->getElementsByTagName('h1')->length;$words=str_word_count(wp_strip_all_tags($body));foreach($dom->getElementsByTagName('meta') as $m)if(strtolower($m->getAttribute('name'))==='description')$description=trim($m->getAttribute('content'));foreach($dom->getElementsByTagName('link') as $l)if(strtolower($l->getAttribute('rel'))==='canonical')$canonical=trim($l->getAttribute('href'));}
-  $data=['site_id'=>(int)$site['id'],'url'=>$url,'page_type'=>'homepage','http_status'=>$status,'title'=>$title,'meta_description'=>$description,'canonical'=>$canonical,'h1_count'=>$h1,'word_count'=>$words,'evidence'=>wp_json_encode(['content_type'=>wp_remote_retrieve_header($response,'content-type')]),'fingerprint'=>hash('sha256',$body),'discovered_at'=>current_time('mysql')];
-  if(false===$wpdb->insert($wpdb->prefix.'growthos_discoveries',$data))throw new RuntimeException('DISCOVERY_PERSIST_FAILED');
-  return ['engine'=>'discovery','site_id'=>(int)$site['id'],'status'=>'completed','pages'=>1,'http_status'=>$status,'title'=>$title,'h1_count'=>$h1,'word_count'=>$words];
+  global $wpdb;$base='https://'.$site['domain'];$urls=[$base];$sm=wp_safe_remote_get($base.'/sitemap.xml',['timeout'=>10,'redirection'=>2,'user-agent'=>'GrowthOS/1.0']);
+  if(!is_wp_error($sm)&&(int)wp_remote_retrieve_response_code($sm)===200){$xml=(string)wp_remote_retrieve_body($sm);if(preg_match_all('~<loc>\s*(.*?)\s*</loc>~i',$xml,$m))foreach(array_slice($m[1],0,49) as $u){$u=html_entity_decode(trim($u));if(self::same_host($u,$site['domain']))$urls[]=$u;}}
+  $urls=array_values(array_unique($urls));$saved=0;$errors=0;
+  foreach($urls as $url){$response=wp_safe_remote_get($url,['timeout'=>12,'redirection'=>3,'user-agent'=>'GrowthOS/1.0']);if(is_wp_error($response)){$errors++;continue;}$status=(int)wp_remote_retrieve_response_code($response);$body=(string)wp_remote_retrieve_body($response);$title='';$description='';$canonical='';$h1=0;$words=0;
+   if(class_exists('DOMDocument')&&$body!==''){$dom=new DOMDocument();libxml_use_internal_errors(true);$dom->loadHTML($body);libxml_clear_errors();$titles=$dom->getElementsByTagName('title');if($titles->length)$title=trim($titles->item(0)->textContent);$h1=$dom->getElementsByTagName('h1')->length;$words=str_word_count(wp_strip_all_tags($body));foreach($dom->getElementsByTagName('meta') as $m)if(strtolower($m->getAttribute('name'))==='description')$description=trim($m->getAttribute('content'));foreach($dom->getElementsByTagName('link') as $l)if(strtolower($l->getAttribute('rel'))==='canonical')$canonical=trim($l->getAttribute('href'));}
+   $fingerprint=hash('sha256',$body);$table=$wpdb->prefix.'growthos_discoveries';$prior=$wpdb->get_var($wpdb->prepare("SELECT id FROM $table WHERE site_id=%d AND url=%s AND fingerprint=%s ORDER BY id DESC LIMIT 1",$site['id'],$url,$fingerprint));if($prior)continue;
+   $data=['site_id'=>(int)$site['id'],'url'=>$url,'page_type'=>$url===$base?'homepage':'page','http_status'=>$status,'title'=>$title,'meta_description'=>$description,'canonical'=>$canonical,'h1_count'=>$h1,'word_count'=>$words,'evidence'=>wp_json_encode(['content_type'=>wp_remote_retrieve_header($response,'content-type')]),'fingerprint'=>$fingerprint,'discovered_at'=>current_time('mysql')];if(false!==$wpdb->insert($table,$data))$saved++;else $errors++;
+  }
+  return ['engine'=>'discovery','site_id'=>(int)$site['id'],'status'=>'completed','urls_seen'=>count($urls),'pages_saved'=>$saved,'errors'=>$errors];
  }
+ private static function same_host(string $url,string $domain): bool {$host=strtolower((string)wp_parse_url($url,PHP_URL_HOST));$domain=strtolower($domain);return $host===$domain||$host==='www.'.$domain||('www.'.$host)===$domain;}
+
 }
 GrowthOS_Engines::register();
