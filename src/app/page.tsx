@@ -1,4 +1,5 @@
 import { growthSites as sites, growthWorkspaces } from '../core/portfolio';
+import { siteScopeOptions } from '../core/site-scope';
 
 const workspaces = growthWorkspaces.map(workspace => workspace.label);
 
@@ -28,6 +29,12 @@ export default function Dashboard() {
             <p className="eyebrow">WEBSITE GROWTH OPERATING SYSTEM</p>
             <h1>Command Center</h1>
             <p className="lede">Discover, test, compare, improve and grow the full website portfolio from one control plane.</p>
+          </div>
+          <div className="siteScope" aria-label="Website scope">
+            <label htmlFor="website-scope">Website</label>
+            <select id="website-scope" defaultValue="">
+              {siteScopeOptions(sites).map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
+            </select>
           </div>
           <button type="button">+ Add website</button>
         </header>
