@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/recommendations/summary',['methods'=>'GET','callback'=>[self::class,'recommendation_summary'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/plan-intelligence/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_plan_intelligence'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/plan-intelligence',['methods'=>'GET','callback'=>[self::class,'plan_intelligence'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/package-gap/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_package_gaps'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
@@ -59,6 +60,9 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function recommendation_summary(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_recommendations';$where=$site?$wpdb->prepare("WHERE site_id=%d",$site):'';$rows=$wpdb->get_results("SELECT category,approval_class,status,COUNT(*) n,AVG(score) avg_score,MAX(score) max_score FROM $t $where GROUP BY category,approval_class,status ORDER BY max_score DESC",ARRAY_A);$total=0;$pending=0;foreach($rows as $x){$total+=(int)$x['n'];if($x['status']==='proposed')$pending+=(int)$x['n'];}return new WP_REST_Response(['site_id'=>$site?:null,'total'=>$total,'pending'=>$pending,'groups'=>$rows],200);
  }
  public static function recommend_plan_intelligence(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$probe=new WP_REST_Request('GET','/growthos/v1/plan-intelligence');$probe->set_param('site_id',$site);$data=self::plan_intelligence($probe)->get_data();if(isset($data['ok'])&&$data['ok']===false)return new WP_REST_Response($data,400);$t=$wpdb->prefix.'growthos_recommendations';$made=0;
