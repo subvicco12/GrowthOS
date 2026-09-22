@@ -5,8 +5,11 @@ export interface ServerActor {id:string;role:UserRole;}
 const roles=new Set<UserRole>(['owner','admin','operator','analyst','viewer']);
 export async function authenticateSupabaseRequest(request:Request):Promise<ServerActor|null>{
  const config=readServerDatabaseConfig(); if(!config)return null;
- const header=request.headers.get('authorization'); if(!header?.startsWith('Bearer '))return null;
- const token=header.slice(7).trim(); if(!token)return null;
+ const header=request.headers.get('authorization');
+ const bearer=header?.startsWith('Bearer ')?header.slice(7).trim():'';
+ const cookie=request.headers.get('cookie')||'';
+ const cookieToken=/sb-access-token=([^;]+)/.exec(cookie)?.[1];
+ const token=bearer||cookieToken?decodeURIComponent(bearer||cookieToken!):''; if(!token)return null;
  const admin=createClient(config.url,config.serviceRoleKey,{auth:{persistSession:false,autoRefreshToken:false}});
  const {data,error}=await admin.auth.getUser(token); if(error||!data.user)return null;
  const {data:profile,error:profileError}=await admin.from('profiles').select('role').eq('id',data.user.id).single();
