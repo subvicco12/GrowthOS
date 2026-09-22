@@ -7,6 +7,9 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/sites',['methods'=>'POST','callback'=>[self::class,'create_site'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/jobs',['methods'=>'GET','callback'=>[self::class,'jobs'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/jobs',['methods'=>'POST','callback'=>[self::class,'create_job'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/features',['methods'=>'GET','callback'=>[self::class,'features'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/features/(?P<id>\\d+)',['methods'=>'POST','callback'=>[self::class,'update_feature'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/recommendations/(?P<id>\\d+)/decision',['methods'=>'POST','callback'=>[self::class,'decide'],'permission_callback'=>fn()=>current_user_can('growthos_approve')]);
@@ -30,6 +33,29 @@ final class GrowthOS_REST {
  public static function connectors(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_connectors';$rows=$site?$wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d ORDER BY kind",$site),ARRAY_A):$wpdb->get_results("SELECT * FROM $t ORDER BY site_id,kind",ARRAY_A);
   return new WP_REST_Response(['connectors'=>$rows],200);
+ }
+ public static function upsert_connector(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$kind=sanitize_key((string)$request->get_param('kind'));$status=sanitize_key((string)$request->get_param('status'));
+  if(!$site||$kind===''||!in_array($status,['needs_connection','connected','degraded','disabled'],true))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_INPUT_INVALID'],400);
+  $t=$wpdb->prefix.'growthos_connectors';$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d AND kind=%s",$site,$kind),ARRAY_A);
+  $data=['site_id'=>$site,'kind'=>$kind,'status'=>$status,'last_seen_at'=>current_time('mysql'),'last_error'=>sanitize_textarea_field((string)$request->get_param('last_error'))?:null];
+  $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
+  if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
+  return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function jobs(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_jobs';
+  $rows=$site?$wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d ORDER BY id DESC LIMIT 100",$site),ARRAY_A):$wpdb->get_results("SELECT * FROM $t ORDER BY id DESC LIMIT 100",ARRAY_A);
+  return new WP_REST_Response(['jobs'=>$rows],200);
+ }
+ public static function create_job(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$type=sanitize_key((string)$request->get_param('job_type'));$key=sanitize_text_field((string)$request->get_param('idempotency_key'));
+  if($type==='')return new WP_REST_Response(['ok'=>false,'code'=>'JOB_INPUT_INVALID'],400);
+  $t=$wpdb->prefix.'growthos_jobs';$payload=wp_json_encode($request->get_param('payload')??[]);
+  if($key!==''){$prior=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE idempotency_key=%s",$key),ARRAY_A);if($prior)return new WP_REST_Response(['ok'=>true,'job'=>$prior,'idempotent'=>true],200);}
+  $data=['site_id'=>$site?:null,'job_type'=>$type,'status'=>'queued','payload'=>$payload,'attempts'=>0,'max_attempts'=>3,'idempotency_key'=>$key?:null,'updated_at'=>current_time('mysql')];
+  if(false===$wpdb->insert($t,$data))return new WP_REST_Response(['ok'=>false,'code'=>'JOB_CREATE_FAILED'],500);
+  $data['id']=$wpdb->insert_id;return new WP_REST_Response(['ok'=>true,'job'=>$data],201);
  }
  public static function features(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_features';
