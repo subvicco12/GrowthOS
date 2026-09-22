@@ -343,3 +343,8 @@ test('job runner retries after started attempts one and two but stops after atte
  const store:any={claim:async()=>({id:'j',type:'x',status:'running',idempotencyKey:'k',attempts:attempt,maxAttempts:3,createdAt:'x'}),succeed:async()=>{},fail:async(_id:string,_err:string,retryAt?:Date)=>{retryFlags.push(Boolean(retryAt));}};
  const runner=new JobRunner(store,{x:async()=>{throw new Error('transient')}}); await runner.runOne('w'); attempt=2; await runner.runOne('w'); attempt=3; await runner.runOne('w'); assert.deepEqual(retryFlags,[true,true,false]);
 });
+
+test('approved recommendation dispatch uses a stable idempotency key and bounded attempts', async()=>{
+ const {enqueueRecommendation,recommendationJobKey}=await import('../recommendation-jobs'); const calls:any[]=[]; const recommendation:any={id:'rec-1',siteId:'site-1',category:'qa',title:'QA',evidence:['e'],impact:3,confidence:4,effort:1,recurringCostUsd:0,risk:1,score:6,approvalClass:'green',status:'approved',createdAt:'x'}; const executable:any={recommendation,jobType:'recommendation.qa',payload:{recommendationId:'rec-1',siteId:'site-1'}};
+ const enqueuer:any={enqueue:async(input:any)=>{calls.push(input);return{id:'job-1',created:calls.length===1}}}; await enqueueRecommendation(enqueuer,executable); await enqueueRecommendation(enqueuer,executable); assert.equal(calls[0].idempotencyKey,recommendationJobKey(executable)); assert.equal(calls[0].idempotencyKey,calls[1].idempotencyKey); assert.equal(calls[0].maxAttempts,3);
+});
