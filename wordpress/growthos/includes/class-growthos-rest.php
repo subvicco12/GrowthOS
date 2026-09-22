@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/plan-intelligence',['methods'=>'GET','callback'=>[self::class,'plan_intelligence'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/package-gap/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_package_gaps'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/package-gap',['methods'=>'GET','callback'=>[self::class,'package_gap'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/competitors',['methods'=>'GET','callback'=>[self::class,'competitors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -57,6 +58,13 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function plan_intelligence(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);$f=$wpdb->prefix.'growthos_features';
+  $rows=$wpdb->get_results($wpdb->prepare("SELECT feature_key,name,free_enabled,pro_enabled,business_enabled,quota_json FROM $f WHERE site_id=%d ORDER BY name",$site),ARRAY_A);
+  $counts=['free'=>0,'pro'=>0,'business'=>0];$exclusive=['pro'=>[],'business'=>[]];foreach($rows as $x){if($x['free_enabled'])$counts['free']++;if($x['pro_enabled'])$counts['pro']++;if($x['business_enabled'])$counts['business']++;if(!$x['free_enabled']&&$x['pro_enabled'])$exclusive['pro'][]=$x['name'];if(!$x['pro_enabled']&&$x['business_enabled'])$exclusive['business'][]=$x['name'];}
+  $signals=[];if(!$exclusive['pro'])$signals[]=['code'=>'WEAK_FREE_TO_PRO','severity'=>80,'message'=>'No Pro-only capability currently differentiates Pro from Free.'];if(!$exclusive['business'])$signals[]=['code'=>'WEAK_PRO_TO_BUSINESS','severity'=>85,'message'=>'No Business-only capability currently differentiates Business from Pro.'];if($counts['pro']<$counts['free'])$signals[]=['code'=>'PRO_REGRESSION','severity'=>95,'message'=>'Pro exposes fewer enabled capabilities than Free.'];if($counts['business']<$counts['pro'])$signals[]=['code'=>'BUSINESS_REGRESSION','severity'=>95,'message'=>'Business exposes fewer enabled capabilities than Pro.'];
+  return new WP_REST_Response(['site_id'=>$site,'counts'=>$counts,'exclusive'=>$exclusive,'signals'=>$signals,'features'=>$rows],200);
  }
  public static function recommend_package_gaps(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
