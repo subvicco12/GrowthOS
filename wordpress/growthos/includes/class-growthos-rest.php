@@ -69,8 +69,8 @@ final class GrowthOS_REST {
   $pages=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT url) FROM $d WHERE site_id=%d",$site));
   $rows=$wpdb->get_results($wpdb->prepare("SELECT category,score FROM $r WHERE site_id=%d AND status='proposed' AND category IN ('seo','qa')",$site),ARRAY_A);
   $pen=['seo'=>0,'qa'=>0];$cnt=['seo'=>0,'qa'=>0];foreach($rows as $x){$k=$x['category'];$pen[$k]+=min(25,max(1,(float)$x['score']/10));$cnt[$k]++;}
-  $seo=max(0,round(100-min(100,$pen['seo'])));$qa=max(0,round(100-min(100,$pen['qa'])));$overall=round(($seo+$qa)/2);
-  return new WP_REST_Response(['site_id'=>$site,'pages'=>$pages,'scores'=>['overall'=>$overall,'seo'=>$seo,'qa'=>$qa],'open_findings'=>$cnt],200);
+  $seo=max(0,round(100-min(100,$pen['seo'])));$qa=max(0,round(100-min(100,$pen['qa'])));$overall=round(($seo+$qa)/2);$severity=['critical'=>0,'high'=>0,'medium'=>0,'low'=>0];foreach($rows as $x){$s=(float)$x['score'];if($s>=90)$severity['critical']++;elseif($s>=70)$severity['high']++;elseif($s>=50)$severity['medium']++;else $severity['low']++;}
+  return new WP_REST_Response(['site_id'=>$site,'pages'=>$pages,'scores'=>['overall'=>$overall,'seo'=>$seo,'qa'=>$qa],'open_findings'=>$cnt,'severity'=>$severity],200);
  }
  public static function discoveries(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
