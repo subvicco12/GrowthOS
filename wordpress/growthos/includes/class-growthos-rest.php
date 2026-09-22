@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/system-health/repair-worker',['methods'=>'POST','callback'=>[self::class,'repair_worker'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/system-health',['methods'=>'GET','callback'=>[self::class,'system_health'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/recommendations/summary',['methods'=>'GET','callback'=>[self::class,'recommendation_summary'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/plan-intelligence/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_plan_intelligence'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
@@ -61,6 +62,9 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function repair_worker(WP_REST_Request $request): WP_REST_Response {
+  $before=wp_next_scheduled(GrowthOS_Jobs::HOOK);if(!$before)GrowthOS_Jobs::schedule();$after=wp_next_scheduled(GrowthOS_Jobs::HOOK);return new WP_REST_Response(['ok'=>(bool)$after,'was_scheduled'=>(bool)$before,'scheduled'=>(bool)$after,'next_run'=>$after?gmdate('c',$after):null],$after?200:500);
  }
  public static function system_health(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$j=$wpdb->prefix.'growthos_jobs';$c=$wpdb->prefix.'growthos_connectors';$now=current_time('mysql');$queued=(int)$wpdb->get_var("SELECT COUNT(*) FROM $j WHERE status='queued'");$failed=(int)$wpdb->get_var("SELECT COUNT(*) FROM $j WHERE status='failed'");$running=(int)$wpdb->get_var("SELECT COUNT(*) FROM $j WHERE status='running'");$degraded=(int)$wpdb->get_var("SELECT COUNT(*) FROM $c WHERE status='degraded'");$next=wp_next_scheduled(GrowthOS_Jobs::HOOK);$status=($failed>0||$degraded>0)?'attention':'healthy';return new WP_REST_Response(['status'=>$status,'jobs'=>['queued'=>$queued,'running'=>$running,'failed'=>$failed],'degraded_connectors'=>$degraded,'worker'=>['scheduled'=>(bool)$next,'next_run'=>$next?gmdate('c',$next):null],'checked_at'=>$now],200);
