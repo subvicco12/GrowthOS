@@ -4,6 +4,9 @@ final class GrowthOS_REST {
  public static function register_routes(): void {
   register_rest_route('growthos/v1','/health',['methods'=>'GET','callback'=>fn()=>new WP_REST_Response(['ok'=>true,'version'=>GROWTHOS_VERSION,'host'=>GROWTHOS_PRODUCTION_HOST],200),'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/sites',['methods'=>'GET','callback'=>[self::class,'sites'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/sites',['methods'=>'POST','callback'=>[self::class,'create_site'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
+  register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/features',['methods'=>'GET','callback'=>[self::class,'features'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/features/(?P<id>\\d+)',['methods'=>'POST','callback'=>[self::class,'update_feature'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/recommendations/(?P<id>\\d+)/decision',['methods'=>'POST','callback'=>[self::class,'decide'],'permission_callback'=>fn()=>current_user_can('growthos_approve')]);
@@ -11,6 +14,22 @@ final class GrowthOS_REST {
  public static function sites(): WP_REST_Response {
   global $wpdb; $table=$wpdb->prefix.'growthos_sites';
   return new WP_REST_Response(['sites'=>$wpdb->get_results("SELECT id,name,domain,status,created_at FROM $table ORDER BY id DESC",ARRAY_A)],200);
+ }
+ public static function create_site(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$name=sanitize_text_field((string)$request->get_param('name'));$domain=strtolower(trim(sanitize_text_field((string)$request->get_param('domain'))));
+  $domain=preg_replace('#^https?://#','',$domain);$domain=rtrim($domain,'/');
+  if($name===''||$domain===''||!preg_match('/^[a-z0-9.-]+$/',$domain))return new WP_REST_Response(['ok'=>false,'code'=>'SITE_INPUT_INVALID'],400);
+  $t=$wpdb->prefix.'growthos_sites';if(false===$wpdb->insert($t,['name'=>$name,'domain'=>$domain,'status'=>'active']))return new WP_REST_Response(['ok'=>false,'code'=>'SITE_CREATE_FAILED'],409);
+  return new WP_REST_Response(['ok'=>true,'site'=>['id'=>$wpdb->insert_id,'name'=>$name,'domain'=>$domain,'status'=>'active']],201);
+ }
+ public static function dashboard(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$p=$wpdb->prefix.'growthos_';$where=$site?$wpdb->prepare(' WHERE site_id=%d',$site):'';
+  $data=['sites'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}sites"),'recommendations'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}recommendations".$where),'pending_approvals'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}recommendations".$where.($where?' AND':' WHERE')." status='proposed'"),'queued_jobs'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}jobs".$where.($where?' AND':' WHERE')." status='queued'"),'degraded_connectors'=>(int)$wpdb->get_var("SELECT COUNT(*) FROM {$p}connectors".$where.($where?' AND':' WHERE')." status='degraded'")];
+  return new WP_REST_Response(['ok'=>true,'scope'=>$site?:'portfolio','metrics'=>$data],200);
+ }
+ public static function connectors(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_connectors';$rows=$site?$wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d ORDER BY kind",$site),ARRAY_A):$wpdb->get_results("SELECT * FROM $t ORDER BY site_id,kind",ARRAY_A);
+  return new WP_REST_Response(['connectors'=>$rows],200);
  }
  public static function features(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_features';
