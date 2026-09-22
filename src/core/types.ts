@@ -64,5 +64,6 @@ export interface Job {
   idempotencyKey: string;
   attempts: number;
   maxAttempts: number;
+  payload?: Record<string,unknown>;
   createdAt: string;
 }
