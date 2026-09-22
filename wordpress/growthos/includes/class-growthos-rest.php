@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/package-gap',['methods'=>'GET','callback'=>[self::class,'package_gap'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/competitors',['methods'=>'GET','callback'=>[self::class,'competitors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/competitors',['methods'=>'POST','callback'=>[self::class,'save_competitor'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/competitor-packages',['methods'=>'GET','callback'=>[self::class,'competitor_packages'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -55,6 +56,16 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function package_gap(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
+  $c=$wpdb->prefix.'growthos_competitors';$p=$wpdb->prefix.'growthos_competitor_packages';$f=$wpdb->prefix.'growthos_features';
+  $own=$wpdb->get_results($wpdb->prepare("SELECT feature_key,name,free_enabled,pro_enabled,business_enabled FROM $f WHERE site_id=%d",$site),ARRAY_A);
+  $rows=$wpdb->get_results($wpdb->prepare("SELECT c.id competitor_id,c.name competitor,c.domain,p.plan_key,p.plan_name,p.price_amount,p.currency,p.billing_period,p.features,p.evidence_url,p.observed_at FROM $c c JOIN $p p ON p.competitor_id=c.id WHERE c.site_id=%d AND c.status='active' ORDER BY c.name,p.id",$site),ARRAY_A);
+  $ownKeys=[];foreach($own as $x){$ownKeys[sanitize_key($x['feature_key'])]=true;$ownKeys[sanitize_key($x['name'])]=true;}
+  $freq=[];$evidence=[];foreach($rows as &$x){$features=json_decode($x['features']?:'[]',true);$x['features']=is_array($features)?$features:[];foreach($x['features'] as $v){$label=is_array($v)?($v['name']??''):$v;$key=sanitize_key((string)$label);if(!$key)continue;$freq[$key]=($freq[$key]??0)+1;$evidence[$key][]=[$x['competitor'],$x['evidence_url']];}}
+  unset($x);arsort($freq);$gaps=[];foreach($freq as $key=>$count)if(!isset($ownKeys[$key]))$gaps[]=['feature_key'=>$key,'competitor_mentions'=>$count,'evidence'=>$evidence[$key]];
+  return new WP_REST_Response(['site_id'=>$site,'own_features'=>$own,'packages'=>$rows,'gaps'=>$gaps],200);
  }
  public static function competitors(WP_REST_Request $request): WP_REST_Response {global $wpdb;$site=(int)$request->get_param('site_id');$t=$wpdb->prefix.'growthos_competitors';return new WP_REST_Response($wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d ORDER BY name",$site),ARRAY_A),200);}
  public static function save_competitor(WP_REST_Request $request): WP_REST_Response {global $wpdb;$t=$wpdb->prefix.'growthos_competitors';$site=(int)$request->get_param('site_id');$name=sanitize_text_field($request->get_param('name'));$domain=strtolower(preg_replace('#^https?://#','',trim((string)$request->get_param('domain'))));$domain=rtrim($domain,'/');$e=esc_url_raw($request->get_param('evidence_url'));if(!$site||!$name||!$domain||!$e)return new WP_REST_Response(['ok'=>false,'code'=>'EVIDENCE_REQUIRED'],400);$wpdb->replace($t,['site_id'=>$site,'name'=>$name,'domain'=>$domain,'evidence_url'=>$e,'status'=>'active','verified_at'=>current_time('mysql'),'created_at'=>current_time('mysql')]);return new WP_REST_Response(['ok'=>true,'id'=>$wpdb->insert_id],201);}
