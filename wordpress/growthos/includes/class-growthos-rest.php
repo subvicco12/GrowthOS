@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/plan-intelligence/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_plan_intelligence'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/plan-intelligence',['methods'=>'GET','callback'=>[self::class,'plan_intelligence'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/package-gap/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_package_gaps'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/package-gap',['methods'=>'GET','callback'=>[self::class,'package_gap'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -58,6 +59,11 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function recommend_plan_intelligence(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$probe=new WP_REST_Request('GET','/growthos/v1/plan-intelligence');$probe->set_param('site_id',$site);$data=self::plan_intelligence($probe)->get_data();if(isset($data['ok'])&&$data['ok']===false)return new WP_REST_Response($data,400);$t=$wpdb->prefix.'growthos_recommendations';$made=0;
+  foreach($data['signals']??[] as $s){$title='Improve subscription packaging: '.sanitize_text_field($s['message']);$exists=$wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE site_id=%d AND category='packaging' AND title=%s AND status='proposed'",$site,$title));if($exists)continue;$wpdb->insert($t,['site_id'=>$site,'category'=>'packaging','title'=>$title,'evidence'=>wp_json_encode(['signal'=>$s['code'],'plan_counts'=>$data['counts'],'exclusive'=>$data['exclusive']]),'score'=>(int)$s['severity'],'approval_class'=>'amber','status'=>'proposed','created_at'=>current_time('mysql')]);$made++;}
+  return new WP_REST_Response(['ok'=>true,'created'=>$made],201);
  }
  public static function plan_intelligence(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);$f=$wpdb->prefix.'growthos_features';
