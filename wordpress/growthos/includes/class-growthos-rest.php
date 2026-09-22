@@ -79,16 +79,21 @@ final class GrowthOS_REST {
   return new WP_REST_Response(['features'=>$rows],200);
  }
  public static function update_feature(WP_REST_Request $request): WP_REST_Response {
-  global $wpdb;$id=(int)$request['id'];$state=sanitize_key((string)$request->get_param('state'));
-  if(!in_array($state,['on','off','maintenance','beta','admin-only'],true))return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_STATE_INVALID'],400);
-  $t=$wpdb->prefix.'growthos_features';$e=$wpdb->prefix.'growthos_audit_events';$before=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE id=%d",$id),ARRAY_A);
-  if(!$before)return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_NOT_FOUND'],404);
-  $data=['state'=>$state,'updated_at'=>current_time('mysql')];
-  foreach(['free_enabled','pro_enabled','business_enabled'] as $k){if(null!==$request->get_param($k))$data[$k]=(int)(bool)$request->get_param($k);}
-  if(null!==$request->get_param('rollout_percent'))$data['rollout_percent']=max(0,min(100,(int)$request->get_param('rollout_percent')));
-  if(false===$wpdb->update($t,$data,['id'=>$id]))return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_UPDATE_FAILED'],500);
-  $wpdb->insert($e,['actor_id'=>get_current_user_id(),'site_id'=>$before['site_id'],'action'=>'feature.updated','object_type'=>'feature','object_id'=>(string)$id,'before_data'=>wp_json_encode($before),'after_data'=>wp_json_encode(array_merge($before,$data))]);
-  return new WP_REST_Response(['ok'=>true,'feature'=>array_merge($before,$data)],200);
+  global $wpdb;$id=(int)$request['id'];$t=$wpdb->prefix.'growthos_features';$e=$wpdb->prefix.'growthos_audit_events';
+  $wpdb->query('START TRANSACTION');
+  try{
+   $before=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE id=%d FOR UPDATE",$id),ARRAY_A);if(!$before)throw new Exception('FEATURE_NOT_FOUND');
+   $data=['updated_at'=>current_time('mysql')];
+   if(null!==$request->get_param('state')){$state=sanitize_key((string)$request->get_param('state'));if(!in_array($state,['on','off','maintenance','beta','admin-only'],true))throw new Exception('FEATURE_STATE_INVALID');$data['state']=$state;}
+   foreach(['free_enabled','pro_enabled','business_enabled'] as $k)if(null!==$request->get_param($k))$data[$k]=(int)(bool)$request->get_param($k);
+   if(null!==$request->get_param('rollout_percent'))$data['rollout_percent']=max(0,min(100,(int)$request->get_param('rollout_percent')));
+   if(null!==$request->get_param('quota_json')){$q=$request->get_param('quota_json');$data['quota_json']=wp_json_encode(is_array($q)?$q:[]);}
+   if(null!==$request->get_param('status_message'))$data['status_message']=sanitize_text_field((string)$request->get_param('status_message'));
+   $reason=sanitize_text_field((string)$request->get_param('reason'));if($reason==='')$reason='GrowthOS control panel update';
+   if(false===$wpdb->update($t,$data,['id'=>$id]))throw new Exception('FEATURE_UPDATE_FAILED');
+   $after=array_merge($before,$data);if(false===$wpdb->insert($e,['actor_id'=>get_current_user_id(),'site_id'=>$before['site_id'],'action'=>'feature.updated','object_type'=>'feature','object_id'=>(string)$id,'before_data'=>wp_json_encode($before),'after_data'=>wp_json_encode(['feature'=>$after,'reason'=>$reason])]))throw new Exception('FEATURE_AUDIT_FAILED');
+   $wpdb->query('COMMIT');return new WP_REST_Response(['ok'=>true,'feature'=>$after],200);
+  }catch(Throwable $x){$wpdb->query('ROLLBACK');$code=$x->getMessage();$status=$code==='FEATURE_NOT_FOUND'?404:($code==='FEATURE_STATE_INVALID'?400:500);return new WP_REST_Response(['ok'=>false,'code'=>$status===500?'FEATURE_UPDATE_FAILED':$code],$status);}
  }
  public static function decide(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;
