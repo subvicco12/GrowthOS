@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/package-gap/recommend',['methods'=>'POST','callback'=>[self::class,'recommend_package_gaps'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/package-gap',['methods'=>'GET','callback'=>[self::class,'package_gap'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/competitors',['methods'=>'GET','callback'=>[self::class,'competitors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/competitors',['methods'=>'POST','callback'=>[self::class,'save_competitor'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
@@ -56,6 +57,12 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function recommend_package_gaps(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
+  $probe=new WP_REST_Request('GET','/growthos/v1/package-gap');$probe->set_param('site_id',$site);$data=self::package_gap($probe)->get_data();$t=$wpdb->prefix.'growthos_recommendations';$made=0;
+  foreach(array_slice($data['gaps']??[],0,20) as $g){if((int)$g['competitor_mentions']<2)continue;$title='Evaluate competitor-supported feature: '.sanitize_text_field(str_replace('-',' ',$g['feature_key']));$exists=$wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE site_id=%d AND category='packaging' AND title=%s AND status='proposed'",$site,$title));if($exists)continue;$score=min(95,55+((int)$g['competitor_mentions']*10));$wpdb->insert($t,['site_id'=>$site,'category'=>'packaging','title'=>$title,'evidence'=>wp_json_encode(['competitor_mentions'=>$g['competitor_mentions'],'sources'=>$g['evidence']]),'score'=>$score,'approval_class'=>'amber','status'=>'proposed','created_at'=>current_time('mysql')]);$made++;}
+  return new WP_REST_Response(['ok'=>true,'created'=>$made],201);
  }
  public static function package_gap(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');if(!$site)return new WP_REST_Response(['ok'=>false,'code'=>'SITE_REQUIRED'],400);
