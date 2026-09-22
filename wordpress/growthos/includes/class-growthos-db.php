@@ -1,7 +1,9 @@
 <?php
 if (!defined('ABSPATH')) exit;
 final class GrowthOS_DB {
- public static function activate(): void {
+ public static function maybe_upgrade(): void { if((string)get_option('growthos_db_version','0')!==(string)GROWTHOS_DB_VERSION) self::install(false); }
+ public static function activate(): void { self::install(true); }
+ private static function install(bool $flush): void {
   global $wpdb; require_once ABSPATH.'wp-admin/includes/upgrade.php';
   $c=$wpdb->get_charset_collate(); $p=$wpdb->prefix.'growthos_';
   dbDelta("CREATE TABLE {$p}sites (id bigint unsigned NOT NULL AUTO_INCREMENT, name varchar(190) NOT NULL, domain varchar(255) NOT NULL, status varchar(32) NOT NULL DEFAULT 'active', created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), UNIQUE KEY domain(domain)) $c;");
@@ -11,9 +13,11 @@ final class GrowthOS_DB {
   dbDelta("CREATE TABLE {$p}connectors (id bigint unsigned NOT NULL AUTO_INCREMENT, site_id bigint unsigned NOT NULL, kind varchar(64) NOT NULL, status varchar(32) NOT NULL DEFAULT 'needs_connection', last_seen_at datetime NULL, last_error text NULL, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), UNIQUE KEY site_kind(site_id,kind)) $c;");
   dbDelta("CREATE TABLE {$p}jobs (id bigint unsigned NOT NULL AUTO_INCREMENT, site_id bigint unsigned NULL, job_type varchar(190) NOT NULL, status varchar(32) NOT NULL DEFAULT 'queued', payload longtext NULL, result longtext NULL, error text NULL, attempts smallint unsigned NOT NULL DEFAULT 0, max_attempts smallint unsigned NOT NULL DEFAULT 3, idempotency_key varchar(190) NULL, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), UNIQUE KEY idempotency_key(idempotency_key), KEY job_status(status,created_at)) $c;");
   dbDelta("CREATE TABLE {$p}discoveries (id bigint unsigned NOT NULL AUTO_INCREMENT, site_id bigint unsigned NOT NULL, url text NOT NULL, page_type varchar(64) NULL, http_status smallint unsigned NULL, title text NULL, meta_description text NULL, canonical text NULL, h1_count smallint unsigned NOT NULL DEFAULT 0, word_count int unsigned NOT NULL DEFAULT 0, evidence longtext NULL, fingerprint varchar(64) NULL, discovered_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), KEY site_discovered(site_id,discovered_at)) $c;");
+  dbDelta("CREATE TABLE {$p}competitors (id bigint unsigned NOT NULL AUTO_INCREMENT, site_id bigint unsigned NOT NULL, name varchar(190) NOT NULL, domain varchar(190) NOT NULL, evidence_url text NULL, status varchar(32) NOT NULL DEFAULT 'active', verified_at datetime NULL, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), UNIQUE KEY site_domain(site_id,domain), KEY site_status(site_id,status)) $c;");
+  dbDelta("CREATE TABLE {$p}competitor_packages (id bigint unsigned NOT NULL AUTO_INCREMENT, competitor_id bigint unsigned NOT NULL, plan_key varchar(64) NOT NULL, plan_name varchar(190) NOT NULL, price_amount decimal(12,2) NULL, currency varchar(8) NULL, billing_period varchar(32) NULL, features longtext NULL, evidence_url text NULL, observed_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), KEY competitor_plan(competitor_id,plan_key)) $c;");
   dbDelta("CREATE TABLE {$p}audit_events (id bigint unsigned NOT NULL AUTO_INCREMENT, actor_id bigint unsigned NULL, site_id bigint unsigned NULL, action varchar(190) NOT NULL, object_type varchar(64) NOT NULL, object_id varchar(190) NULL, before_data longtext NULL, after_data longtext NULL, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(id), KEY site_created(site_id,created_at)) $c;");
   $admin=get_role('administrator'); if($admin){$admin->add_cap('growthos_access');$admin->add_cap('growthos_approve');$admin->add_cap('growthos_manage');}
   update_option('growthos_db_version',GROWTHOS_DB_VERSION);
-  flush_rewrite_rules();
+  if($flush)flush_rewrite_rules();
  }
 }
