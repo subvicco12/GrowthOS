@@ -8,6 +8,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/security-status',['methods'=>'GET','callback'=>[self::class,'security_status'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/system-health/repair-worker',['methods'=>'POST','callback'=>[self::class,'repair_worker'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/system-health',['methods'=>'GET','callback'=>[self::class,'system_health'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/recommendations/summary',['methods'=>'GET','callback'=>[self::class,'recommendation_summary'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -62,6 +63,9 @@ final class GrowthOS_REST {
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
+ }
+ public static function security_status(WP_REST_Request $request): WP_REST_Response {
+  $https=is_ssl();$debug=(bool)(defined('WP_DEBUG')&&WP_DEBUG);$display=(bool)(defined('WP_DEBUG_DISPLAY')&&WP_DEBUG_DISPLAY);$discouraged=(bool)get_option('blog_public');$checks=[['key'=>'https','ok'=>$https,'message'=>$https?'HTTPS active':'HTTPS is not detected'],['key'=>'debug_display','ok'=>!($debug&&$display),'message'=>($debug&&$display)?'Debug output may be visible':'Debug output is not publicly displayed'],['key'=>'file_edit','ok'=>(defined('DISALLOW_FILE_EDIT')&&DISALLOW_FILE_EDIT),'message'=>(defined('DISALLOW_FILE_EDIT')&&DISALLOW_FILE_EDIT)?'Dashboard file editing disabled':'Consider DISALLOW_FILE_EDIT in production']];$score=0;foreach($checks as $x)if($x['ok'])$score++;return new WP_REST_Response(['score'=>$score,'total'=>count($checks),'checks'=>$checks,'search_visibility'=>$discouraged?'public':'discouraged'],200);
  }
  public static function repair_worker(WP_REST_Request $request): WP_REST_Response {
   $before=wp_next_scheduled(GrowthOS_Jobs::HOOK);if(!$before)GrowthOS_Jobs::schedule();$after=wp_next_scheduled(GrowthOS_Jobs::HOOK);return new WP_REST_Response(['ok'=>(bool)$after,'was_scheduled'=>(bool)$before,'scheduled'=>(bool)$after,'next_run'=>$after?gmdate('c',$after):null],$after?200:500);
