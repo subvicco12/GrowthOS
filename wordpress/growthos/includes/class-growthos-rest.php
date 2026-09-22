@@ -11,6 +11,7 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/audit',['methods'=>'GET','callback'=>[self::class,'audit'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/jobs',['methods'=>'GET','callback'=>[self::class,'jobs'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/jobs',['methods'=>'POST','callback'=>[self::class,'create_job'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/recommendations',['methods'=>'POST','callback'=>[self::class,'create_recommendation'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/recommendations',['methods'=>'GET','callback'=>[self::class,'recommendations'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/features',['methods'=>'POST','callback'=>[self::class,'create_feature'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/features',['methods'=>'GET','callback'=>[self::class,'features'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -64,6 +65,12 @@ final class GrowthOS_REST {
   $data=['site_id'=>$site?:null,'job_type'=>$type,'status'=>'queued','payload'=>$payload,'attempts'=>0,'max_attempts'=>3,'idempotency_key'=>$key?:null,'updated_at'=>current_time('mysql')];
   if(false===$wpdb->insert($t,$data))return new WP_REST_Response(['ok'=>false,'code'=>'JOB_CREATE_FAILED'],500);
   $data['id']=$wpdb->insert_id;return new WP_REST_Response(['ok'=>true,'job'=>$data],201);
+ }
+ public static function create_recommendation(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$category=sanitize_key((string)$request->get_param('category'));$title=sanitize_text_field((string)$request->get_param('title'));$class=sanitize_key((string)$request->get_param('approval_class'));$score=(int)$request->get_param('score');
+  if(!$site||$category===''||$title===''||!in_array($class,['green','amber','red'],true))return new WP_REST_Response(['ok'=>false,'code'=>'RECOMMENDATION_INPUT_INVALID'],400);
+  $t=$wpdb->prefix.'growthos_recommendations';$data=['site_id'=>$site,'category'=>$category,'title'=>$title,'evidence'=>wp_json_encode($request->get_param('evidence')??[]),'score'=>max(0,min(100,$score)),'approval_class'=>$class,'status'=>'proposed'];
+  if(false===$wpdb->insert($t,$data))return new WP_REST_Response(['ok'=>false,'code'=>'RECOMMENDATION_CREATE_FAILED'],500);$data['id']=$wpdb->insert_id;return new WP_REST_Response(['ok'=>true,'recommendation'=>$data],201);
  }
  public static function recommendations(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$status=sanitize_key((string)$request->get_param('status'));$t=$wpdb->prefix.'growthos_recommendations';
