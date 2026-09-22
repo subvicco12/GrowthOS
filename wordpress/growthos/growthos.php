@@ -10,7 +10,11 @@ define('GROWTHOS_PRODUCTION_HOST','growthos.converentis.com');
 define('GROWTHOS_DB_VERSION','2');
 require_once __DIR__.'/includes/class-growthos-db.php';
 require_once __DIR__.'/includes/class-growthos-rest.php';
-register_activation_hook(__FILE__,['GrowthOS_DB','activate']);
+require_once __DIR__.'/includes/class-growthos-jobs.php';
+register_activation_hook(__FILE__,function(){GrowthOS_DB::activate();GrowthOS_Jobs::schedule();});
+register_deactivation_hook(__FILE__,['GrowthOS_Jobs','unschedule']);
+add_filter('cron_schedules',function($s){$s['growthos_five_minutes']=['interval'=>300,'display'=>'GrowthOS every five minutes'];return $s;});
+add_action(GrowthOS_Jobs::HOOK,['GrowthOS_Jobs','run']);
 add_action('rest_api_init',['GrowthOS_REST','register_routes']);
 add_action('init',function(){
  add_rewrite_rule('^growthos/?$','index.php?growthos_app=1','top');
