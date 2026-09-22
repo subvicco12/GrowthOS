@@ -11,7 +11,7 @@ export function createApprovalRpcService():ApprovalCommandService|null{
   const {data,error}=await client.rpc('decide_recommendation',{p_recommendation_id:input.recommendationId,p_actor_id:input.actorId,p_decision:decision,p_note:input.note??null,p_idempotency_key:input.idempotencyKey});
   if(error){
    const message=error.message||'APPROVAL_PERSISTENCE_FAILED';
-   for(const code of ['APPROVAL_IDEMPOTENCY_CONFLICT','RECOMMENDATION_NOT_FOUND','INVALID_RECOMMENDATION_TRANSITION','APPROVAL_INPUT_INVALID','APPROVAL_DECISION_INVALID'])if(message.includes(code))throw new Error(code);
+   for(const code of ['APPROVAL_IDEMPOTENCY_CONFLICT','RECOMMENDATION_NOT_FOUND','INVALID_RECOMMENDATION_TRANSITION','APPROVAL_INPUT_INVALID','APPROVAL_DECISION_INVALID','APPROVAL_ACTOR_FORBIDDEN'])if(message.includes(code))throw new Error(code);
    throw new Error('APPROVAL_PERSISTENCE_FAILED');
   }
   const row=Array.isArray(data)?data[0]:data; if(!row)throw new Error('RECOMMENDATION_NOT_FOUND');
