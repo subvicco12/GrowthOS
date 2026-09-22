@@ -2,9 +2,9 @@ import type { Job } from './types';
 
 export interface SqlExecutor { query<T=Record<string,unknown>>(sql:string,params?:unknown[]):Promise<{rows:T[]}>; }
 
-type JobRow={id:string;site_id:string|null;type:string;status:Job['status'];idempotency_key:string;attempts:number;max_attempts:number;created_at:string};
+type JobRow={id:string;site_id:string|null;type:string;status:Job['status'];idempotency_key:string;attempts:number;max_attempts:number;payload:Record<string,unknown>|null;created_at:string};
 
-function mapJob(row:JobRow):Job{return {id:row.id,siteId:row.site_id??undefined,type:row.type,status:row.status,idempotencyKey:row.idempotency_key,attempts:row.attempts,maxAttempts:row.max_attempts,createdAt:row.created_at};}
+function mapJob(row:JobRow):Job{return {id:row.id,siteId:row.site_id??undefined,type:row.type,status:row.status,idempotencyKey:row.idempotency_key,attempts:row.attempts,maxAttempts:row.max_attempts,payload:row.payload??undefined,createdAt:row.created_at};}
 
 export class PostgresJobStore {
   constructor(private readonly db:SqlExecutor){}
@@ -20,7 +20,7 @@ export class PostgresJobStore {
       )
       update public.jobs j set status='running',locked_by=$1,locked_until=now()+($2 * interval '1 second'),attempts=j.attempts+1,updated_at=now()
       from candidate where j.id=candidate.id
-      returning j.id,j.site_id,j.type,j.status,j.idempotency_key,j.attempts,j.max_attempts,j.created_at
+      returning j.id,j.site_id,j.type,j.status,j.idempotency_key,j.attempts,j.max_attempts,j.payload,j.created_at
     `,[workerId,leaseSeconds]);
     return rows[0]?mapJob(rows[0]):null;
   }
