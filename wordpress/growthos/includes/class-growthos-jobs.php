@@ -1,0 +1,25 @@
+<?php
+if (!defined('ABSPATH')) exit;
+final class GrowthOS_Jobs {
+ const HOOK='growthos_run_jobs';
+ public static function schedule(): void { if(!wp_next_scheduled(self::HOOK))wp_schedule_event(time()+60,'growthos_five_minutes',self::HOOK); }
+ public static function unschedule(): void { $t=wp_next_scheduled(self::HOOK);if($t)wp_unschedule_event($t,self::HOOK); }
+ public static function run(): void {
+  global $wpdb;$t=$wpdb->prefix.'growthos_jobs';
+  $jobs=$wpdb->get_results("SELECT * FROM $t WHERE status='queued' AND attempts<max_attempts ORDER BY id ASC LIMIT 10",ARRAY_A);
+  foreach($jobs as $job)self::execute($job);
+ }
+ private static function execute(array $job): void {
+  global $wpdb;$t=$wpdb->prefix.'growthos_jobs';$id=(int)$job['id'];$attempt=(int)$job['attempts']+1;
+  $claimed=$wpdb->query($wpdb->prepare("UPDATE $t SET status='running',attempts=%d,updated_at=%s WHERE id=%d AND status='queued'",$attempt,current_time('mysql'),$id));
+  if($claimed!==1)return;
+  try{
+   $payload=json_decode($job['payload']?:'{}',true);if(!is_array($payload))throw new RuntimeException('JOB_PAYLOAD_INVALID');
+   $result=apply_filters('growthos_execute_job',null,$job['job_type'],$payload,$job);
+   if($result===null)throw new RuntimeException('JOB_HANDLER_MISSING');
+   $wpdb->update($t,['status'=>'completed','result'=>wp_json_encode($result),'error'=>null,'updated_at'=>current_time('mysql')],['id'=>$id]);
+  }catch(Throwable $e){
+   $terminal=$attempt>=(int)$job['max_attempts'];$wpdb->update($t,['status'=>$terminal?'failed':'queued','error'=>sanitize_text_field($e->getMessage()),'updated_at'=>current_time('mysql')],['id'=>$id]);
+  }
+ }
+}
