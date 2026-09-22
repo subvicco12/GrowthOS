@@ -6,7 +6,8 @@
  */
 if (!defined('ABSPATH')) exit;
 define('GROWTHOS_VERSION','1.0.0');
-define('GROWTHOS_DB_VERSION','1');
+define('GROWTHOS_PRODUCTION_HOST','growthos.converentis.com');
+define('GROWTHOS_DB_VERSION','2');
 require_once __DIR__.'/includes/class-growthos-db.php';
 require_once __DIR__.'/includes/class-growthos-rest.php';
 register_activation_hook(__FILE__,['GrowthOS_DB','activate']);
