@@ -30,6 +30,15 @@ jobs:
           cd ..
           test -s dist/growthos.zip
           unzip -t dist/growthos.zip
+      - name: Verify plugin manifest
+        run: |
+          unzip -p dist/growthos.zip growthos/growthos.php | grep -q 'Plugin Name: GrowthOS'
+          unzip -p dist/growthos.zip growthos/growthos.php | grep -q "GROWTHOS_PRODUCTION_HOST','growthos.converentis.com'"
+          unzip -l dist/growthos.zip | grep -q 'growthos/includes/class-growthos-db.php'
+          unzip -l dist/growthos.zip | grep -q 'growthos/includes/class-growthos-rest.php'
+          unzip -l dist/growthos.zip | grep -q 'growthos/includes/class-growthos-jobs.php'
+          unzip -l dist/growthos.zip | grep -q 'growthos/includes/class-growthos-engines.php'
+          unzip -l dist/growthos.zip | grep -q 'growthos/assets/growthos.js'
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
         with:
