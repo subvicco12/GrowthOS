@@ -310,7 +310,7 @@ final class GrowthOS_REST {
    if(false===$wpdb->insert($a,['recommendation_id'=>$rid,'actor_id'=>$actor,'decision'=>$decision,'note'=>$note?:null,'idempotency_key'=>$key]))throw new Exception('APPROVAL_PERSISTENCE_FAILED');
    $before=$row['status'];
    if(false===$wpdb->update($r,['status'=>$decision],['id'=>$rid]))throw new Exception('APPROVAL_PERSISTENCE_FAILED');
-   $wpdb->insert($e,['actor_id'=>$actor,'site_id'=>$row['site_id'],'action'=>'recommendation.decision','object_type'=>'recommendation','object_id'=>(string)$rid,'before_data'=>wp_json_encode(['status'=>$before]),'after_data'=>wp_json_encode(['status'=>$decision])]);
+   if(false===$wpdb->insert($e,['actor_id'=>$actor,'site_id'=>$row['site_id'],'action'=>'recommendation.decision','object_type'=>'recommendation','object_id'=>(string)$rid,'before_data'=>wp_json_encode(['status'=>$before]),'after_data'=>wp_json_encode(['status'=>$decision])]))throw new Exception('APPROVAL_AUDIT_FAILED');
    $wpdb->query('COMMIT');$row['status']=$decision;
    return new WP_REST_Response(['ok'=>true,'recommendation'=>$row],200);
   }catch(Throwable $x){$wpdb->query('ROLLBACK');$code=$x->getMessage();$status=$code==='RECOMMENDATION_NOT_FOUND'?404:(in_array($code,['APPROVAL_IDEMPOTENCY_CONFLICT','INVALID_RECOMMENDATION_TRANSITION'],true)?409:500);return new WP_REST_Response(['ok'=>false,'code'=>$status===500?'APPROVAL_FAILED':$code],$status);}
