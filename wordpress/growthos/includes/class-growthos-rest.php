@@ -185,6 +185,7 @@ final class GrowthOS_REST {
  public static function retry_job(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$id=(int)$request['id'];$t=$wpdb->prefix.'growthos_jobs';$job=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE id=%d",$id),ARRAY_A);if(!$job)return new WP_REST_Response(['ok'=>false,'code'=>'JOB_NOT_FOUND'],404);if($job['status']!=='failed')return new WP_REST_Response(['ok'=>false,'code'=>'JOB_NOT_FAILED'],409);
   if(false===$wpdb->update($t,['status'=>'queued','attempts'=>0,'error'=>null,'updated_at'=>current_time('mysql')],['id'=>$id]))return new WP_REST_Response(['ok'=>false,'code'=>'JOB_RETRY_FAILED'],500);
+  $payload=json_decode($job['payload']?:'{}',true)?:[];if(!empty($payload['batch'])&&isset($payload['sequence'])){$blocked=$wpdb->get_results($wpdb->prepare("SELECT id,payload,error FROM $t WHERE site_id=%d AND status='blocked' AND error=%s",(int)$job['site_id'],'BLOCKED_BY_FAILED_PREDECESSOR:'.$id),ARRAY_A);foreach($blocked as $b){$bp=json_decode($b['payload']?:'{}',true)?:[];if(($bp['batch']??null)===$payload['batch']&&(int)($bp['sequence']??-1)>(int)$payload['sequence'])$wpdb->update($t,['status'=>'queued','error'=>null,'updated_at'=>current_time('mysql')],['id'=>(int)$b['id'],'status'=>'blocked']);}}
   return new WP_REST_Response(['ok'=>true,'job_id'=>$id],202);
  }
  public static function scan_status(WP_REST_Request $request): WP_REST_Response {
