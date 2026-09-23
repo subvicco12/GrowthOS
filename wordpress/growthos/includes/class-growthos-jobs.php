@@ -15,7 +15,6 @@ final class GrowthOS_Jobs {
  private static function block_dependents_of_failed_jobs(string $t): void {
   global $wpdb;$queued=$wpdb->get_results("SELECT id,site_id,payload FROM $t WHERE status='queued'",ARRAY_A);foreach($queued as $job){$p=json_decode($job['payload']?:'{}',true);if(!is_array($p)||empty($p['batch'])||!isset($p['sequence']))continue;$failed=$wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE site_id=%d AND status='failed' AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.batch'))=%s AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload,'$.sequence')) AS UNSIGNED)<%d ORDER BY id ASC LIMIT 1",(int)$job['site_id'],(string)$p['batch'],(int)$p['sequence']));if($failed)$wpdb->update($t,['status'=>'blocked','error'=>'BLOCKED_BY_FAILED_PREDECESSOR:'.(int)$failed,'updated_at'=>current_time('mysql')],['id'=>(int)$job['id'],'status'=>'queued']);}
  }
- }
  private static function execute(array $job): void {
   global $wpdb;$t=$wpdb->prefix.'growthos_jobs';$id=(int)$job['id'];$attempt=(int)$job['attempts']+1;
   $claimed=$wpdb->query($wpdb->prepare("UPDATE $t SET status='running',attempts=%d,updated_at=%s WHERE id=%d AND status='queued'",$attempt,current_time('mysql'),$id));
