@@ -18,7 +18,6 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/revenue-summary',['methods'=>'GET','callback'=>[self::class,'revenue_summary'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/metric-goals',['methods'=>['GET','POST'],'callback'=>[self::class,'metric_goals'],'permission_callback'=>fn()=>current_user_can('growthos_access')&&($_SERVER['REQUEST_METHOD']==='GET'||current_user_can('growthos_manage'))]);
   register_rest_route('growthos/v1','/impact',['methods'=>'GET','callback'=>[self::class,'impact'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
-  register_rest_route('growthos/v1','/measurements',['methods'=>['GET','POST'],'callback'=>[self::class,'measurements'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/measurements',['methods'=>['GET','POST'],'callback'=>[self::class,'measurements'],'permission_callback'=>fn()=>current_user_can('growthos_access')&&($_SERVER['REQUEST_METHOD']==='GET'||current_user_can('growthos_manage'))]);
   register_rest_route('growthos/v1','/executions/from-approved',['methods'=>'POST','callback'=>[self::class,'create_execution'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/executions/(?P<id>\\d+)/verify',['methods'=>'POST','callback'=>[self::class,'verify_execution'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
