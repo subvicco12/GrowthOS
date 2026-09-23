@@ -24,9 +24,11 @@ add_action('init',function(){
 });
 add_filter('query_vars',function($vars){$vars[]='growthos_app';return $vars;});
 add_action('template_redirect',function(){
- $host=strtolower((string)wp_parse_url(home_url('/'),PHP_URL_HOST));
- $path=untrailingslashit((string)wp_parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH));
- $is_root=($path==='');
+ $host=strtolower(preg_replace('/:\\d+$/','',(string)($_SERVER['HTTP_HOST']??'')));
+ if($host==='')$host=strtolower((string)wp_parse_url(home_url('/'),PHP_URL_HOST));
+ $path=(string)wp_parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH);
+ $path='/'.ltrim($path,'/');
+ $is_root=($path==='/');
  if((int)get_query_var('growthos_app')!==1&&!($host===strtolower(GROWTHOS_PRODUCTION_HOST)&&$is_root))return;
  if(!is_user_logged_in()){auth_redirect();exit;}
  if(!current_user_can('growthos_access'))wp_die('GrowthOS access denied.',403);
