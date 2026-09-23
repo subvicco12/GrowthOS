@@ -2,10 +2,10 @@
 /**
  * Plugin Name: GrowthOS
  * Description: Hostinger WordPress control plane for GrowthOS.
- * Version: 1.0.7
+ * Version: 1.0.8
  */
 if (!defined('ABSPATH')) exit;
-define('GROWTHOS_VERSION','1.0.7');
+define('GROWTHOS_VERSION','1.0.8');
 define('GROWTHOS_PRODUCTION_HOST','growthos.converentis.com');
 define('GROWTHOS_DB_VERSION','11');
 require_once __DIR__.'/includes/class-growthos-db.php';
@@ -26,7 +26,8 @@ add_action('rest_api_init',['GrowthOS_REST','register_routes']);
 add_action('init',function(){
  $host=strtolower(preg_replace('/:\\d+$/','',(string)($_SERVER['HTTP_HOST']??'')));
  $path=(string)wp_parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH);$path='/'.ltrim($path,'/');
- if($host===strtolower(GROWTHOS_PRODUCTION_HOST)&&$path==='/'&&!is_user_logged_in()){
+ $is_rest_query=isset($_GET['rest_route'])&&is_string($_GET['rest_route']);
+ if($host===strtolower(GROWTHOS_PRODUCTION_HOST)&&$path==='/'&&!$is_rest_query&&!is_user_logged_in()){
   wp_safe_redirect(wp_login_url(home_url('/')));exit;
  }
 },0);
