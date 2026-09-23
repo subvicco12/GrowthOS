@@ -13,6 +13,7 @@ require_once __DIR__.'/includes/class-growthos-rest.php';
 require_once __DIR__.'/includes/class-growthos-jobs.php';
 require_once __DIR__.'/includes/class-growthos-engines.php';
 register_activation_hook(__FILE__,function(){GrowthOS_DB::activate();GrowthOS_Jobs::schedule();});
+add_action('plugins_loaded',function(){if(!wp_next_scheduled(GrowthOS_Jobs::HOOK))GrowthOS_Jobs::schedule();},20);
 add_action('plugins_loaded',['GrowthOS_DB','maybe_upgrade']);
 register_deactivation_hook(__FILE__,['GrowthOS_Jobs','unschedule']);
 add_filter('cron_schedules',function($s){$s['growthos_five_minutes']=['interval'=>300,'display'=>'GrowthOS every five minutes'];return $s;});
