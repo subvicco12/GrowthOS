@@ -262,8 +262,8 @@ final class GrowthOS_REST {
  public static function create_feature(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;$site=(int)$request->get_param('site_id');$key=sanitize_key((string)$request->get_param('feature_key'));$name=sanitize_text_field((string)$request->get_param('name'));
   if(!$site||$key===''||$name==='')return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_INPUT_INVALID'],400);
-  $t=$wpdb->prefix.'growthos_features';$data=['site_id'=>$site,'feature_key'=>$key,'name'=>$name,'state'=>'on','free_enabled'=>1,'pro_enabled'=>1,'business_enabled'=>1,'rollout_percent'=>100,'updated_at'=>current_time('mysql')];
-  if(false===$wpdb->insert($t,$data))return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_CREATE_FAILED'],409);$data['id']=$wpdb->insert_id;
+  $t=$wpdb->prefix.'growthos_features';$sites=$wpdb->prefix.'growthos_sites';$audit=$wpdb->prefix.'growthos_audit_events';if(!(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $sites WHERE id=%d",$site)))return new WP_REST_Response(['ok'=>false,'code'=>'SITE_NOT_FOUND'],404);$data=['site_id'=>$site,'feature_key'=>$key,'name'=>$name,'state'=>'on','free_enabled'=>1,'pro_enabled'=>1,'business_enabled'=>1,'rollout_percent'=>100,'updated_at'=>current_time('mysql')];
+  $wpdb->query('START TRANSACTION');if(false===$wpdb->insert($t,$data)){$wpdb->query('ROLLBACK');return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_CREATE_FAILED'],409);}$data['id']=(int)$wpdb->insert_id;if(false===$wpdb->insert($audit,['actor_id'=>get_current_user_id(),'site_id'=>$site,'action'=>'feature.created','object_type'=>'feature','object_id'=>(string)$data['id'],'after_data'=>wp_json_encode($data)])){$wpdb->query('ROLLBACK');return new WP_REST_Response(['ok'=>false,'code'=>'FEATURE_AUDIT_FAILED'],500);}$wpdb->query('COMMIT');
   return new WP_REST_Response(['ok'=>true,'feature'=>$data],201);
  }
  public static function features(WP_REST_Request $request): WP_REST_Response {
