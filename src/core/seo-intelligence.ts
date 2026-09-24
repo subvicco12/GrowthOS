@@ -1,8 +1,15 @@
+import { normalizePageUrl } from './url-normalization';
+
 export interface SeoPage { url:string; status:number; indexable:boolean; canonical?:string; title?:string; description?:string; h1Count:number; wordCount:number; internalLinks:number; }
 export interface SeoFinding { key:string; url:string; type:'indexability'|'canonical'|'metadata'|'heading'|'content'|'internal_link'; severity:'info'|'warning'|'critical'; evidence:string; }
 export function inspectSeoPages(pages:SeoPage[]):SeoFinding[]{
  const out:SeoFinding[]=[];
+ const seen=new Set<string>();
  for(const p of pages){
+  const normalizedUrl=normalizePageUrl(p.url);
+  if(seen.has(normalizedUrl))continue;
+  seen.add(normalizedUrl);
+  p={...p,url:normalizedUrl,canonical:p.canonical?normalizePageUrl(p.canonical):p.canonical};
   if(p.status>=400)out.push({key:'http-error',url:p.url,type:'indexability',severity:'critical',evidence:`HTTP status ${p.status}`});
   if(p.indexable&&!p.canonical)out.push({key:'missing-canonical',url:p.url,type:'canonical',severity:'warning',evidence:'Indexable page has no canonical evidence'});
   if(p.indexable&&!p.title)out.push({key:'missing-title',url:p.url,type:'metadata',severity:'critical',evidence:'Indexable page has no title evidence'});
