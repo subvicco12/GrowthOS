@@ -70,8 +70,8 @@ export function comparePackageSnapshots(
   }
  }
  for(const row of result.values()){
-  if(!row.ours.business&&row.competitors.business.present) row.recommendation='business_upgrade';
-  else if(!row.ours.pro&&row.competitors.pro.present) row.recommendation='pro_upgrade';
+  if(!row.ours.pro&&row.competitors.pro.present) row.recommendation='pro_upgrade';
+  else if(!row.ours.business&&row.competitors.business.present) row.recommendation='business_upgrade';
   else if(!row.ours.free&&row.competitors.free.present) row.recommendation='consider_free';
  }
  return [...result.values()].sort((a,b)=>
