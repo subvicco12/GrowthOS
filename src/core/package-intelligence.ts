@@ -34,7 +34,7 @@ export function buildPackageSnapshot(
  planAccess:Partial<Record<Plan,string[]>>,
  capturedAt:string,
 ):SitePackageSnapshot {
- const plans:PlanSnapshot[]=['free','pro','business'].map(plan=>({
+ const plans:PlanSnapshot[]=(['free','pro','business'] as Plan[]).map(plan=>({
   plan,
   featureKeys:planAccess[plan]??[],
   limits:{},
