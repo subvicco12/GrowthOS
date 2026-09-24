@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { growthSites as sites, growthWorkspaces } from '../core/portfolio';
-import { siteScopeOptions } from '../core/site-scope';
+import { resolveSiteScope, siteScopeOptions } from '../core/site-scope';
 import { ApprovalInboxPanel } from './approval-inbox-panel';
 import { buildApprovalInboxViewModel } from '../core/approval-inbox-view';
 import type { DashboardSnapshot } from '../core/dashboard-repository';
@@ -15,14 +15,14 @@ export default function Dashboard() {
  const [snapshot,setSnapshot]=useState<DashboardSnapshot|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
- const selectedSite=useMemo(()=>{const option=siteScopeOptions(sites).find(o=>o.value===siteId);return option?sites.find(s=>s.name===option.label):undefined},[siteId]);
+ const selectedSite=useMemo(()=>resolveSiteScope(sites,siteId||undefined),[siteId]);
  useEffect(()=>{let active=true;setLoading(true);setError('');const query=siteId?'?siteId='+encodeURIComponent(siteId):'';fetch('/api/dashboard'+query,{credentials:'include',cache:'no-store'}).then(async r=>{const body=await r.json();if(!r.ok)throw new Error(body.message||body.code||'DASHBOARD_FAILED');return body;}).then(body=>{if(active)setSnapshot(body.data)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'DASHBOARD_FAILED')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[siteId]);
  const counts=snapshot?.counts;
  const approvals=buildApprovalInboxViewModel((snapshot?.approvalInbox??[]).filter(x=>x.approvalClass!=='green').map(x=>({...x,approvalClass:x.approvalClass as 'amber'|'red'})));
  return <main className="shell">
   <aside className="sidebar"><div className="brand">GrowthOS</div><nav aria-label="Primary navigation">{workspaces.map((item,i)=><a className={i===0?'nav active':'nav'} href={i===0?'#portfolio':'#'+item.toLowerCase().replaceAll(' ','-')} key={item}>{item}</a>)}</nav></aside>
   <section className="content">
-   <header className="topbar"><div><p className="eyebrow">WEBSITE GROWTH OPERATING SYSTEM</p><h1>Command Center</h1><p className="lede">Discover, test, compare, improve and grow the full website portfolio from one control plane.</p></div><div className="siteScope"><label htmlFor="website-scope">Website</label><select id="website-scope" value={siteId} onChange={e=>setSiteId(e.target.value)}><option value="">All websites</option>{siteScopeOptions(sites).map(option=><option value={option.value} key={option.value}>{option.label}</option>)}</select></div><button type="button">+ Add website</button></header>
+   <header className="topbar"><div><p className="eyebrow">WEBSITE GROWTH OPERATING SYSTEM</p><h1>Command Center</h1><p className="lede">Discover, test, compare, improve and grow the full website portfolio from one control plane.</p></div><div className="siteScope"><label htmlFor="website-scope">Website</label><select id="website-scope" value={siteId} onChange={e=>setSiteId(e.target.value)}>{siteScopeOptions(sites).map(option=><option value={option.value} key={option.value||"all"}>{option.label}</option>)}</select></div><button type="button">+ Add website</button></header>
    {error&&<section className="panel"><strong>Dashboard unavailable</strong><p>{error}</p></section>}{loading&&<section className="panel"><p>Loading live portfolio data…</p></section>}
    <div className="metrics"><article><span>Websites</span><strong>{siteId?(selectedSite?1:0):sites.length}</strong><small>central registry</small></article><article><span>Connected</span><strong>{snapshot?.integrations.filter(x=>x.status==='healthy').length??0}</strong><small>live connector status</small></article><article><span>Active jobs</span><strong>{counts?.activeJobs??0}</strong><small>queued + running</small></article><article><span>Needs approval</span><strong>{counts?.needsApproval??0}</strong><small>AMBER / RED decisions</small></article></div>
    <section className="panel"><div className="panelHead"><div><h2>Operations at a glance</h2><p>Live operational signals from the GrowthOS control plane.</p></div><span className="engineCount">Control plane</span></div><div className="workspaceGrid">{operationalItems.map(([label,key])=><article className="workspace" key={key}><strong>{label}</strong><span>{counts?.[key as keyof typeof counts]??0}</span></article>)}</div></section>

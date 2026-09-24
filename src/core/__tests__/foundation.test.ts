@@ -418,3 +418,10 @@ test('approval route requires authenticated privileged actor and ignores client 
 test('server database config fails closed and never substitutes public anon credentials', async()=>{ const {readServerDatabaseConfig,databaseConfigured}=await import('../server-config'); assert.equal(readServerDatabaseConfig({}),null); assert.equal(readServerDatabaseConfig({NEXT_PUBLIC_SUPABASE_URL:'https://db.test',NEXT_PUBLIC_SUPABASE_ANON_KEY:'anon'}),null); const cfg=readServerDatabaseConfig({SUPABASE_URL:'https://db.test',SUPABASE_SERVICE_ROLE_KEY:'server-secret'}); assert.deepEqual(cfg,{url:'https://db.test',serviceRoleKey:'server-secret'}); assert.equal(databaseConfigured({SUPABASE_URL:'https://db.test',SUPABASE_SERVICE_ROLE_KEY:'server-secret'}),true); });
 
 test('approval route rejects client supplied actor identity', async()=>{ const {createApprovalRoute}=await import('../approval-route'); const route=createApprovalRoute({service:{} as any,authenticate:async()=>({id:'server-user',role:'owner'})}); const res=await route(new Request('http://x',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({recommendationId:'r',actorId:'spoofed',action:'approve',idempotencyKey:'k'})})); assert.equal(res.status,400); assert.equal((await res.json() as any).code,'CLIENT_ACTOR_FORBIDDEN'); });
+test('site scope options contain exactly one portfolio-wide option',async()=>{
+ const {growthSites}=await import('../portfolio');
+ const {siteScopeOptions}=await import('../site-scope');
+ const options=siteScopeOptions(growthSites);
+ assert.equal(options.filter(option=>option.value==='').length,1);
+ assert.equal(options[0]?.label,'All websites');
+});
