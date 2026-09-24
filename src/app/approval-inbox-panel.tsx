@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildApprovalInboxViewModel, type ApprovalInboxViewModel } from '../core/approval-inbox-view';
 import { approvalRequest } from '../core/approval-request';
 export function ApprovalInboxPanel({items,onAction}:{items:ApprovalInboxViewModel[];onAction?:(id:string,action:'approve'|'reject'|'defer')=>void}){
@@ -7,6 +7,8 @@ export function ApprovalInboxPanel({items,onAction}:{items:ApprovalInboxViewMode
  const [busy,setBusy]=useState<string|null>(null);
  const [feedback,setFeedback]=useState<string>('');
  const [pending,setPending]=useState<{id:string;action:'approve'|'reject'|'defer'}|null>(null);
+ const cancelRef=useRef<HTMLButtonElement|null>(null);
+ useEffect(()=>{if(pending)cancelRef.current?.focus()},[pending]);
  const models=useMemo(()=>buildApprovalInboxViewModel(items),[items]);
  async function act(id:string,action:'approve'|'reject'|'defer'){
   if(onAction){onAction(id,action);return;}
@@ -23,7 +25,7 @@ export function ApprovalInboxPanel({items,onAction}:{items:ApprovalInboxViewMode
  return <section className="panel" aria-labelledby="approval-inbox-title">
   <div className="panelHead"><div><h2 id="approval-inbox-title">Approval Inbox</h2><p>Only recommendations requiring human decisions appear here.</p></div><span className="engineCount">{models.length} pending</span></div>
   {feedback&&<p className="approvalFeedback" role="status">{feedback}</p>}
-  {pending&&<div className="approvalConfirm" role="alertdialog" aria-modal="true" aria-label="Confirm recommendation decision"><p>Confirm <strong>{pending.action}</strong>. This records a human decision in GrowthOS and cannot be treated as a preview.</p><div className="approvalActions"><button type="button" disabled={busy===pending.id} onClick={()=>{const decision=pending;setPending(null);void act(decision.id,decision.action)}}>Confirm {pending.action}</button><button type="button" disabled={busy===pending.id} onClick={()=>setPending(null)}>Cancel</button></div></div>}
+  {pending&&<div className="approvalConfirm" role="alertdialog" aria-modal="true" aria-label="Confirm recommendation decision"><p>Confirm <strong>{pending.action}</strong>. This records a human decision in GrowthOS and cannot be treated as a preview.</p><div className="approvalActions"><button type="button" disabled={busy===pending.id} onClick={()=>{const decision=pending;setPending(null);void act(decision.id,decision.action)}}>Confirm {pending.action}</button><button ref={cancelRef} type="button" disabled={busy===pending.id} onClick={()=>setPending(null)}>Cancel</button></div></div>}
   {models.length===0?<p className="emptyState">No approval decisions pending.</p>:<div className="approvalList">
    {models.map(item=><article className="approvalCard" key={item.id}>
     <button className="approvalSummary" type="button" onClick={()=>setSelected(item)} aria-expanded={selected?.id===item.id}><span><strong>{item.title}</strong><small>{item.category} · {item.siteId}</small></span><span>{item.approvalClass.toUpperCase()} · {item.score.toFixed(2)}</span></button>
