@@ -10,16 +10,18 @@ export interface DashboardQuery {
  counts:OperationalCounts;
  activeJobs:number;
 }
+export interface DashboardSite { id:string; name:string; domain:string; status:string; }
 export interface DashboardSnapshot {
  counts:OperationalCounts;
  activeJobs:number;
  nextBestActions:ActionItem[];
  approvalInbox:ApprovalInboxItem[];
  integrations:IntegrationHealth[];
+ sites:DashboardSite[];
  generatedAt:string;
 }
-export function buildDashboardSnapshot(input:DashboardQuery,now=new Date()):DashboardSnapshot {
- return {counts:{...input.counts,activeJobs:input.activeJobs},activeJobs:input.activeJobs,nextBestActions:buildNextBestActions(input.recommendations),approvalInbox:buildApprovalInbox(input.approvals),integrations:[...input.integrations],generatedAt:now.toISOString()};
+export function buildDashboardSnapshot(input:DashboardQuery & {sites?:DashboardSite[]},now=new Date()):DashboardSnapshot {
+ return {counts:{...input.counts,activeJobs:input.activeJobs},activeJobs:input.activeJobs,nextBestActions:buildNextBestActions(input.recommendations),approvalInbox:buildApprovalInbox(input.approvals),integrations:[...input.integrations],sites:[...(input.sites??[])],generatedAt:now.toISOString()};
 }
 export interface DashboardSql { query<T=unknown>(sql:string,params?:unknown[]):Promise<{rows:T[]}>; }
 export class PostgresDashboardRepository {

@@ -9,15 +9,16 @@ export async function GET(request:Request):Promise<Response>{
  try{
   const siteId=validateDashboardSite(new URL(request.url).searchParams.get('siteId')||undefined);
   const client=new WordPressGrowthOSClient(config);
-  const [dashboard,recs,connectors]=await Promise.all([client.dashboard(siteId),client.recommendations(siteId),client.connectors(siteId)]);
+  const [dashboard,recs,connectors,siteResponse]=await Promise.all([client.dashboard(siteId),client.recommendations(siteId),client.connectors(siteId),client.sites()]);
   const rows=Array.isArray(recs)?recs:(recs.recommendations??recs.items??[]);
   const recommendations=rows.map((r:any)=>({id:String(r.id),siteId:String(r.site_id),title:r.title,category:r.category,score:Number(r.score??0),approvalClass:r.approval_class,status:r.status,reason:r.title,evidence:decodeWordPressEvidence(r.evidence),impact:Number(r.impact??0),confidence:Number(r.confidence??0),effort:Number(r.effort??0),risk:Number(r.risk??0)}));
   const connectorRows=connectors.connectors??connectors.items??[];
   const integrations=connectorRows.map((row:any)=>({name:row.kind,status:(row.status==='connected'?'healthy':row.status==='disabled'?'disabled':'attention') as 'healthy'|'attention'|'disabled',detail:row.status==='connected'?(row.last_seen_at?'Connected':'Connected; awaiting first heartbeat'):String(row.status).replaceAll('_',' ')}));
+  const sites=(siteResponse.sites??[]).map((row:any)=>({id:String(row.id),name:String(row.name),domain:String(row.domain),status:String(row.status)})).filter((row:any)=>!siteId||row.id===String(siteId));
   const metrics=dashboard.metrics??{};
   const activeJobs=Number(metrics.queued_jobs??0);
   const counts={needsApproval:Number(metrics.pending_approvals??recommendations.filter((x:any)=>x.status==='proposed'&&x.approvalClass!=='green').length),inDevelopment:0,inProduction:0,qaFailed:0,readyForReview:0,readyForListing:0,readyToPublish:0,live:0,exceptions:Number(metrics.degraded_connectors??0),activeJobs};
-  return Response.json({ok:true,data:buildDashboardSnapshot({counts,activeJobs,recommendations,approvals:recommendations.filter((x:any)=>x.status==='proposed'),integrations})});
+  return Response.json({ok:true,data:buildDashboardSnapshot({counts,activeJobs,recommendations,approvals:recommendations.filter((x:any)=>x.status==='proposed'),integrations,sites})});
  }catch(error){
   if(error instanceof Error&&error.message==='INVALID_SITE')return Response.json({ok:false,code:'INVALID_SITE',message:error.message},{status:400});
   if(error instanceof Error&&error.message==='WORDPRESS_UNAUTHORIZED')return Response.json({ok:false,code:'UNAUTHORIZED',message:'WordPress GrowthOS authentication failed'},{status:401});
