@@ -21,7 +21,7 @@ export async function GET(request:Request):Promise<Response>{
     const recommendations=(rec.data??[]).map((r:any)=>({id:r.id,siteId:r.site_id,title:r.title,category:r.category,score:Number(r.score),approvalClass:r.approval_class,status:r.status,reason:r.title,evidence:r.evidence??[],impact:Number(r.impact??0),confidence:Number(r.confidence??0),effort:Number(r.effort??0),risk:Number(r.risk??0)}));
     const activeJobs=(jobs.data??[]).length;
     const counts={needsApproval:recommendations.filter((x:any)=>x.status==='proposed'&&x.approvalClass!=='green').length,inDevelopment:0,inProduction:0,qaFailed:0,readyForReview:0,readyForListing:0,readyToPublish:0,live:0,exceptions:0,activeJobs};
-    const integrations=(connectors.data??[]).map((row:any)=>({name:row.kind,status:row.status==='connected'?'healthy':row.status==='disabled'?'disabled':'attention',detail:row.status==='connected'?(row.last_seen_at?'Connected':'Connected; awaiting first heartbeat'):String(row.status).replaceAll('_',' ')}));
+    const integrations=(connectors.data??[]).map((row:any)=>({name:row.kind,status:(row.status==='connected'?'healthy':row.status==='disabled'?'disabled':'attention') as 'healthy'|'attention'|'disabled',detail:row.status==='connected'?(row.last_seen_at?'Connected':'Connected; awaiting first heartbeat'):String(row.status).replaceAll('_',' ')}));
     return Response.json({ok:true,data:buildDashboardSnapshot({counts,activeJobs,recommendations,approvals:recommendations.filter((x:any)=>x.status==='proposed'),integrations})});
   }catch(error){
     if(error instanceof Error&&error.message==='INVALID_SITE')return Response.json({ok:false,code:'INVALID_SITE',message:error.message},{status:400});
