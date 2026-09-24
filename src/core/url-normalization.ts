@@ -8,7 +8,6 @@ export function normalizePageUrl(value:string):string{
   if((url.protocol==='https:'&&url.port==='443')||(url.protocol==='http:'&&url.port==='80'))url.port='';
   const isSynthetic=url.hostname==='growthos.invalid';
   let pathname=url.pathname.replace(/\/{2,}/g,'/');
-  if(pathname!=='/'&&pathname.endsWith('/'))pathname=pathname.slice(0,-1);
   url.pathname=pathname||'/';
   if(isSynthetic)return url.pathname+url.search;
   return url.toString();

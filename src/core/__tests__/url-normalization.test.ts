@@ -9,9 +9,11 @@ test('normalizes equivalent root URL spellings',()=>{
  assert.deepEqual(dedupePageUrls(['https://example.com','https://example.com/']),['https://example.com/']);
 });
 
-test('normalizes trailing slash while preserving query semantics',()=>{
- assert.equal(normalizePageUrl('https://example.com/tools/'),'https://example.com/tools');
- assert.equal(normalizePageUrl('https://example.com/tools/?tier=pro'),'https://example.com/tools?tier=pro');
+test('preserves non-root trailing slash semantics and query strings',()=>{
+ assert.equal(normalizePageUrl('https://example.com/tools/'),'https://example.com/tools/');
+ assert.equal(normalizePageUrl('https://example.com/tools'),'https://example.com/tools');
+ assert.equal(normalizePageUrl('https://example.com/tools/?tier=pro'),'https://example.com/tools/?tier=pro');
+ assert.deepEqual(dedupePageUrls(['https://example.com/tools','https://example.com/tools/']),['https://example.com/tools','https://example.com/tools/']);
 });
 
 test('SEO inspection analyzes equivalent URLs only once',()=>{
