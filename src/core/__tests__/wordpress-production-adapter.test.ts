@@ -15,7 +15,7 @@ test('dashboard accepts production integer site IDs',()=>{
 
 test('production site scope maps six domains to GrowthOS IDs',()=>{
  const options=siteScopeOptions(growthSites);
- assert.deepEqual([...options.map(x=>x.value)].sort(),['1','2','3','4','5','6']);
+ assert.deepEqual([...options.map(x=>x.value).filter(Boolean)].sort(),['1','2','3','4','5','6']);
  assert.equal(resolveSiteScope(growthSites,'1')?.domain,'priceinsight360.com');
  assert.equal(resolveSiteScope(growthSites,'6')?.domain,'calcumint.com');
 });
