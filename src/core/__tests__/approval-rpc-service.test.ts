@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createApprovalRpcServiceWithClient, type ApprovalRpcClient } from '../approval-rpc-service';
+const row={id:'r1',site_id:'s1',category:'qa',title:'Fix regression',evidence:['e'],impact:5,confidence:5,effort:1,recurring_cost_usd:0,risk:'low',score:90,approval_class:'amber',status:'approved',created_at:'2026-09-22T00:00:00Z'};
+const input={recommendationId:'r1',actorId:'u1',action:'approve' as const,idempotencyKey:'k1'};
+test('approval RPC maps command to atomic database function',async()=>{let seen:any;const client:ApprovalRpcClient={async rpc(name,args){seen={name,args};return{data:row,error:null};}};const result=await createApprovalRpcServiceWithClient(client).decide(input);assert.equal(seen.name,'decide_recommendation');assert.deepEqual(seen.args,{p_recommendation_id:'r1',p_actor_id:'u1',p_decision:'approved',p_note:null,p_idempotency_key:'k1'});assert.equal(result.status,'approved');});
+test('approval RPC preserves known database errors',async()=>{for(const code of ['APPROVAL_IDEMPOTENCY_CONFLICT','RECOMMENDATION_NOT_FOUND','INVALID_RECOMMENDATION_TRANSITION','APPROVAL_ACTOR_FORBIDDEN']){const client:ApprovalRpcClient={async rpc(){return{data:null,error:{message:'database: '+code}};}};await assert.rejects(()=>createApprovalRpcServiceWithClient(client).decide(input),new RegExp(code));}});
+test('approval RPC redacts unknown database errors',async()=>{const client:ApprovalRpcClient={async rpc(){return{data:null,error:{message:'password secret internal detail'}};}};await assert.rejects(()=>createApprovalRpcServiceWithClient(client).decide(input),/APPROVAL_PERSISTENCE_FAILED/);});
+test('approval RPC treats empty success data as not found',async()=>{const client:ApprovalRpcClient={async rpc(){return{data:null,error:null};}};await assert.rejects(()=>createApprovalRpcServiceWithClient(client).decide(input),/RECOMMENDATION_NOT_FOUND/);});
