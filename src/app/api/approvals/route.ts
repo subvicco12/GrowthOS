@@ -1,7 +1,8 @@
 import { readWordPressGrowthOSConfig, WordPressGrowthOSClient } from '../../../core/wordpress-growthos-client';
 const decisions={approve:'approved',reject:'rejected',defer:'deferred'} as const;
 export async function POST(request:Request):Promise<Response>{
- const config=readWordPressGrowthOSConfig();
+ let config;
+ try{config=readWordPressGrowthOSConfig();}catch{return Response.json({ok:false,code:'INVALID_CONFIGURATION'},{status:503});}
  if(!config)return Response.json({ok:false,code:'NEEDS_CONNECTION'},{status:503});
  let body:unknown; try{body=await request.json();}catch{return Response.json({ok:false,code:'INVALID_JSON'},{status:400});}
  if(!body||typeof body!=='object')return Response.json({ok:false,code:'INVALID_APPROVAL_REQUEST'},{status:400});

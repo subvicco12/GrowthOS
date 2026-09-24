@@ -4,7 +4,8 @@ import { readWordPressGrowthOSConfig, WordPressGrowthOSClient } from '../../../c
 import { decodeWordPressEvidence } from '../../../core/wordpress-evidence';
 
 export async function GET(request:Request):Promise<Response>{
- const config=readWordPressGrowthOSConfig();
+ let config;
+ try{config=readWordPressGrowthOSConfig();}catch{return Response.json({ok:false,code:'INVALID_CONFIGURATION',message:'WordPress GrowthOS connection configuration is invalid'},{status:503});}
  if(!config)return Response.json({ok:false,code:'NEEDS_CONNECTION',message:'WordPress GrowthOS connection is not configured'},{status:503});
  try{
   const siteId=validateDashboardSite(new URL(request.url).searchParams.get('siteId')||undefined);
