@@ -5,7 +5,7 @@ export interface SeoFinding { key:string; url:string; type:'indexability'|'canon
 export function inspectSeoPages(pages:SeoPage[]):SeoFinding[]{
  const out:SeoFinding[]=[];
  const seen=new Set<string>();
- for(const p of pages){
+ for(let p of pages){
   const normalizedUrl=normalizePageUrl(p.url);
   if(seen.has(normalizedUrl))continue;
   seen.add(normalizedUrl);
