@@ -1,10 +1,12 @@
+import { dedupePageUrls } from './url-normalization';
+
 export type DiscoverySource='connector'|'crawl'|'manual';
 export type DiscoveryConfidence='high'|'medium'|'low';
 export interface DiscoveredFeature { key:string; name:string; evidence:string[]; source:DiscoverySource; confidence:DiscoveryConfidence; }
 export interface WebsiteSnapshot { siteId:string; url:string; capturedAt:string; routes:string[]; features:DiscoveredFeature[]; technologies:string[]; }
 const normalize=(value:string)=>value.trim().replace(/\s+/g,' ');
 export function buildWebsiteSnapshot(input:{siteId:string;url:string;capturedAt:string;routes?:string[];featureNames?:string[];technologies?:string[];source?:DiscoverySource}):WebsiteSnapshot {
- const routes=[...new Set((input.routes??[]).map(normalize).filter(Boolean))].slice(0,10000);
+ const routes=dedupePageUrls((input.routes??[]).map(normalize).filter(Boolean)).slice(0,10000);
  const source=input.source??'crawl';
  const features=[...new Set((input.featureNames??[]).map(normalize).filter(Boolean))].slice(0,5000).map((name,index)=>({key:`discovered-${index+1}`,name,evidence:[],source,confidence:'medium' as const}));
  return {siteId:input.siteId,url:input.url,capturedAt:input.capturedAt,routes,features,technologies:[...new Set((input.technologies??[]).map(normalize).filter(Boolean))].slice(0,500)};
