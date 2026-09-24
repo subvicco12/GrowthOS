@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { authorizeConnectedExecution } from '../connected-execution-guard';
 import type { Entitlement } from '../types';
-const entitlement:Entitlement={id:'e1',siteId:'11111111-1111-4111-8111-111111111111',featureKey:'deploy',mode:'on',freeAccess:false,proAccess:true,businessAccess:true,quotaFree:null,quotaPro:null,quotaBusiness:null,rolloutPercent:100,emergencyKill:false,failSafe:'deny',customerMessage:undefined,updatedAt:new Date().toISOString()};
+const entitlement:Entitlement={siteId:'11111111-1111-4111-8111-111111111111',featureKey:'deploy',mode:'on',freeAccess:false,proAccess:true,businessAccess:true,quotaFree:null,quotaPro:null,quotaBusiness:null,rolloutPercent:100,emergencyKill:false,failSafe:'deny',customerMessage:undefined,updatedAt:new Date().toISOString()};
 const base={authenticatedSiteId:entitlement.siteId,authorization:{actorId:'admin-1',siteId:entitlement.siteId,role:'admin' as const},command:{commandId:'cmd-1',type:'deploy.safe',payload:{},idempotencyKey:'idem-1',requestedAt:new Date().toISOString()},allowedCommands:['deploy.safe'],permission:'manageSite' as const,feature:{role:'admin' as const,requiredRole:'admin' as const,siteStatus:'active' as const,plan:'pro' as const,entitlement},execution:{id:'exec-1',siteId:entitlement.siteId,state:'prepared' as const,reversible:true,beforeRef:'snapshot://before'}};
 test('authorizes only a same-site entitled recoverable allow-listed command',()=>{assert.equal(authorizeConnectedExecution(base).allowed,true)});
 test('fails closed on cross-site execution',()=>{assert.throws(()=>authorizeConnectedExecution({...base,execution:{...base.execution,siteId:'22222222-2222-4222-8222-222222222222'}}),/CROSS_SITE_ACCESS_DENIED/)});
