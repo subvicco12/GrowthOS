@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { discoverFeatureCandidates } from '../feature-intelligence';
-import { comparePackageSnapshots } from '../package-intelligence';
+import { comparePackageSnapshots, type SitePackageSnapshot } from '../package-intelligence';
 import { scoreCompetitor } from '../competitor-discovery';
 
 test('discovers explicit tool and pricing features from page evidence',()=>{
@@ -14,12 +14,12 @@ test('discovers explicit tool and pricing features from page evidence',()=>{
 });
 
 test('package comparison creates tier-specific upgrade opportunities',()=>{
- const ours={siteId:'1',productName:'Example',capturedAt:'2026-09-24T00:00:00Z',plans:[
+ const ours:SitePackageSnapshot={siteId:'1',productName:'Example',capturedAt:'2026-09-24T00:00:00Z',plans:[
   {plan:'free',featureKeys:['core'],limits:{},evidence:[],capturedAt:'x'},
   {plan:'pro',featureKeys:['core'],limits:{},evidence:[],capturedAt:'x'},
   {plan:'business',featureKeys:['core'],limits:{},evidence:[],capturedAt:'x'},
  ]};
- const competitor={...ours,siteId:'2',plans:[
+ const competitor:SitePackageSnapshot={...ours,siteId:'2',plans:[
   {plan:'free',featureKeys:['core'],limits:{},evidence:[],capturedAt:'x'},
   {plan:'pro',featureKeys:['core','advanced'],limits:{},evidence:['pricing'],capturedAt:'x'},
   {plan:'business',featureKeys:['core','advanced','team'],limits:{},evidence:['pricing'],capturedAt:'x'},
