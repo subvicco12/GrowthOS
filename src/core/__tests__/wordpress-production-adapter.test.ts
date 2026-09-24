@@ -26,3 +26,10 @@ test('WordPress GrowthOS config is server-only and HTTPS',()=>{
  assert.equal(config?.baseUrl,'https://growthos.converentis.com');
  assert.throws(()=>readWordPressGrowthOSConfig({GROWTHOS_WORDPRESS_URL:'http://growthos.converentis.com',GROWTHOS_WORDPRESS_USERNAME:'admin',GROWTHOS_WORDPRESS_APPLICATION_PASSWORD:'secret'}),/WORDPRESS_HTTPS_REQUIRED/);
 });
+
+test('WordPress production client posts approval decisions to GrowthOS REST',async()=>{
+ const {WordPressGrowthOSClient}=await import('../wordpress-growthos-client');
+ const original=globalThis.fetch; let seen:any;
+ globalThis.fetch=(async(url:any,init:any)=>{seen={url:String(url),init};return new Response(JSON.stringify({ok:true,recommendation:{id:7,status:'approved'}}),{status:200,headers:{'Content-Type':'application/json'}});}) as any;
+ try{const client=new WordPressGrowthOSClient({baseUrl:'https://growthos.example',username:'admin',applicationPassword:'secret'});const out:any=await client.decideRecommendation(7,'approved','idem-7','reviewed');assert.equal(out.ok,true);assert.equal(seen.url,'https://growthos.example/wp-json/growthos/v1/recommendations/7/decision');assert.equal(seen.init.method,'POST');assert.deepEqual(JSON.parse(seen.init.body),{decision:'approved',idempotency_key:'idem-7',note:'reviewed'});assert.ok(String(seen.init.headers.Authorization).startsWith('Basic '));}finally{globalThis.fetch=original;}
+});
