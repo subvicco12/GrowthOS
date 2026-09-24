@@ -6,5 +6,5 @@ export function resolveSiteScope(sites:readonly GrowthSiteDefinition[],siteId:st
  return sites.find(site=>(productionSiteIds[site.domain]??site.domain)===siteId);
 }
 export function siteScopeOptions(sites:readonly GrowthSiteDefinition[]):Array<{value:string;label:string}>{
- return sites.map(site=>({value:productionSiteIds[site.domain]??site.domain,label:site.name}));
+ return [{value:'',label:'All websites'},...sites.map(site=>({value:productionSiteIds[site.domain]??site.domain,label:site.name}))];
 }
