@@ -2,7 +2,7 @@ name: GrowthOS CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, phase/1-foundation]
 permissions:
   contents: read
 jobs:
@@ -18,3 +18,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Production architecture guard
+        run: |
+          ! grep -RInE 'from .*supabase|createClient\(' src/app/api --include='*.ts'
+          grep -q "WordPressGrowthOSClient" src/app/api/dashboard/route.ts
+          grep -q "WordPressGrowthOSClient" src/app/api/approvals/route.ts
+          grep -q "INVALID_CONFIGURATION" src/app/api/dashboard/route.ts
+          grep -q "INVALID_CONFIGURATION" src/app/api/approvals/route.ts
