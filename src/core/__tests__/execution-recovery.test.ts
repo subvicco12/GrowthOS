@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {markExecuting,markFailed,markRolledBack,markVerified,type ExecutionRecord} from '../execution-recovery';
+const base:ExecutionRecord={id:'e1',siteId:'1',state:'prepared',reversible:true,beforeRef:'snapshot-before'};
+test('reversible execution requires recovery evidence and verification',()=>{const running=markExecuting(base);const verified=markVerified(running,'verification-1');assert.equal(verified.state,'verified');assert.equal(verified.verificationRef,'verification-1');});
+test('failed reversible execution can record rollback evidence',()=>{const failed=markFailed(markExecuting(base),'test failure');const rolled=markRolledBack(failed,'snapshot-restored');assert.equal(rolled.state,'rolled_back');assert.equal(rolled.afterRef,'snapshot-restored');});
+test('reversible execution fails closed without before snapshot',()=>{assert.throws(()=>markExecuting({...base,beforeRef:undefined}),/EXECUTION_NOT_RECOVERABLE/);});
+test('rollback fails closed for irreversible work',()=>{const failed:ExecutionRecord={...base,state:'failed',reversible:false};assert.throws(()=>markRolledBack(failed,'x'),/ROLLBACK_NOT_AVAILABLE/);});
