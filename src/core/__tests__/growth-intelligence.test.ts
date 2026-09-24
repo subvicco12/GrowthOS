@@ -7,8 +7,8 @@ import { summarizeRevenue } from '../revenue-intelligence';
 
 test('ranks evidence-backed growth signals and preserves safety class',()=>{
  const signals=rankGrowthSignals([
-  {id:'a',siteId:'1',category:'seo',title:'Fix title',description:'',evidence:[{source:'crawl',observedAt:'x'}],impact:5,confidence:5,effort:1,recurringCostUsd:0,risk:1,successMetric:'CTR'},
-  {id:'b',siteId:'1',category:'revenue',title:'Change pricing',description:'',evidence:[{source:'pricing',observedAt:'x'}],impact:5,confidence:5,effort:1,recurringCostUsd:0,risk:4,successMetric:'MRR'},
+  {id:'a',siteId:'1',category:'seo',title:'Fix title',description:'',evidence:[{source:'crawl',observedAt:'x'}],impact:5,confidence:5,effort:1,recurringCostUsd:0,risk:1,successMetric:'CTR',approvalClass:'amber'},
+  {id:'b',siteId:'1',category:'revenue',title:'Change pricing',description:'',evidence:[{source:'pricing',observedAt:'x'}],impact:5,confidence:5,effort:1,recurringCostUsd:0,risk:4,successMetric:'MRR',approvalClass:'red'},
  ]);
  assert.equal(signals[0].title,'Fix title'); assert.equal(signals[1].approvalClass,'red');
  assert.equal(buildNextBestActions(signals,2).length,2);

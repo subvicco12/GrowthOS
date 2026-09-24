@@ -34,7 +34,7 @@ export function buildPackageSnapshot(
  planAccess:Partial<Record<Plan,string[]>>,
  capturedAt:string,
 ):SitePackageSnapshot {
- const plans:PlanSnapshot[]=['free','pro','business'].map(plan=>({
+ const plans:PlanSnapshot[]=(['free','pro','business'] as Plan[]).map(plan=>({
   plan,
   featureKeys:planAccess[plan]??[],
   limits:{},
@@ -70,8 +70,8 @@ export function comparePackageSnapshots(
   }
  }
  for(const row of result.values()){
-  if(!row.ours.business&&row.competitors.business.present) row.recommendation='business_upgrade';
-  else if(!row.ours.pro&&row.competitors.pro.present) row.recommendation='pro_upgrade';
+  if(!row.ours.pro&&row.competitors.pro.present) row.recommendation='pro_upgrade';
+  else if(!row.ours.business&&row.competitors.business.present) row.recommendation='business_upgrade';
   else if(!row.ours.free&&row.competitors.free.present) row.recommendation='consider_free';
  }
  return [...result.values()].sort((a,b)=>
