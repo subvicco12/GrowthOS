@@ -18,7 +18,7 @@ export default function Dashboard() {
  const selectedSite=useMemo(()=>sites.find(s=>s.domain===siteId),[siteId]);
  useEffect(()=>{let active=true;setLoading(true);setError('');const query=siteId?'?siteId='+encodeURIComponent(siteId):'';fetch('/api/dashboard'+query,{credentials:'include',cache:'no-store'}).then(async r=>{const body=await r.json();if(!r.ok)throw new Error(body.message||body.code||'DASHBOARD_FAILED');return body;}).then(body=>{if(active)setSnapshot(body.data)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'DASHBOARD_FAILED')}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[siteId]);
  const counts=snapshot?.counts;
- const approvals=buildApprovalInboxViewModel((snapshot?.approvalInbox??[]).filter(x=>x.approvalClass!=='green'));
+ const approvals=buildApprovalInboxViewModel((snapshot?.approvalInbox??[]).filter(x=>x.approvalClass!=='green').map(x=>({...x,approvalClass:x.approvalClass as 'amber'|'red'})));
  return <main className="shell">
   <aside className="sidebar"><div className="brand">GrowthOS</div><nav aria-label="Primary navigation">{workspaces.map((item,i)=><a className={i===0?'nav active':'nav'} href={i===0?'#portfolio':'#'+item.toLowerCase().replaceAll(' ','-')} key={item}>{item}</a>)}</nav></aside>
   <section className="content">
