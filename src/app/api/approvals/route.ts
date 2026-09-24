@@ -12,7 +12,7 @@ export async function POST(request:Request):Promise<Response>{
  const action=typeof input.action==='string'?input.action:'';
  const idempotencyKey=typeof input.idempotencyKey==='string'?input.idempotencyKey.trim():'';
  const note=typeof input.note==='string'?input.note.trim():'';
- if(!Number.isInteger(recommendationId)||recommendationId<1||!(action in decisions)||!idempotencyKey||note.length>2000)return Response.json({ok:false,code:'INVALID_APPROVAL_REQUEST'},{status:400});
+ if(!Number.isInteger(recommendationId)||recommendationId<1||!(action in decisions)||!idempotencyKey||idempotencyKey.length>128||note.length>2000)return Response.json({ok:false,code:'INVALID_APPROVAL_REQUEST'},{status:400});
  try{
   const data=await new WordPressGrowthOSClient(config).decideRecommendation(recommendationId,decisions[action as keyof typeof decisions],idempotencyKey,note||undefined);
   return Response.json({ok:true,data},{status:200});
