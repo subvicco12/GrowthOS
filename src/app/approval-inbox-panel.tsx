@@ -6,7 +6,9 @@ export function ApprovalInboxPanel({items,onAction}:{items:ApprovalInboxViewMode
  const [selected,setSelected]=useState<ApprovalInboxViewModel|null>(null);
  const [busy,setBusy]=useState<string|null>(null);
  const [feedback,setFeedback]=useState<string>('');
- const [pending,setPending]=useState<{id:string;action:'approve'|'reject'|'defer'}|null>(null);\n const cancelRef=useRef<HTMLButtonElement|null>(null);\n useEffect(()=>{if(pending)cancelRef.current?.focus()},[pending]);
+ const [pending,setPending]=useState<{id:string;action:'approve'|'reject'|'defer'}|null>(null);
+ const cancelRef=useRef<HTMLButtonElement|null>(null);
+ useEffect(()=>{if(pending)cancelRef.current?.focus()},[pending]);
  const models=useMemo(()=>buildApprovalInboxViewModel(items),[items]);
  async function act(id:string,action:'approve'|'reject'|'defer'){
   if(onAction){onAction(id,action);return;}
