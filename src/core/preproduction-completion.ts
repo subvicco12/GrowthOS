@@ -5,6 +5,7 @@ import {
 } from './preproduction-evidence';
 import type { GrowthWorkflowEvidence } from './growth-workflow-certification';
 import { certifySecurityGate, type SecurityGateEvidence } from './security-gate-certification';
+import {hasResponsiveAdminEvidence,hasConnectorContractEvidence,hasGithubTraceabilityEvidence,hasExternalBlockerEvidence,type ResponsiveAdminEvidence,type ConnectorContractEvidence,type GithubTraceabilityEvidence,type ExternalBlockerEvidence} from './final-preproduction-evidence';
 
 export const PREPRODUCTION_GATE_KEYS: readonly (keyof CompletionGateEvidence)[]=['customAdminResponsive','portfolioSixSites','futureSiteConnector','pilotDiscoveryEvidence','competitorSnapshots','packageRecommendations','entitlementEnforcement','realGrowthWorkflows','githubTraceability','securityAuditRollback','productionSmokeTests','externalBlockersLabeled'];
 
@@ -16,6 +17,10 @@ export interface StructuredPreproductionEvidence {
  entitlements?:EntitlementGateRecord;
  growthWorkflow?:GrowthWorkflowEvidence;
  security?:SecurityGateEvidence;
+ responsiveAdmin?:ResponsiveAdminEvidence;
+ connectorContract?:ConnectorContractEvidence;
+ githubTrace?:GithubTraceabilityEvidence;
+ externalBlockers?:ExternalBlockerEvidence[];
 }
 
 const hasGrowthWorkflowEvidence=(record:GrowthWorkflowEvidence|undefined):boolean=>{
@@ -25,6 +30,10 @@ const hasGrowthWorkflowEvidence=(record:GrowthWorkflowEvidence|undefined):boolea
 
 const structuredGateValues=(input:StructuredPreproductionEvidence):Partial<CompletionGateEvidence>=>({
  ...input.gates,
+ customAdminResponsive:hasResponsiveAdminEvidence(input.responsiveAdmin),
+ futureSiteConnector:hasConnectorContractEvidence(input.connectorContract),
+ githubTraceability:hasGithubTraceabilityEvidence(input.githubTrace),
+ externalBlockersLabeled:hasExternalBlockerEvidence(input.externalBlockers),
  pilotDiscoveryEvidence:hasPilotDiscoveryEvidence(input.discovery),
  competitorSnapshots:hasCompetitorSnapshotEvidence(input.competitors),
  packageRecommendations:hasPackageRecommendationEvidence(input.packages),
