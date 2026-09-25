@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const connectorEnvelopeSchema = z.object({
-  siteId: z.string().uuid(),
+  siteId: z.union([z.string().uuid(), z.string().regex(/^[1-9]\\d*$/)]),
   timestamp: z.string().datetime(),
   nonce: z.string().min(16).max(128),
   requestId: z.string().min(8).max(128),
@@ -33,6 +33,6 @@ export interface ConnectorCommand<T = unknown> {
   requestedAt: string;
 }
 
-// Contract intentionally separates transport validation from authorization.
+// WordPress control-plane site IDs are positive integer strings; non-WordPress transports may use UUIDs.\n// Contract intentionally separates transport validation from authorization.
 // Signature, nonce replay protection, site membership, role, feature state and
 // command allow-list must all be verified server-side before mutation.
