@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import{buildReadinessReport}from'../readiness-report';
+test('reports missing structured evidence as preproduction incomplete',()=>{const r=buildReadinessReport({gates:{productionSmokeTests:false}});assert.equal(r.stage,'preproduction_incomplete');assert.equal(r.needsConnection,false);assert.ok(r.failed.length>0);assert.ok(r.blocked.includes('productionSmokeTests'))});
+test('never treats production smoke blocker alone as complete',()=>{const r=buildReadinessReport({gates:{productionSmokeTests:false}});assert.equal(r.complete,false);assert.notEqual(r.stage,'complete')});
+
+test('connection state distinguishes ready to connect from post-connection smoke verification',()=>{const incomplete={gates:{productionSmokeTests:false}} as any;const pre=buildReadinessReport(incomplete,false);const connected=buildReadinessReport(incomplete,true);assert.equal(pre.stage,'preproduction_incomplete');assert.equal(connected.stage,'preproduction_incomplete')});
