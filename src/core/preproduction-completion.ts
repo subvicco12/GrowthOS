@@ -3,6 +3,8 @@ import {
  hasPilotDiscoveryEvidence,hasCompetitorSnapshotEvidence,hasPackageRecommendationEvidence,hasEntitlementEnforcementEvidence,
  type DiscoveryGateRecord,type CompetitorGateRecord,type PackageGateRecord,type EntitlementGateRecord
 } from './preproduction-evidence';
+import type { GrowthWorkflowEvidence } from './growth-workflow-certification';
+import { certifySecurityGate, type SecurityGateEvidence } from './security-gate-certification';
 
 export const PREPRODUCTION_GATE_KEYS: readonly (keyof CompletionGateEvidence)[]=['customAdminResponsive','portfolioSixSites','futureSiteConnector','pilotDiscoveryEvidence','competitorSnapshots','packageRecommendations','entitlementEnforcement','realGrowthWorkflows','githubTraceability','securityAuditRollback','productionSmokeTests','externalBlockersLabeled'];
 
@@ -12,7 +14,14 @@ export interface StructuredPreproductionEvidence {
  competitors?:CompetitorGateRecord;
  packages?:PackageGateRecord;
  entitlements?:EntitlementGateRecord;
+ growthWorkflow?:GrowthWorkflowEvidence;
+ security?:SecurityGateEvidence;
 }
+
+const hasGrowthWorkflowEvidence=(record:GrowthWorkflowEvidence|undefined):boolean=>{
+ if(!record||!record.siteId.trim()||!Number.isFinite(Date.parse(record.capturedAt))||record.signals.length===0||record.actions.length===0)return false;
+ return record.signals.every(signal=>signal.siteId===record.siteId&&signal.evidence.length>0&&!!signal.successMetric.trim())&&record.actions.every(action=>!!action.signalId&&action.evidenceCount>0);
+};
 
 const structuredGateValues=(input:StructuredPreproductionEvidence):Partial<CompletionGateEvidence>=>({
  ...input.gates,
@@ -20,6 +29,8 @@ const structuredGateValues=(input:StructuredPreproductionEvidence):Partial<Compl
  competitorSnapshots:hasCompetitorSnapshotEvidence(input.competitors),
  packageRecommendations:hasPackageRecommendationEvidence(input.packages),
  entitlementEnforcement:hasEntitlementEnforcementEvidence(input.entitlements),
+ realGrowthWorkflows:hasGrowthWorkflowEvidence(input.growthWorkflow),
+ securityAuditRollback:input.security?certifySecurityGate(input.security).passed:false,
 });
 
 export function evaluatePreproductionEvidence(input:StructuredPreproductionEvidence):{complete:boolean;results:CompletionGateResult[];missing:(keyof CompletionGateEvidence)[]}{
