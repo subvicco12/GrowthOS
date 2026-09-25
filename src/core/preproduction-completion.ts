@@ -6,6 +6,7 @@ import {
 import type { GrowthWorkflowEvidence } from './growth-workflow-certification';
 import { certifySecurityGate, type SecurityGateEvidence } from './security-gate-certification';
 import { verifyLivePortfolio, type LivePortfolioSite } from './live-portfolio-verification';
+import { deriveProductionGateState } from './production-readiness-state';
 import {hasResponsiveAdminEvidence,hasConnectorContractEvidence,hasGithubTraceabilityEvidence,hasExternalBlockerEvidence,type ResponsiveAdminEvidence,type ConnectorContractEvidence,type GithubTraceabilityEvidence,type ExternalBlockerEvidence} from './final-preproduction-evidence';
 
 export const PREPRODUCTION_GATE_KEYS: readonly (keyof CompletionGateEvidence)[]=['customAdminResponsive','portfolioSixSites','futureSiteConnector','pilotDiscoveryEvidence','competitorSnapshots','packageRecommendations','entitlementEnforcement','realGrowthWorkflows','githubTraceability','securityAuditRollback','productionSmokeTests','externalBlockersLabeled'];
@@ -23,6 +24,7 @@ export interface StructuredPreproductionEvidence {
  githubTrace?:GithubTraceabilityEvidence;
  externalBlockers?:ExternalBlockerEvidence[];
  livePortfolio?:LivePortfolioSite[];
+ production?:{connected:boolean;wordpressReady:boolean;failedChecks:string[]};
 }
 
 const hasGrowthWorkflowEvidence=(record:GrowthWorkflowEvidence|undefined):boolean=>{
@@ -43,6 +45,7 @@ const structuredGateValues=(input:StructuredPreproductionEvidence):Partial<Compl
  entitlementEnforcement:hasEntitlementEnforcementEvidence(input.entitlements),
  realGrowthWorkflows:hasGrowthWorkflowEvidence(input.growthWorkflow),
  securityAuditRollback:input.security?certifySecurityGate(input.security).passed:false,
+ productionSmokeTests:input.production?deriveProductionGateState(input.production).productionSmokeTests:false,
 });
 
 export function evaluatePreproductionEvidence(input:StructuredPreproductionEvidence):{complete:boolean;results:CompletionGateResult[];missing:(keyof CompletionGateEvidence)[]}{
