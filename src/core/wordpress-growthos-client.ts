@@ -25,6 +25,7 @@ export class WordPressGrowthOSClient {
  recommendations(siteId?:number){return this.get<any>('recommendations',{site_id:siteId});}
  connectors(siteId?:number){return this.get<any>('connectors',{site_id:siteId});}
  sites(){return this.get<any>('sites');}
+ readiness(){return this.get<any>('readiness');}
  async decideRecommendation(recommendationId:number,decision:'approved'|'rejected'|'deferred',idempotencyKey:string,note?:string){
   if(!Number.isInteger(recommendationId)||recommendationId<1)throw new Error('INVALID_RECOMMENDATION_ID');
   const url=new URL('/wp-json/growthos/v1/recommendations/'+recommendationId+'/decision',this.config.baseUrl);
