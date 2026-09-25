@@ -78,7 +78,8 @@ final class GrowthOS_REST {
   global $wpdb;$site=(int)$request->get_param('site_id');$kind=sanitize_key((string)$request->get_param('kind'));$status=sanitize_key((string)$request->get_param('status'));
   if(!$site||$kind===''||!in_array($status,['needs_connection','connected','degraded','disabled'],true))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_INPUT_INVALID'],400);
   $t=$wpdb->prefix.'growthos_connectors';$existing=$wpdb->get_row($wpdb->prepare("SELECT * FROM $t WHERE site_id=%d AND kind=%s",$site,$kind),ARRAY_A);
-  $data=['site_id'=>$site,'kind'=>$kind,'status'=>$status,'last_seen_at'=>current_time('mysql'),'last_error'=>sanitize_textarea_field((string)$request->get_param('last_error'))?:null];
+  if($status==='connected')return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_HEARTBEAT_REQUIRED'],409);
+  $data=['site_id'=>$site,'kind'=>$kind,'status'=>$status,'last_seen_at'=>null,'last_error'=>sanitize_textarea_field((string)$request->get_param('last_error'))?:null];
   $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
