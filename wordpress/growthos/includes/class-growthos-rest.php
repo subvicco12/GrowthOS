@@ -8,6 +8,8 @@ final class GrowthOS_REST {
   register_rest_route('growthos/v1','/dashboard',['methods'=>'GET','callback'=>[self::class,'dashboard'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'GET','callback'=>[self::class,'connectors'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
   register_rest_route('growthos/v1','/connectors',['methods'=>'POST','callback'=>[self::class,'upsert_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/connectors/enroll',['methods'=>'POST','callback'=>[self::class,'enroll_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
+  register_rest_route('growthos/v1','/connectors/revoke',['methods'=>'POST','callback'=>[self::class,'revoke_connector'],'permission_callback'=>fn()=>current_user_can('growthos_manage')]);
   register_rest_route('growthos/v1','/connectors/heartbeat',['methods'=>'POST','callback'=>[self::class,'connector_heartbeat'],'permission_callback'=>'__return_true']);
   register_rest_route('growthos/v1','/cost-events',['methods'=>['GET','POST'],'callback'=>[self::class,'cost_events'],'permission_callback'=>fn()=>current_user_can('growthos_access')&&($_SERVER['REQUEST_METHOD']==='GET'||current_user_can('growthos_manage'))]);
   register_rest_route('growthos/v1','/portfolio-commercial',['methods'=>'GET','callback'=>[self::class,'portfolio_commercial'],'permission_callback'=>fn()=>current_user_can('growthos_access')]);
@@ -84,20 +86,35 @@ final class GrowthOS_REST {
   if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_UPDATE_FAILED'],500);
   return new WP_REST_Response(['ok'=>true,'connector'=>$data],$existing?200:201);
  }
+ public static function enroll_connector(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$kind=sanitize_key((string)$request->get_param('kind'));
+  if(!$site||$kind===''||!(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}growthos_sites WHERE id=%d AND status='active'",$site)))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_INPUT_INVALID'],400);
+  try{$secret=bin2hex(random_bytes(32));}catch(Exception $e){return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_SECRET_GENERATION_FAILED'],500);}
+  $option='growthos_connector_secret_'.$site.'_'.$kind;delete_option($option);if(!add_option($option,$secret,'','no'))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_SECRET_STORE_FAILED'],500);
+  $t=$wpdb->prefix.'growthos_connectors';$existing=$wpdb->get_row($wpdb->prepare("SELECT id FROM $t WHERE site_id=%d AND kind=%s",$site,$kind),ARRAY_A);$data=['site_id'=>$site,'kind'=>$kind,'status'=>'needs_connection','last_seen_at'=>null,'last_error'=>null];$ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);if(false===$ok){delete_option($option);return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_ENROLL_FAILED'],500);}
+  $wpdb->insert($wpdb->prefix.'growthos_audit_events',['actor_id'=>get_current_user_id(),'site_id'=>$site,'action'=>$existing?'connector.rotated':'connector.enrolled','object_type'=>'connector','object_id'=>$site.':'.$kind,'after_data'=>wp_json_encode(['kind'=>$kind,'status'=>'needs_connection'])]);
+  return new WP_REST_Response(['ok'=>true,'site_id'=>$site,'kind'=>$kind,'status'=>'needs_connection','secret'=>$secret,'secret_display'=>'one_time_only'],201);
+ }
+ public static function revoke_connector(WP_REST_Request $request): WP_REST_Response {
+  global $wpdb;$site=(int)$request->get_param('site_id');$kind=sanitize_key((string)$request->get_param('kind'));if(!$site||$kind==='')return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_INPUT_INVALID'],400);
+  delete_option('growthos_connector_secret_'.$site.'_'.$kind);$t=$wpdb->prefix.'growthos_connectors';$wpdb->update($t,['status'=>'disabled','last_seen_at'=>null,'last_error'=>'Credential revoked'],['site_id'=>$site,'kind'=>$kind]);
+  $wpdb->insert($wpdb->prefix.'growthos_audit_events',['actor_id'=>get_current_user_id(),'site_id'=>$site,'action'=>'connector.revoked','object_type'=>'connector','object_id'=>$site.':'.$kind,'after_data'=>wp_json_encode(['kind'=>$kind,'status'=>'disabled'])]);
+  return new WP_REST_Response(['ok'=>true,'site_id'=>$site,'kind'=>$kind,'status'=>'disabled'],200);
+ }
  public static function connector_heartbeat(WP_REST_Request $request): WP_REST_Response {
   global $wpdb;
   $site=(int)$request->get_param('site_id');$kind=sanitize_key((string)$request->get_param('kind'));$timestamp=(string)$request->get_header('x-growthos-timestamp');$nonce=(string)$request->get_header('x-growthos-nonce');$request_id=(string)$request->get_header('x-growthos-request-id');$signature=strtolower((string)$request->get_header('x-growthos-signature'));
   if(!$site||$kind===''||$timestamp===''||strlen($nonce)<16||strlen($nonce)>128||strlen($request_id)<8||strlen($request_id)>128||!preg_match('/^[0-9a-f]{64}$/',$signature))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_AUTH_INVALID'],401);
-  $ts=strtotime($timestamp);$now=time();if($ts===false||$ts<$now-300||$ts>$now+30)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_TIMESTAMP_INVALID'],401);
+  $strict=(bool)preg_match('/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$/',$timestamp);try{$dt=$strict?new DateTimeImmutable($timestamp):false;}catch(Exception $e){$dt=false;}$ts=$dt?$dt->getTimestamp():false;$now=time();if($ts===false||$ts<$now-300||$ts>$now+30)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_TIMESTAMP_INVALID'],401);
   $site_exists=(int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}growthos_sites WHERE id=%d AND status='active'",$site));if(!$site_exists)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_SITE_INVALID'],404);
-  $secret=(string)get_option('growthos_connector_secret_'.$site,'');if(strlen($secret)<32)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_NEEDS_CONNECTION'],503);
-  $nonce_key='growthos_nonce_'.$site.'_'.hash('sha256',$nonce);if(get_transient($nonce_key)!==false)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_REPLAY_DETECTED'],409);
+  $secret=(string)get_option('growthos_connector_secret_'.$site.'_'.$kind,'');if(strlen($secret)<32)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_NEEDS_CONNECTION'],503);
+  $nonce_key='growthos_nonce_'.$site.'_'.hash('sha256',$nonce);
   $body=(string)$request->get_body();if(strlen($body)>1048576)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_BODY_TOO_LARGE'],413);
   $canonical=$site."\n".$timestamp."\n".$nonce."\n".$request_id."\n".$body;$expected=hash_hmac('sha256',$canonical,$secret);
   if(!hash_equals($expected,$signature))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_SIGNATURE_INVALID'],401);
-  set_transient($nonce_key,'1',300);
+  $added=add_option($nonce_key,(string)($now+300),'','no');if(!$added){$expires=(int)get_option($nonce_key,0);if($expires>$now)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_REPLAY_DETECTED'],409);delete_option($nonce_key);if(!add_option($nonce_key,(string)($now+300),'','no'))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_REPLAY_DETECTED'],409);}
   $t=$wpdb->prefix.'growthos_connectors';$existing=$wpdb->get_row($wpdb->prepare("SELECT id FROM $t WHERE site_id=%d AND kind=%s",$site,$kind),ARRAY_A);$data=['site_id'=>$site,'kind'=>$kind,'status'=>'connected','last_seen_at'=>current_time('mysql'),'last_error'=>null];
-  $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_HEARTBEAT_FAILED'],500);
+  $was_connected=$existing&&((string)$wpdb->get_var($wpdb->prepare("SELECT status FROM $t WHERE id=%d",$existing['id']))==='connected');$ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_HEARTBEAT_FAILED'],500);if(!$was_connected)$wpdb->insert($wpdb->prefix.'growthos_audit_events',['actor_id'=>0,'site_id'=>$site,'action'=>'connector.connected','object_type'=>'connector','object_id'=>$site.':'.$kind,'after_data'=>wp_json_encode(['kind'=>$kind,'status'=>'connected','request_id'=>$request_id])]);
   return new WP_REST_Response(['ok'=>true,'site_id'=>$site,'kind'=>$kind,'status'=>'connected','request_id'=>$request_id],200);
  }
  public static function cost_events(WP_REST_Request $request): WP_REST_Response {
