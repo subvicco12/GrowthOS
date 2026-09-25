@@ -9,3 +9,6 @@ test('valid structured evidence leaves production verification as final external
 test('incomplete security evidence blocks security audit rollback gate',()=>{const r=evaluatePreproductionEvidence({gates:base,...structured,security:{...structured.security,recoveryRollback:false}});assert.ok(r.missing.includes('securityAuditRollback'))});
 
 test('portfolio boolean cannot bypass live six-site verification',()=>{const r=evaluatePreproductionEvidence({gates:{...base,portfolioSixSites:true},...structured,livePortfolio:structured.livePortfolio.slice(0,5)});assert.ok(r.missing.includes('portfolioSixSites'))});
+
+test('caller production smoke boolean cannot bypass authoritative production evidence',()=>{const result=evaluatePreproductionEvidence({...structured,gates:{...base,productionSmokeTests:true},production:{connected:false,wordpressReady:true,failedChecks:[]}});assert.equal(result.complete,false);assert.ok(result.missing.includes('productionSmokeTests'))});
+test('authoritative connected ready WordPress evidence satisfies production smoke gate',()=>{const result=evaluatePreproductionEvidence({...structured,gates:{...base,productionSmokeTests:false},production:{connected:true,wordpressReady:true,failedChecks:[]}});assert.equal(result.complete,true);assert.equal(result.missing.length,0)});
