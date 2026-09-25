@@ -112,9 +112,9 @@ final class GrowthOS_REST {
   $body=(string)$request->get_body();if(strlen($body)>1048576)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_BODY_TOO_LARGE'],413);
   $canonical=$site."\n".$timestamp."\n".$nonce."\n".$request_id."\n".$body;$expected=hash_hmac('sha256',$canonical,$secret);
   if(!hash_equals($expected,$signature))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_SIGNATURE_INVALID'],401);
-  if(!add_option($nonce_key,'1','','no'))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_REPLAY_DETECTED'],409);wp_schedule_single_event(time()+300,'growthos_cleanup_nonce',[$nonce_key]);
+  if(!wp_cache_add($nonce_key,'1','growthos_connector_nonces',300))return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_REPLAY_DETECTED'],409);
   $t=$wpdb->prefix.'growthos_connectors';$existing=$wpdb->get_row($wpdb->prepare("SELECT id FROM $t WHERE site_id=%d AND kind=%s",$site,$kind),ARRAY_A);$data=['site_id'=>$site,'kind'=>$kind,'status'=>'connected','last_seen_at'=>current_time('mysql'),'last_error'=>null];
-  $ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_HEARTBEAT_FAILED'],500);
+  $was_connected=$existing&&((string)$wpdb->get_var($wpdb->prepare("SELECT status FROM $t WHERE id=%d",$existing['id']))==='connected');$ok=$existing?$wpdb->update($t,$data,['id'=>$existing['id']]):$wpdb->insert($t,$data);if(false===$ok)return new WP_REST_Response(['ok'=>false,'code'=>'CONNECTOR_HEARTBEAT_FAILED'],500);if(!$was_connected)$wpdb->insert($wpdb->prefix.'growthos_audit_events',['actor_id'=>0,'site_id'=>$site,'action'=>'connector.connected','object_type'=>'connector','object_id'=>$site.':'.$kind,'after_data'=>wp_json_encode(['kind'=>$kind,'status'=>'connected','request_id'=>$request_id])]);
   return new WP_REST_Response(['ok'=>true,'site_id'=>$site,'kind'=>$kind,'status'=>'connected','request_id'=>$request_id],200);
  }
  public static function cost_events(WP_REST_Request $request): WP_REST_Response {
