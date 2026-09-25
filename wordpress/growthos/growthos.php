@@ -2,12 +2,12 @@
 /**
  * Plugin Name: GrowthOS
  * Description: Hostinger WordPress control plane for GrowthOS.
- * Version: 1.0.14
+ * Version: 1.0.15
  */
 if (!defined('ABSPATH')) exit;
-define('GROWTHOS_VERSION','1.0.14');
+define('GROWTHOS_VERSION','1.0.15');
 define('GROWTHOS_PRODUCTION_HOST','growthos.converentis.com');
-define('GROWTHOS_DB_VERSION','11');
+define('GROWTHOS_DB_VERSION','12');
 require_once __DIR__.'/includes/class-growthos-db.php';
 require_once __DIR__.'/includes/class-growthos-rest.php';
 require_once __DIR__.'/includes/class-growthos-jobs.php';
