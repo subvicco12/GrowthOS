@@ -6,17 +6,13 @@ type Row = RowDataPacket & Record<string, unknown>;
 export type FinalStatus = 'completed' | 'cancelled';
 
 /** Trusted server only; verify operator membership before invoking. */
-export async function finalizeMySQLBudget(reservationId: string, actualCostMinor: number, status: FinalStatus): Promise<void> {
-  if (!reservationId || !Number.isSafeInteger(actualCostMinor) || actualCostMinor < 0 ||
+export async function finalizeMySQLBudget(organizationId: string, reservationId: string, actualCostMinor: number, status: FinalStatus): Promise<void> {
+  if (!organizationId || !reservationId || !Number.isSafeInteger(actualCostMinor) || actualCostMinor < 0 ||
       !['completed', 'cancelled'].includes(status)) throw new Error('INVALID_RECONCILIATION');
   const connection = await getMySQLPool().getConnection();
   try {
     await connection.beginTransaction();
     // Lock the organization's budget row FIRST, matching reservation lock order.
-    const [lookup] = await connection.execute<Row[]>(
-      'SELECT organization_id FROM growth_ai_reservations WHERE id = ?', [reservationId]);
-    if (!lookup.length) throw new Error('RESERVATION_NOT_FOUND');
-    const organizationId = String(lookup[0].organization_id);
     const [org] = await connection.execute<Row[]>(
       'SELECT organization_id FROM growth_organization_budgets WHERE organization_id = ? FOR UPDATE',
       [organizationId]);
