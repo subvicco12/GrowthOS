@@ -54,7 +54,12 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
       // Trigger statements have client DELIMITER syntax; send each CREATE TRIGGER to server directly.
       let statements;
       if (m.file.startsWith('008_') || m.file.startsWith('009_')) {
-        if (m.file.startsWith('009_')) statements = [m.sql.match(/CREATE TABLE[\s\S]*?ENGINE=InnoDB;/i)?.[0], ...m.sql.split('\n').filter(line => /^CREATE TRIGGER /i.test(line.trim()))].filter(Boolean);
+        if (m.file.startsWith('009_')) {
+          const table = m.sql.match(/CREATE TABLE[\s\S]*?ENGINE=InnoDB;/i)?.[0];
+          const guards = [...m.sql.matchAll(/CREATE TRIGGER[\s\S]*?;/gi)].map(match => match[0]);
+          if (!table || guards.length !== 2) throw Error('Expected feature audit table and two guards');
+          statements = [table, ...guards];
+        }
         else
         statements = m.sql.split('\n').filter(line=>/^CREATE TRIGGER /i.test(line.trim())).map(line=>line.trim().replace(/\/\/$/,''));
       } else {
