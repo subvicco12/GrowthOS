@@ -103,6 +103,24 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
       }
       await mustReject('UPDATE growth_approval_decisions SET note=? WHERE id=?',['tamper',decision],'Audit UPDATE');
       await mustReject('DELETE FROM growth_approval_decisions WHERE id=?',[decision],'Audit DELETE');
+      await conn.execute(
+        'INSERT INTO growth_website_feature_audit(id,organization_id,website_id,actor_id,feature,enabled) VALUES (?,?,?,?,?,FALSE)',
+        [randomUUID(),org,site,user,'automation']
+      );
+      const [[featureEntry]] = await conn.execute(
+        'SELECT id FROM growth_website_feature_audit WHERE organization_id=? AND website_id=?',
+        [org,site]
+      );
+      async function mustRejectFeature(sql, params, label) {
+        try { await conn.execute(sql, params); }
+        catch (e) {
+          if (e.sqlState === '45000' && /Feature audit entries/.test(e.message)) return;
+          throw Error(label + ' rejected for unexpected reason: ' + e.message);
+        }
+        throw Error(label + ' unexpectedly succeeded');
+      }
+      await mustRejectFeature('UPDATE growth_website_feature_audit SET feature=? WHERE id=?',['auto_publish',featureEntry.id],'Feature audit UPDATE');
+      await mustRejectFeature('DELETE FROM growth_website_feature_audit WHERE id=?',[featureEntry.id],'Feature audit DELETE');
       let rejected=false;
       try { await conn.execute('INSERT INTO growth_memberships(organization_id,user_id,role) VALUES (?,?,?)',[randomUUID(),user,'viewer']); }
       catch(e) { if (e.code === 'ER_NO_REFERENCED_ROW_2') rejected=true; else throw e; }
