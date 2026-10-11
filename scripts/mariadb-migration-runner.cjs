@@ -79,6 +79,28 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
     }
     const [foreignKeys] = await conn.query("SELECT TABLE_NAME, REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL");
     if (foreignKeys.length < 10) throw Error('Expected foreign keys missing: found ' + foreignKeys.length);
-    console.log('PASS: 8 migrations, '+tables.length+' InnoDB tables, 2 audit triggers, '+foreignKeys.length+' foreign-key columns. No cleanup performed.');
+    // Functional FK and audit-trigger checks are confined to a transaction in the disposable schema.
+    const { randomUUID } = crypto;
+    const org=randomUUID(), user=randomUUID(), site=randomUUID(), approval=randomUUID(), decision=randomUUID();
+    await conn.beginTransaction();
+    try {
+      await conn.execute('INSERT INTO growth_organizations(id,name) VALUES (?,?)',[org,'Disposable QA']);
+      await conn.execute('INSERT INTO growth_users(id,email,password_hash) VALUES (?,?,?)',[user,'qa-'+randomUUID()+'@example.invalid','disabled-test-hash']);
+      await conn.execute('INSERT INTO growth_websites(id,organization_id,domain,platform) VALUES (?,?,?,?)',[site,org,'qa.example.invalid','custom']);
+      await conn.execute('INSERT INTO growth_approval_queue(id,organization_id,website_id,title,action_type) VALUES (?,?,?,?,?)',[approval,org,site,'QA approval','test']);
+      await conn.execute('INSERT INTO growth_approval_decisions(id,organization_id,website_id,approval_id,actor_id,idempotency_key,decision) VALUES (?,?,?,?,?,?,?)',[decision,org,site,approval,user,randomUUID(),'deferred']);
+      async function mustReject(sql, params, label) {
+        try { await conn.execute(sql,params); }
+        catch (e) { if (e.sqlState === '45000' && /AUDIT_IMMUTABLE/.test(e.message)) return; throw Error(label+' rejected for unexpected reason: '+e.message); }
+        throw Error(label+' unexpectedly succeeded');
+      }
+      await mustReject('UPDATE growth_approval_decisions SET note=? WHERE id=?',['tamper',decision],'Audit UPDATE');
+      await mustReject('DELETE FROM growth_approval_decisions WHERE id=?',[decision],'Audit DELETE');
+      let rejected=false;
+      try { await conn.execute('INSERT INTO growth_memberships(organization_id,user_id,role) VALUES (?,?,?)',[randomUUID(),user,'viewer']); }
+      catch(e) { if (e.code === 'ER_NO_REFERENCED_ROW_2') rejected=true; else throw e; }
+      if (!rejected) throw Error('Foreign-key violation was not rejected');
+    } finally { await conn.rollback(); }
+    console.log('PASS: 8 migrations, '+tables.length+' InnoDB tables, 2 audit triggers, '+foreignKeys.length+' foreign-key columns, functional audit/FK checks. No cleanup performed.');
   } finally { await conn.end(); }
 })().catch(e=>{console.error('TEST FAILED:',e.message);process.exitCode=1;});
