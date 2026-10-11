@@ -11,6 +11,8 @@ export interface BudgetReservation {
   websiteId: string;
   idempotencyKey: string;
   estimatedCostMinor: number;
+  contentType: ProductionRequest['contentType'];
+  requestedUnits: number;
   status: 'reserved' | 'completed' | 'cancelled';
 }
 export interface BudgetTransaction {
@@ -35,9 +37,12 @@ export async function reserveProductionBudget(db: BudgetDatabase, request: Produ
     const existing = await tx.findExisting(request.organizationId, request.idempotencyKey);
     if (existing) {
       // Idempotency collisions must be rejected rather than replaying another job's reservation.
-      if (existing.websiteId !== request.websiteId || existing.estimatedCostMinor !== request.estimatedCostMinor) {
+      if (existing.websiteId !== request.websiteId || existing.organizationId !== request.organizationId ||
+          existing.contentType !== request.contentType || existing.requestedUnits !== request.requestedUnits ||
+          existing.estimatedCostMinor !== request.estimatedCostMinor) {
         return denied('INVALID_REQUEST');
       }
+      if (existing.status !== 'reserved') return denied('DISABLED');
       return { decision: { allowed: true, code: 'APPROVED' }, reservation: existing, replayed: true };
     }
     const policy = await tx.loadPolicy(request);
