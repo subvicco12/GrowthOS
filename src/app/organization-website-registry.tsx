@@ -81,7 +81,7 @@ export function OrganizationWebsiteRegistry() {
           {['owner','admin'].includes(data.organization.role) && <div className="approvalActions">
             {site.automationEnabled && <button type="button" onClick={() => void disableFeature(site.id, 'automation')}>Disable automation</button>}
             {site.autoPublishEnabled && <button type="button" onClick={() => void disableFeature(site.id, 'auto_publish')}>Disable publishing</button>}
-          </div>
+          </div>}
         </article>)}
         {!data.websites.length && <p>No websites registered in this workspace.</p>}
       </div>
