@@ -64,6 +64,19 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
     }
     const [rows] = await conn.query('SELECT migration_id,sha256 FROM growth_schema_migrations ORDER BY migration_id');
     if (rows.length !== 8 || rows.some((row,i)=>row.migration_id!==migrations[i].file || row.sha256!==migrations[i].hash)) throw Error('Ledger validation failed');
-    console.log('PASS: 8 migrations recorded in disposable MariaDB schema. No cleanup performed.');
+    const [tables] = await conn.query("SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()");
+    const expectedTables = new Set([...objects, 'growth_schema_migrations']);
+    if (tables.length !== expectedTables.size ||
+        tables.some(t => !expectedTables.has(t.TABLE_NAME) || t.ENGINE !== 'InnoDB')) {
+      throw Error('Unexpected table inventory or non-InnoDB engine');
+    }
+    const [installedTriggers] = await conn.query("SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()");
+    if (installedTriggers.length !== 2 ||
+        installedTriggers.some(t => !triggers.includes(t.TRIGGER_NAME) || t.EVENT_OBJECT_TABLE !== 'growth_approval_decisions')) {
+      throw Error('Audit trigger inventory mismatch');
+    }
+    const [foreignKeys] = await conn.query("SELECT TABLE_NAME, REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL");
+    if (foreignKeys.length < 10) throw Error('Expected foreign keys missing: found ' + foreignKeys.length);
+    console.log('PASS: 8 migrations, '+tables.length+' InnoDB tables, 2 audit triggers, '+foreignKeys.length+' foreign-key columns. No cleanup performed.');
   } finally { await conn.end(); }
 })().catch(e=>{console.error('TEST FAILED:',e.message);process.exitCode=1;});
