@@ -23,7 +23,8 @@ test('reservation service checks policy inside transaction and inserts once', as
       insertReservation: async r => {
         inserts++;
         saved = { id: 'res-1', organizationId: r.organizationId, websiteId: r.websiteId,
-          idempotencyKey: r.idempotencyKey, estimatedCostMinor: r.estimatedCostMinor, status: 'reserved' };
+          idempotencyKey: r.idempotencyKey, estimatedCostMinor: r.estimatedCostMinor,
+          contentType: r.contentType, requestedUnits: r.requestedUnits, status: 'reserved' };
         return saved;
       }
     })
@@ -32,6 +33,9 @@ test('reservation service checks policy inside transaction and inserts once', as
   const again = await reserveProductionBudget(db, request);
   assert.equal(again.replayed, true);
   assert.equal(inserts, 1);
+  assert.equal((await reserveProductionBudget(db, { ...request, requestedUnits: 2 })).decision.code, 'INVALID_REQUEST');
+  if (saved) saved.status = 'completed';
+  assert.equal((await reserveProductionBudget(db, request)).decision.allowed, false);
   assert.equal((await reserveProductionBudget(db, { ...request, websiteId: 'site-2' })).decision.code, 'INVALID_REQUEST');
 });
 test('reservation service fails closed without a policy', async () => {
