@@ -26,7 +26,7 @@ DECLARE
   v_new_id uuid;
 BEGIN
   IF p_organization_id IS NULL OR p_website_id IS NULL OR
-     p_content_type IS NULL OR length(p_idempotency_key) NOT BETWEEN 1 AND 200 OR
+     p_content_type IS NULL OR p_idempotency_key IS NULL OR length(p_idempotency_key) NOT BETWEEN 1 AND 200 OR
      p_units IS NULL OR p_units < 1 OR p_estimated_minor IS NULL OR p_estimated_minor < 0 THEN
     RAISE EXCEPTION 'INVALID_REQUEST';
   END IF;
@@ -48,6 +48,7 @@ BEGIN
     IF v_existing.website_id <> p_website_id OR v_existing.content_type <> p_content_type
        OR v_existing.requested_units <> p_units OR v_existing.estimated_cost_minor <> p_estimated_minor
     THEN RAISE EXCEPTION 'IDEMPOTENCY_CONFLICT'; END IF;
+    IF v_existing.status <> 'reserved' THEN RAISE EXCEPTION 'RESERVATION_ALREADY_FINALIZED'; END IF;
     RETURN v_existing.id;
   END IF;
   IF p_estimated_minor > v_policy.max_job_cost_minor THEN RAISE EXCEPTION 'JOB_COST_EXCEEDED'; END IF;
@@ -58,7 +59,7 @@ BEGIN
   IF p_units > v_policy.weekly_limit - v_week_used THEN RAISE EXCEPTION 'WEEKLY_QUOTA_EXCEEDED'; END IF;
   SELECT COALESCE(sum(CASE WHEN status = 'reserved' THEN estimated_cost_minor ELSE actual_cost_minor END), 0)
     INTO v_site_spent FROM growth_ai_reservations
-    WHERE website_id = p_website_id AND month_start = v_month;
+    WHERE website_id = p_website_id AND content_type = p_content_type AND month_start = v_month;
   IF p_estimated_minor > v_policy.monthly_budget_minor - v_site_spent
     THEN RAISE EXCEPTION 'WEBSITE_BUDGET_EXCEEDED'; END IF;
   SELECT COALESCE(sum(CASE WHEN status = 'reserved' THEN estimated_cost_minor ELSE actual_cost_minor END), 0)
