@@ -10,6 +10,9 @@ type Payload = { organization: { id: string; name: string; role: string }; websi
 export function OrganizationWebsiteRegistry() {
   const [data, setData] = useState<Payload | null>(null);
   const [message, setMessage] = useState('Loading organization websites…');
+  const [domain, setDomain] = useState('');
+  const [platform, setPlatform] = useState<'wordpress'|'nextjs'|'react'|'static'|'custom'>('wordpress');
+  const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
     let active = true;
     fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' })
@@ -21,9 +24,38 @@ export function OrganizationWebsiteRegistry() {
       .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Website registry unavailable.'); });
     return () => { active = false; };
   }, []);
+  async function register(event: import('react').FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/organization-websites', {
+        method: 'POST', credentials: 'include', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, platform })
+      });
+      if (!response.ok) throw new Error(response.status === 409 ? 'This website is already registered.' : response.status === 403 ? 'Your role cannot register websites.' : 'Registration failed.');
+      const refreshed = await fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' });
+      if (!refreshed.ok) throw new Error('Website registered, but the list could not be refreshed.');
+      setData(await refreshed.json() as Payload);
+      setDomain('');
+      setMessage('Website registered as draft. Verification and automation remain disabled.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Registration failed.'); }
+    finally { setSubmitting(false); }
+  }
   return <section aria-label="Organization website registry">
     <h2>Workspace websites</h2>
     {message && <p role="status">{message}</p>}
+    {data && ['owner','admin'].includes(data.organization.role) && <form onSubmit={event => void register(event)}>
+      <label htmlFor="register-domain">Register website (draft only)</label>
+      <input id="register-domain" value={domain} onChange={event => setDomain(event.target.value)} placeholder="example.com" required maxLength={253} />
+      <label htmlFor="register-platform">Platform</label>
+      <select id="register-platform" value={platform} onChange={event => setPlatform(event.target.value as typeof platform)}>
+        <option value="wordpress">WordPress</option><option value="nextjs">Next.js</option>
+        <option value="react">React</option><option value="static">Static</option><option value="custom">Custom</option>
+      </select>
+      <button type="submit" disabled={submitting}>{submitting ? 'Registering…' : 'Add draft website'}</button>
+    </form>}
     {data && <><p>{data.organization.name} · {data.organization.role} · {data.websites.length} websites</p>
       <div className="siteRows">
         {data.websites.map(site => <article className="siteRow" key={site.id}>
