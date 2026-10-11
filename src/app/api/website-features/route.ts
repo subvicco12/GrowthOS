@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getAuthenticatedOrganizationContext } from '../../../../server/organization-context';
 import { getMySQLPool } from '../../../../server/mysql';
 import { canDisableWebsiteFeature, websiteFeaturePatchSchema } from '../../../../core/website-feature-controls';
@@ -14,18 +15,35 @@ export async function PATCH(request: Request): Promise<Response> {
       return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
   } catch { return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 }); }
   try {
-    const { organization } = await getAuthenticatedOrganizationContext(request);
+    const { userId, organization } = await getAuthenticatedOrganizationContext(request);
     if (!canDisableWebsiteFeature(organization.role))
       return Response.json({ ok: false, code: 'INSUFFICIENT_ROLE' }, { status: 403 });
     const parsed = websiteFeaturePatchSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_FEATURE_CHANGE' }, { status: 400 });
     const column = parsed.data.feature === 'automation' ? 'automation_enabled' : 'auto_publish_enabled';
-    const [result] = await getMySQLPool().execute(
-      'UPDATE growth_websites SET ' + column + '=FALSE WHERE id=? AND organization_id=?',
-      [parsed.data.websiteId, organization.id]
-    );
-    const affected = (result as { affectedRows?: number }).affectedRows ?? 0;
-    if (!affected) return Response.json({ ok: false, code: 'WEBSITE_NOT_FOUND' }, { status: 404 });
+    const connection = await getMySQLPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.execute(
+        'UPDATE growth_websites SET ' + column + '=FALSE WHERE id=? AND organization_id=?',
+        [parsed.data.websiteId, organization.id]
+      );
+      const affected = (result as { affectedRows?: number }).affectedRows ?? 0;
+      if (!affected) {
+        await connection.rollback();
+        return Response.json({ ok: false, code: 'WEBSITE_NOT_FOUND' }, { status: 404 });
+      }
+      await connection.execute(
+        'INSERT INTO growth_website_feature_audit (id,organization_id,website_id,actor_id,feature,enabled) VALUES (?,?,?,?,?,FALSE)',
+        [randomUUID(), organization.id, parsed.data.websiteId, userId, parsed.data.feature]
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
     return Response.json({ ok: true, websiteId: parsed.data.websiteId, feature: parsed.data.feature, enabled: false },
       { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
