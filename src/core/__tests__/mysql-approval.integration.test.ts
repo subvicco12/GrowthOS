@@ -32,9 +32,13 @@ integration('concurrent decisions, replay, tenant boundaries and audit immutabil
   assert.equal(settled.filter(x => x.status === 'rejected').length, 1);
   const winner = settled.find(x => x.status === 'fulfilled');
   assert.ok(winner && winner.status === 'fulfilled');
+  const rejected = settled.find(x => x.status === 'rejected');
+  assert.ok(rejected && rejected.status === 'rejected');
+  assert.match(String(rejected.reason), /APPROVAL_ALREADY_DECIDED/);
   const [events] = await db.execute<import('mysql2/promise').RowDataPacket[]>(
     'SELECT id,idempotency_key,decision FROM growth_approval_decisions WHERE organization_id=? AND approval_id=?', [org,approval]);
   assert.equal(events.length, 1);
+  assert.equal(winner.value.decisionId, String(events[0].id));
   const original = { ...input, idempotencyKey: String(events[0].idempotency_key),
     decision: String(events[0].decision) as 'approved' | 'rejected' };
   const replay = await decideInternalApproval(original);
