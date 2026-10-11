@@ -42,6 +42,18 @@ export async function finalizeMySQLBudget(organizationId: string, reservationId:
     await connection.execute(
       'UPDATE growth_ai_reservations SET status = ?, actual_cost_minor = ? WHERE id = ? AND organization_id = ?',
       [status,actualCostMinor,reservationId,organizationId]);
+    // An actual provider bill can exhaust a cap even without an individual job overrun.
+    const [totals] = await connection.execute<Row[]>(
+      "SELECT COALESCE(SUM(CASE WHEN status='reserved' THEN estimated_cost_minor ELSE COALESCE(actual_cost_minor,estimated_cost_minor) END),0) AS used FROM growth_ai_reservations WHERE organization_id=? AND month_start=DATE_FORMAT(UTC_TIMESTAMP(),'%Y-%m-01')",
+      [organizationId]);
+    const [caps] = await connection.execute<Row[]>(
+      'SELECT monthly_limit_minor FROM growth_organization_budgets WHERE organization_id=?',
+      [organizationId]);
+    if (Number(totals[0].used) > Number(caps[0].monthly_limit_minor)) {
+      await connection.execute(
+        'UPDATE growth_organization_budgets SET globally_paused=TRUE WHERE organization_id=?',
+        [organizationId]);
+    }
     await connection.commit();
   } catch (error) {
     await connection.rollback();
