@@ -11,14 +11,14 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const folder = path.join(root, 'database/mysql');
-const files = fs.readdirSync(folder).filter(f => /^00[1-8]_.*\.sql$/.test(f)).sort();
-if (files.length !== 8 || files.some((f,i) => !f.startsWith(String(i+1).padStart(3,'0')+'_'))) throw Error('Expected exactly migrations 001..008');
+const files = fs.readdirSync(folder).filter(f => /^00[1-9]_.*\.sql$/.test(f)).sort();
+if (files.length !== 9 || files.some((f,i) => !f.startsWith(String(i+1).padStart(3,'0')+'_'))) throw Error('Expected exactly migrations 001..009');
 const migrations = files.map(file => {
   const sql = fs.readFileSync(path.join(folder,file),'utf8');
   return {file, sql, hash:crypto.createHash('sha256').update(sql).digest('hex')};
 });
 const objects = migrations.flatMap(m => [...m.sql.matchAll(/CREATE\s+TABLE\s+(\w+)/gi)].map(x=>x[1]));
-const triggers = ['approval_audit_update_guard','approval_audit_delete_guard'];
+const triggers = ['approval_audit_update_guard','approval_audit_delete_guard','growth_feature_audit_no_update','growth_feature_audit_no_delete'];
 const mode = process.argv.includes('--test-disposable');
 if (!mode) {
   for (const m of migrations) console.log(m.file, m.hash);
@@ -53,7 +53,9 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
     for (const m of migrations) {
       // Trigger statements have client DELIMITER syntax; send each CREATE TRIGGER to server directly.
       let statements;
-      if (m.file.startsWith('008_')) {
+      if (m.file.startsWith('008_') || m.file.startsWith('009_')) {
+        if (m.file.startsWith('009_')) statements = [m.sql.match(/CREATE TABLE[\s\S]*?ENGINE=InnoDB;/i)?.[0], ...m.sql.split('\n').filter(line => /^CREATE TRIGGER /i.test(line.trim()))].filter(Boolean);
+        else
         statements = m.sql.split('\n').filter(line=>/^CREATE TRIGGER /i.test(line.trim())).map(line=>line.trim().replace(/\/\/$/,''));
       } else {
         const uncommented = m.sql.split('\n').filter(line => !/^\s*--/.test(line)).join('\n');
@@ -65,7 +67,7 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
       console.log('APPLIED IN DISPOSABLE TEST SCHEMA:',m.file);
     }
     const [rows] = await conn.query('SELECT migration_id,sha256 FROM growth_schema_migrations ORDER BY migration_id');
-    if (rows.length !== 8 || rows.some((row,i)=>row.migration_id!==migrations[i].file || row.sha256!==migrations[i].hash)) throw Error('Ledger validation failed');
+    if (rows.length !== 9 || rows.some((row,i)=>row.migration_id!==migrations[i].file || row.sha256!==migrations[i].hash)) throw Error('Ledger validation failed');
     const [tables] = await conn.query("SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()");
     const expectedTables = new Set([...objects, 'growth_schema_migrations']);
     if (tables.length !== expectedTables.size ||
@@ -73,8 +75,8 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
       throw Error('Unexpected table inventory or non-InnoDB engine');
     }
     const [installedTriggers] = await conn.query("SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()");
-    if (installedTriggers.length !== 2 ||
-        installedTriggers.some(t => !triggers.includes(t.TRIGGER_NAME) || t.EVENT_OBJECT_TABLE !== 'growth_approval_decisions')) {
+    if (installedTriggers.length !== 4 ||
+        installedTriggers.some(t => !triggers.includes(t.TRIGGER_NAME) || !(['approval_audit_update_guard','approval_audit_delete_guard'].includes(t.TRIGGER_NAME) ? t.EVENT_OBJECT_TABLE === 'growth_approval_decisions' : t.EVENT_OBJECT_TABLE === 'growth_website_feature_audit'))) {
       throw Error('Audit trigger inventory mismatch');
     }
     const [foreignKeys] = await conn.query("SELECT TABLE_NAME, REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL");
@@ -101,6 +103,6 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
       catch(e) { if (e.code === 'ER_NO_REFERENCED_ROW_2') rejected=true; else throw e; }
       if (!rejected) throw Error('Foreign-key violation was not rejected');
     } finally { await conn.rollback(); }
-    console.log('PASS: 8 migrations, '+tables.length+' InnoDB tables, 2 audit triggers, '+foreignKeys.length+' foreign-key columns, functional audit/FK checks. No cleanup performed.');
+    console.log('PASS: 9 migrations, '+tables.length+' InnoDB tables, 4 audit triggers, '+foreignKeys.length+' foreign-key columns, functional audit/FK checks. No cleanup performed.');
   } finally { await conn.end(); }
 })().catch(e=>{console.error('TEST FAILED:',e.message);process.exitCode=1;});
