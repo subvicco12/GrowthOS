@@ -17,6 +17,10 @@ export async function GET(request: Request): Promise<Response> {
       'SELECT id,domain,status,platform FROM growth_websites WHERE organization_id=? ORDER BY domain LIMIT 100',
       [organization.id]
     );
+    const [countRows] = await pool.execute<CountRow[]>(
+      'SELECT COUNT(*) AS total FROM growth_websites WHERE organization_id=?',
+      [organization.id]
+    );
     const [pending] = await pool.execute<CountRow[]>(
       'SELECT COUNT(*) AS total FROM growth_approval_queue WHERE organization_id=? AND status=?',
       [organization.id, 'pending']
@@ -25,11 +29,9 @@ export async function GET(request: Request): Promise<Response> {
       ok: true,
       organization: { id: organization.id, name: organization.name, role: organization.role },
       websites,
-      websiteCount: websites.length,
+      websiteCount: Number(countRows[0]?.total ?? 0),
       pendingApprovals: Number(pending[0]?.total ?? 0),
-      automationEnabled: false,
-      publishingEnabled: false,
-      dataLimitedToFirst100Websites: websites.length === 100
+      dataLimitedToFirst100Websites: Number(countRows[0]?.total ?? 0) > websites.length
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
