@@ -8,7 +8,9 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --import=tsx --test src/core/__tests__/*.test.ts",
-    "test:approval:mysql": "node scripts/run-approval-integration.mjs"
+    "test:approval:mysql": "node scripts/run-approval-integration.mjs",
+    "test:security:offline": "node scripts/validate-security-offline.cjs",
+    "migration:plan": "node scripts/mariadb-migration-runner.cjs"
   },
   "dependencies": {
     "next": "15.5.24",
