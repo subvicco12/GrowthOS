@@ -24,19 +24,25 @@ export async function PATCH(request: Request): Promise<Response> {
     const connection = await getMySQLPool().getConnection();
     try {
       await connection.beginTransaction();
-      const [result] = await connection.execute(
-        'UPDATE growth_websites SET ' + column + '=FALSE WHERE id=? AND organization_id=?',
+      const [rows] = await connection.execute(
+        'SELECT ' + column + ' AS enabled FROM growth_websites WHERE id=? AND organization_id=? FOR UPDATE',
         [parsed.data.websiteId, organization.id]
       );
-      const affected = (result as { affectedRows?: number }).affectedRows ?? 0;
-      if (!affected) {
+      const websiteRows = rows as Array<{ enabled: number | boolean }>;
+      if (websiteRows.length === 0) {
         await connection.rollback();
         return Response.json({ ok: false, code: 'WEBSITE_NOT_FOUND' }, { status: 404 });
       }
-      await connection.execute(
-        'INSERT INTO growth_website_feature_audit (id,organization_id,website_id,actor_id,feature,enabled) VALUES (?,?,?,?,?,FALSE)',
-        [randomUUID(), organization.id, parsed.data.websiteId, userId, parsed.data.feature]
-      );
+      if (Boolean(websiteRows[0].enabled)) {
+        await connection.execute(
+          'UPDATE growth_websites SET ' + column + '=FALSE WHERE id=? AND organization_id=?',
+          [parsed.data.websiteId, organization.id]
+        );
+        await connection.execute(
+          'INSERT INTO growth_website_feature_audit (id,organization_id,website_id,actor_id,feature,enabled) VALUES (?,?,?,?,?,FALSE)',
+          [randomUUID(), organization.id, parsed.data.websiteId, userId, parsed.data.feature]
+        );
+      }
       await connection.commit();
     } catch (error) {
       await connection.rollback();
