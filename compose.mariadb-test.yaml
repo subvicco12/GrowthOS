@@ -1,0 +1,21 @@
+# Local-only disposable MariaDB 11.8 test container.
+# No Hostinger connection. Do not run in GitHub Actions (avoid billed minutes).
+# Supply DB password through local environment; never commit credentials.
+services:
+  growthos-mariadb-test:
+    image: mariadb:11.8
+    profiles: ["local-test"]
+    environment:
+      MARIADB_DATABASE: growthos_test_local
+      MARIADB_USER: growthos_test
+      MARIADB_PASSWORD: ${GROWTHOS_LOCAL_TEST_PASSWORD:?Set local test password}
+      MARIADB_ROOT_PASSWORD: ${GROWTHOS_LOCAL_ROOT_PASSWORD:?Set local root password}
+    ports:
+      - "127.0.0.1:33317:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
