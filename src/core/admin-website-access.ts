@@ -1,5 +1,5 @@
 export type GrowthRole = 'owner' | 'admin' | 'editor' | 'viewer';
-export type WebsiteAdminAction = 'read' | 'register' | 'change_budget' | 'enable_automation' | 'publish';
+export type WebsiteAdminAction = 'read' | 'register' | 'change_budget' | 'enable_automation' | 'approve' | 'publish';
 
 export interface AuthenticatedMembership {
   userId: string;
@@ -23,6 +23,7 @@ export function assertWebsiteAdminAccess(
     register: ['owner', 'admin'],
     change_budget: ['owner', 'admin'],
     enable_automation: ['owner'],
+    approve: ['owner', 'admin', 'editor'],
     publish: ['owner', 'admin', 'editor']
   };
   if (!allowed[action].includes(membership.role)) throw new Error('INSUFFICIENT_ROLE');
