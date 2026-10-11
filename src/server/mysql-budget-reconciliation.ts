@@ -7,7 +7,7 @@ export type FinalStatus = 'completed' | 'cancelled';
 
 /** Trusted server only; verify operator membership before invoking. */
 export async function finalizeMySQLBudget(organizationId: string, reservationId: string, actualCostMinor: number, status: FinalStatus): Promise<void> {
-  if (!organizationId || !reservationId || !Number.isSafeInteger(actualCostMinor) || actualCostMinor < 0 ||
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId) || !/^[0-9a-f-]{36}$/i.test(reservationId) || !Number.isSafeInteger(actualCostMinor) || actualCostMinor < 0 ||
       !['completed', 'cancelled'].includes(status)) throw new Error('INVALID_RECONCILIATION');
   const connection = await getMySQLPool().getConnection();
   try {
