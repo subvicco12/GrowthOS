@@ -8,6 +8,9 @@ const digest = (token: string) => createHash('sha256').update(token).digest('hex
 /** Session creation is allowed only after password verification and login rate-limit checks. */
 export async function issueMySQLSession(userId: string): Promise<{ token: string; expiresAt: Date }> {
   if (!userId) throw new Error('INVALID_USER');
+  const [users] = await getMySQLPool().execute<SessionRow[]>(
+    'SELECT id AS user_id, disabled FROM growth_users WHERE id = ? LIMIT 1', [userId]);
+  if (!users.length || users[0].disabled) throw new Error('USER_DISABLED');
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
   await getMySQLPool().execute(
