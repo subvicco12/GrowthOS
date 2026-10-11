@@ -5,7 +5,7 @@ import { verifyPassword } from './password-hashing';
 import { issueMySQLSession } from './mysql-session';
 
 type AccountRow = RowDataPacket & { id: string; password_hash: string; disabled: number };
-type ThrottleRow = RowDataPacket & { failed_attempts: number; locked_until: Date | null };
+type ThrottleRow = RowDataPacket & { failed_attempts: number; is_locked: number; had_lock: number };
 const keyFor = (email: string) => createHash('sha256').update(email).digest('hex');
 
 export async function loginWithPassword(emailInput: string, password: string) {
@@ -24,11 +24,11 @@ export async function loginWithPassword(emailInput: string, password: string) {
       'INSERT INTO growth_login_throttles (account_key) VALUES (?) ON DUPLICATE KEY UPDATE account_key=VALUES(account_key)',
       [key]);
     const [throttles] = await connection.execute<ThrottleRow[]>(
-      'SELECT failed_attempts, locked_until FROM growth_login_throttles WHERE account_key=? FOR UPDATE', [key]);
-    if (throttles[0].locked_until && new Date(throttles[0].locked_until).getTime() > Date.now()) {
+      'SELECT failed_attempts, (locked_until > UTC_TIMESTAMP()) AS is_locked, (locked_until IS NOT NULL) AS had_lock FROM growth_login_throttles WHERE account_key=? FOR UPDATE', [key]);
+    if (throttles[0].is_locked) {
       throw new Error('LOGIN_THROTTLED');
     }
-    if (throttles[0].locked_until) {
+    if (throttles[0].had_lock) {
       await connection.execute(
         'UPDATE growth_login_throttles SET failed_attempts=0,locked_until=NULL WHERE account_key=?',
         [key]);
