@@ -1,7 +1,12 @@
 import { randomBytes, scrypt as callbackScrypt, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
-
-const scrypt = promisify(callbackScrypt);
+function scrypt(password: string, salt: Buffer, keyLength: number, options: typeof OPTIONS): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    callbackScrypt(password, salt, keyLength, options, (error, derived) => {
+      if (error) reject(error);
+      else resolve(derived);
+    });
+  });
+}
 const KEY_BYTES = 64;
 const OPTIONS = { N: 16384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 };
 const PREFIX = 'scrypt-v1';

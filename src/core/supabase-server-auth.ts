@@ -24,6 +24,7 @@ export async function authenticateSupabaseRequest(request:Request):Promise<Serve
   const {data,error}=await server.auth.getUser(); if(error||!data.user)return null;
   userId=data.user.id;
  }
+ if(!userId)return null;
  const admin=createClient(db.url,db.serviceRoleKey,{auth:{persistSession:false,autoRefreshToken:false}});
  const {data:profile,error:profileError}=await admin.from('profiles').select('role').eq('id',userId).single();
  if(profileError||!profile||!roles.has(profile.role as UserRole))return null;
