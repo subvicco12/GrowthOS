@@ -1,4 +1,3 @@
-import 'server-only';
 import mysql, { type Pool } from 'mysql2/promise';
 
 let pool: Pool | undefined;
