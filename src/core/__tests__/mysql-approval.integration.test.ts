@@ -44,6 +44,23 @@ integration('concurrent decisions, replay, tenant boundaries and audit immutabil
   await assert.rejects(decideInternalApproval({ ...input, approvalId: approval2 }), /APPROVAL_NOT_FOUND/);
   await assert.rejects(db.execute('UPDATE growth_approval_decisions SET note=? WHERE id=?', ['tamper',events[0].id]));
   await assert.rejects(db.execute('DELETE FROM growth_approval_decisions WHERE id=?', [events[0].id]));
+  // A fresh pending approval receives two simultaneous identical submissions.
+  // Both calls must resolve to one audit event, one new decision and one replay.
+  const replayApproval = randomUUID();
+  await db.execute(
+    "INSERT INTO growth_approval_queue (id,organization_id,website_id,title,action_type) VALUES (?,?,?,?,'review')",
+    [replayApproval,org,site,'Concurrent replay']);
+  const replayInput = { ...input, approvalId: replayApproval, idempotencyKey: randomUUID() };
+  const twins = await Promise.all([
+    decideInternalApproval(replayInput),
+    decideInternalApproval(replayInput)
+  ]);
+  assert.equal(twins[0].decisionId, twins[1].decisionId);
+  assert.equal(twins.filter(x => x.replay).length, 1);
+  const [twinsAudit] = await db.execute<import('mysql2/promise').RowDataPacket[]>(
+    'SELECT id FROM growth_approval_decisions WHERE organization_id=? AND approval_id=?',
+    [org,replayApproval]);
+  assert.equal(twinsAudit.length, 1);
   const [queue] = await db.execute<import('mysql2/promise').RowDataPacket[]>(
     'SELECT status FROM growth_approval_queue WHERE organization_id=? AND id=?', [org,approval]);
   assert.equal(queue.length, 1);
