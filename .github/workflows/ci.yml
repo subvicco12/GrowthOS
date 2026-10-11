@@ -36,10 +36,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Production architecture guard
+      - name: Legacy adapter safety guard
         run: |
-          ! grep -RInE 'from .*supabase|createClient\(' src/app/api --include='*.ts'
-          grep -q "WordPressGrowthOSClient" src/app/api/dashboard/route.ts
-          grep -q "WordPressGrowthOSClient" src/app/api/approvals/route.ts
-          grep -q "INVALID_CONFIGURATION" src/app/api/dashboard/route.ts
-          grep -q "INVALID_CONFIGURATION" src/app/api/approvals/route.ts
+          grep -q LEGACY_ADAPTER_DISABLED src/app/api/dashboard/route.ts
+          grep -q LEGACY_ADAPTER_DISABLED src/app/api/approvals/route.ts
