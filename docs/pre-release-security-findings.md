@@ -1,28 +1,21 @@
-# GrowthOS pre-release security blockers
+# GrowthOS pre-release security findings
 
-Status: **unresolved; no deployment authorization**.
+Status: **NOT CERTIFIED; no deployment authorization**. Updated after checking the current development branch.
 
-## Critical: legacy WordPress adapter endpoints
+## Resolved in code: legacy WordPress adapters fail closed
 
-The existing `src/app/api/dashboard/route.ts` and
-`src/app/api/approvals/route.ts` currently initialize a configured
-WordPressGrowthOSClient without the new MySQL session and organization
-membership checks. The approvals route can initiate approval decisions.
-**Do not deploy with these endpoints exposed** until they enforce
-server-verified user identity, per-organization website ownership,
-action-specific RBAC, CSRF protection and trusted actor attribution.
+- `src/app/api/dashboard/route.ts` responds HTTP 503 without initializing the legacy WordPress client.
+- `src/app/api/approvals/route.ts` responds HTTP 503 without performing an approval.
+- Maintain this behavior until tenant-bound authenticated replacement routes are reviewed. Add regression tests; do not reopen the endpoints without authorization.
 
-## Other gates
+## Open security and release gates
 
-- Login currently throttles by normalized email only; add a bounded
-  network-level anti-abuse control and generic authentication timing.
-- The admin budget view chooses the first member organization; add an
-  explicit authenticated workspace selector before multi-org release.
-- Reconciliation and reservation functions are server-only building
-  blocks; their callers must enforce organization and job authorization.
-- Monetary summaries rendered as JS numbers need safe bounds/formatting
-  for very large values; do not silently round.
-- Run local typecheck, unit tests, build and real MySQL integration tests.
-- Test concurrent reservations and login lockouts.
-- Verify MySQL migration and database backups before provisioning.
-- Obtain approval before enabling any public route or deploying.
+1. Login throttles by normalized email only. Add bounded network-level anti-abuse and examine authentication timing and generic errors.
+2. Review CSRF and session-cookie protections for every mutating route, including logout and approvals.
+3. Replace implicit first-organization selection with explicit authenticated workspace selection before multi-org release.
+4. Verify every admin API enforces organization-scoped authorization and role-specific permissions server-side.
+5. Confirm approval decisions never trigger publication; retain append-only audit behavior.
+6. Review cost reservations, concurrency, reconciliation, overage handling and zero-budget fail-closed defaults.
+7. Complete dependency install, typecheck, unit tests, production build and API security tests without incurring paid CI minutes.
+8. Database integration and MariaDB execution testing are **deferred** by user direction; do not infer database readiness.
+9. No production rollout, merge, Hostinger mutation, DNS change, paid provider call, or public feature activation without separate approval.
