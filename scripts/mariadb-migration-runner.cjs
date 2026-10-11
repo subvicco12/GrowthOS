@@ -56,7 +56,9 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
       if (m.file.startsWith('008_')) {
         statements = m.sql.split('\n').filter(line=>/^CREATE TRIGGER /i.test(line.trim())).map(line=>line.trim().replace(/\/\/$/,''));
       } else {
-        statements = m.sql.split(';').map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/^(?:--[^\n]*\n\s*)+/gm,'').trim()).filter(Boolean);
+        const uncommented = m.sql.split('\n').filter(line => !/^\s*--/.test(line)).join('\n');
+        statements = uncommented.split(';').map(part => part.trim()).filter(Boolean);
+        if (statements.some(part => !/^(CREATE TABLE|INSERT INTO)\b/i.test(part))) throw Error('Unexpected SQL statement in ' + m.file);
       }
       for (const sql of statements) await conn.query(sql);
       await conn.execute('INSERT INTO growth_schema_migrations(migration_id,sha256,engine_version) VALUES (?,?,?)',[m.file,m.hash,version.v]);
