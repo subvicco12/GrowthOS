@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { RowDataPacket } from 'mysql2/promise';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { getMySQLPool } from './mysql';
 
 export type ApprovalDecision = 'approved' | 'rejected' | 'deferred';
@@ -50,9 +50,10 @@ export async function decideInternalApproval(input: DecisionInput): Promise<{ de
     await connection.execute(
       'INSERT INTO growth_approval_decisions (id,organization_id,website_id,approval_id,actor_id,idempotency_key,decision,note) VALUES (?,?,?,?,?,?,?,?)',
       [decisionId,organizationId,websiteId,approvalId,actorId,idempotencyKey,decision,note]);
-    await connection.execute(
+    const [transition] = await connection.execute<ResultSetHeader>(
       'UPDATE growth_approval_queue SET status=?,decided_at=UTC_TIMESTAMP(),decided_by=?,decision_note=? WHERE id=? AND organization_id=? AND website_id=? AND status=?',
       [decision,actorId,note,approvalId,organizationId,websiteId,'pending']);
+    if (transition.affectedRows !== 1) throw new Error('APPROVAL_TRANSITION_FAILED');
     await connection.commit();
     return { decisionId, status: decision, replay: false };
   } catch (error) {
