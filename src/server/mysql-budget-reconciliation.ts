@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { RowDataPacket } from 'mysql2/promise';
 import { getMySQLPool } from './mysql';
+import { exactUnsigned } from './mysql-integer';
 
 type Row = RowDataPacket & Record<string, unknown>;
 export type FinalStatus = 'completed' | 'cancelled';
@@ -23,14 +24,14 @@ export async function finalizeMySQLBudget(organizationId: string, reservationId:
     if (!rows.length) throw new Error('RESERVATION_NOT_FOUND');
     const previous = rows[0];
     if (previous.status !== 'reserved') {
-      if (previous.status === status && Number(previous.actual_cost_minor) === actualCostMinor) {
+      if (previous.status === status && previous.actual_cost_minor !== null && exactUnsigned(previous.actual_cost_minor) === BigInt(actualCostMinor)) {
         await connection.commit();
         return;
       }
       throw new Error('RESERVATION_ALREADY_FINALIZED');
     }
     // Record provider overruns rather than suppressing real charges.
-    if (actualCostMinor > Number(previous.estimated_cost_minor)) {
+    if (BigInt(actualCostMinor) > exactUnsigned(previous.estimated_cost_minor)) {
       await connection.execute(
         'INSERT INTO growth_budget_incidents (id,organization_id,reservation_id,incident_type,estimated_minor,actual_minor) VALUES (?,?,?,?,?,?)',
         [randomUUID(),organizationId,reservationId,'COST_OVERRUN',previous.estimated_cost_minor,actualCostMinor]);
@@ -49,7 +50,7 @@ export async function finalizeMySQLBudget(organizationId: string, reservationId:
     const [caps] = await connection.execute<Row[]>(
       'SELECT monthly_limit_minor FROM growth_organization_budgets WHERE organization_id=?',
       [organizationId]);
-    if (Number(totals[0].used) > Number(caps[0].monthly_limit_minor)) {
+    if (exactUnsigned(totals[0].used) > exactUnsigned(caps[0].monthly_limit_minor)) {
       await connection.execute(
         'UPDATE growth_organization_budgets SET globally_paused=TRUE WHERE organization_id=?',
         [organizationId]);
