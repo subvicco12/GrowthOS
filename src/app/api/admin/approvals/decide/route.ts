@@ -36,7 +36,7 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = schema.safeParse(payload);
   if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_DECISION' }, { status: 400 });
   try {
-    const actor = await requireWebsiteAccess(parsed.data.organizationId, 'publish');
+    const actor = await requireWebsiteAccess(parsed.data.organizationId, 'approve');
     const result = await decideInternalApproval({ ...parsed.data, actorId: actor.userId });
     return Response.json({ ok: true, ...result, externalAction: false }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
