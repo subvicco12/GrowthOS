@@ -38,6 +38,10 @@ export async function finalizeMySQLBudget(reservationId: string, actualCostMinor
       await connection.execute(
         'INSERT INTO growth_budget_incidents (id,organization_id,reservation_id,incident_type,estimated_minor,actual_minor) VALUES (?,?,?,?,?,?)',
         [randomUUID(),organizationId,reservationId,'COST_OVERRUN',previous.estimated_cost_minor,actualCostMinor]);
+      // Stop new AI reservations immediately when provider costs exceed the estimate.
+      await connection.execute(
+        'UPDATE growth_organization_budgets SET globally_paused = TRUE WHERE organization_id = ?',
+        [organizationId]);
     }
     await connection.execute(
       'UPDATE growth_ai_reservations SET status = ?, actual_cost_minor = ? WHERE id = ? AND organization_id = ?',
