@@ -1,0 +1,5 @@
+-- Apply after 007 with a MySQL client that supports DELIMITER.
+DELIMITER //
+CREATE TRIGGER approval_audit_update_guard BEFORE UPDATE ON growth_approval_decisions FOR EACH ROW BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AUDIT_IMMUTABLE'; END//
+CREATE TRIGGER approval_audit_delete_guard BEFORE DELETE ON growth_approval_decisions FOR EACH ROW BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AUDIT_IMMUTABLE'; END//
+DELIMITER ;
