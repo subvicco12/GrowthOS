@@ -1,5 +1,5 @@
-import { getAuthenticatedOrganizationContext } from '../../../../server/organization-context';
-import { getMySQLPool } from '../../../../server/mysql';
+import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
+import { getMySQLPool } from '../../../server/mysql';
 import type { RowDataPacket } from 'mysql2/promise';
 
 export const runtime = 'nodejs';
