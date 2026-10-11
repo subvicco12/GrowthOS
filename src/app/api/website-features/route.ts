@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { getAuthenticatedOrganizationContext } from '../../../../server/organization-context';
-import { getMySQLPool } from '../../../../server/mysql';
-import { canDisableWebsiteFeature, websiteFeaturePatchSchema } from '../../../../core/website-feature-controls';
+import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
+import { getMySQLPool } from '../../../server/mysql';
+import { canDisableWebsiteFeature, websiteFeaturePatchSchema } from '../../../core/website-feature-controls';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
