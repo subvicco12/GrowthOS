@@ -22,7 +22,7 @@ export async function reserveMySQLBudget(request: ProductionRequest): Promise<st
     const org = orgRows[0];
     if (!org || org.globally_paused) throw new Error('GLOBAL_PAUSE');
     const [siteRows] = await connection.execute<Row[]>(
-      'SELECT status, automation_enabled, verified_at FROM growth_websites WHERE organization_id = ? AND id = ? FOR UPDATE',
+      'SELECT status, automation_enabled, verified_at, monthly_budget_minor FROM growth_websites WHERE organization_id = ? AND id = ? FOR UPDATE',
       [request.organizationId, request.websiteId]);
     const site = siteRows[0];
     if (!site || site.status !== 'active' || !site.automation_enabled || !site.verified_at) throw new Error('WEBSITE_DISABLED');
@@ -55,7 +55,11 @@ export async function reserveMySQLBudget(request: ProductionRequest): Promise<st
     const [siteCost] = await connection.execute<Row[]>(
       "SELECT COALESCE(SUM(CASE WHEN status='reserved' THEN estimated_cost_minor ELSE COALESCE(actual_cost_minor,estimated_cost_minor) END),0) AS used FROM growth_ai_reservations WHERE website_id = ? AND content_type = ? AND month_start = ?",
       [request.websiteId, request.contentType, month]);
-    if (request.estimatedCostMinor > Number(policy.monthly_budget_minor) - Number(siteCost[0].used)) throw new Error('WEBSITE_BUDGET_EXCEEDED');
+    if (request.estimatedCostMinor > Number(policy.monthly_budget_minor) - Number(siteCost[0].used)) throw new Error('CONTENT_BUDGET_EXCEEDED');
+    const [allSiteCost] = await connection.execute<Row[]>(
+      "SELECT COALESCE(SUM(CASE WHEN status='reserved' THEN estimated_cost_minor ELSE COALESCE(actual_cost_minor,estimated_cost_minor) END),0) AS used FROM growth_ai_reservations WHERE website_id = ? AND month_start = ?",
+      [request.websiteId, month]);
+    if (request.estimatedCostMinor > Number(site.monthly_budget_minor) - Number(allSiteCost[0].used)) throw new Error('WEBSITE_BUDGET_EXCEEDED');
     const [orgCost] = await connection.execute<Row[]>(
       "SELECT COALESCE(SUM(CASE WHEN status='reserved' THEN estimated_cost_minor ELSE COALESCE(actual_cost_minor,estimated_cost_minor) END),0) AS used FROM growth_ai_reservations WHERE organization_id = ? AND month_start = ?",
       [request.organizationId, month]);
