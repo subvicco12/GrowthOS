@@ -29,3 +29,23 @@
    any external publishing. Keep all new websites inactive with zero budgets.
 6. Validate GROWTHOS_APP_ORIGIN and reverse proxy configuration in staging.
 7. No production deploy or migration without operator approval.
+
+## Disposable database integration verification
+
+The test file `src/core/__tests__/mysql-approval.integration.test.ts`
+covers competing concurrent decisions, successful idempotent replay, conflicting
+replay, cross-tenant approval lookup, and database rejection of audit UPDATE
+and DELETE. It is skipped unless BOTH conditions are met:
+
+- `GROWTHOS_TEST_DB_DISPOSABLE=YES`
+- `GROWTHOS_DB_NAME` begins with `growthos_test_`
+
+Use an isolated MySQL 8+ disposable test database only, never a production
+or shared database. Apply baseline schema and MySQL migrations 002 through
+008 in order, then run `npm test`. Migration 008 uses MySQL-client DELIMITER
+syntax and must be applied by a compatible client.
+
+The test writes fixture organizations, websites, users, approvals and audit
+events and intentionally does not delete them. Confirm no real credentials
+or customer data are present in the test database. No test execution has
+been claimed without a real database connection and successful run.
