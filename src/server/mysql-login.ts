@@ -16,8 +16,10 @@ export async function loginWithPassword(emailInput: string, password: string) {
   const connection = await getMySQLPool().getConnection();
   const key = keyFor(email);
   let userId: string | null = null;
+  let transactionOpen = false;
   try {
     await connection.beginTransaction();
+    transactionOpen = true;
     await connection.execute(
       'INSERT INTO growth_login_throttles (account_key) VALUES (?) ON DUPLICATE KEY UPDATE account_key=VALUES(account_key)',
       [key]);
@@ -42,14 +44,16 @@ export async function loginWithPassword(emailInput: string, password: string) {
         'UPDATE growth_login_throttles SET failed_attempts=?, locked_until=IF(? >= 5, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 MINUTE), NULL) WHERE account_key=?',
         [failures, failures, key]);
       await connection.commit();
+      transactionOpen = false;
       throw new Error('INVALID_CREDENTIALS');
     }
     await connection.execute(
       'UPDATE growth_login_throttles SET failed_attempts=0,locked_until=NULL WHERE account_key=?', [key]);
     userId = user.id;
     await connection.commit();
+    transactionOpen = false;
   } catch (error) {
-    try { await connection.rollback(); } catch { /* transaction may already be committed */ }
+    if (transactionOpen) await connection.rollback();
     throw error;
   } finally {
     connection.release();
