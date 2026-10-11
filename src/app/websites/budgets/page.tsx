@@ -1,17 +1,18 @@
 import { WebsiteBudgetPanel } from '../../website-budget-panel';
+import { getAuthenticatedOrganization } from '../../../server/mysql-organization-access';
+import { listMySQLWebsiteBudgets } from '../../../server/mysql-budget-overview';
 
 export const metadata = { title: 'Website AI Budgets | GrowthOS' };
+export const dynamic = 'force-dynamic';
 
-/**
- * Deliberately empty until the authenticated server-side registry repository is wired.
- * Never use sample budgets or client-provided organization IDs as production data.
- */
-export default function WebsiteBudgetsPage() {
-  return <main>
-    <WebsiteBudgetPanel rows={[]} />
-    <p style={{ maxWidth: 1100, margin: '0 auto', padding: '0 16px 24px' }}>
-      Registry connection pending. No website data is displayed until authenticated
-      organization-scoped reads are available.
-    </p>
-  </main>;
+/** Fail closed: never show placeholder records or another tenant's budgets. */
+export default async function WebsiteBudgetsPage() {
+  try {
+    const organizationId = await getAuthenticatedOrganization();
+    if (!organizationId) return <main><h1>Website AI budgets</h1><p>Sign in with an authorized organization account to view website budgets.</p></main>;
+    const rows = await listMySQLWebsiteBudgets(organizationId);
+    return <main><WebsiteBudgetPanel rows={rows} /></main>;
+  } catch {
+    return <main><h1>Website AI budgets</h1><p>Budget data is temporarily unavailable. No changes have been made.</p></main>;
+  }
 }
