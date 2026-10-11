@@ -22,7 +22,7 @@ const featureTriggers = [...migration.matchAll(/CREATE TRIGGER[\s\S]*?;/gi)].map
 assert.ok(featureTable, 'Feature audit CREATE TABLE must be parseable');
 assert.equal(featureTriggers.length, 2, 'Feature audit requires exactly two complete triggers');
 assert.ok(featureTriggers.every(statement => /FOR EACH ROW SIGNAL SQLSTATE '45000'/i.test(statement)));
-assert.match(runner, /guards\\.length !== 2/, 'Runner must reject missing feature audit triggers');
+assert.match(runner, /guards\.length !== 2/, 'Runner must reject missing feature audit triggers');
 assert.match(runner, /Feature audit UPDATE/);
 assert.match(runner, /Feature audit DELETE/);
 assert.match(migration, /CHECK \(enabled = FALSE\)/);
