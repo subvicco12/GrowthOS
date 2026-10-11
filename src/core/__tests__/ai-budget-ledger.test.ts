@@ -34,7 +34,7 @@ test('reservation service checks policy inside transaction and inserts once', as
   assert.equal(again.replayed, true);
   assert.equal(inserts, 1);
   assert.equal((await reserveProductionBudget(db, { ...request, requestedUnits: 2 })).decision.code, 'INVALID_REQUEST');
-  if (saved) saved.status = 'completed';
+  saved = { ...saved!, status: 'completed' };
   assert.equal((await reserveProductionBudget(db, request)).decision.allowed, false);
   assert.equal((await reserveProductionBudget(db, { ...request, websiteId: 'site-2' })).decision.code, 'INVALID_REQUEST');
 });
