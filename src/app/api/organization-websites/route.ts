@@ -1,3 +1,4 @@
+import { websiteDomainSchema } from '../../../core/website-domain-schema';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { assertWebsiteAdminAccess } from '../../../core/admin-website-access';
@@ -40,7 +41,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 const registerSchema = z.object({
-  domain: z.string().trim().toLowerCase().min(4).max(253).regex(/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$/),
+  domain: websiteDomainSchema,
   platform: z.enum(['wordpress','nextjs','react','static','custom'])
 }).strict();
 
