@@ -26,6 +26,12 @@ export async function loginWithPassword(emailInput: string, password: string) {
     if (throttles[0].locked_until && new Date(throttles[0].locked_until).getTime() > Date.now()) {
       throw new Error('LOGIN_THROTTLED');
     }
+    if (throttles[0].locked_until) {
+      await connection.execute(
+        'UPDATE growth_login_throttles SET failed_attempts=0,locked_until=NULL WHERE account_key=?',
+        [key]);
+      throttles[0].failed_attempts = 0;
+    }
     const [users] = await connection.execute<AccountRow[]>(
       'SELECT id,password_hash,disabled FROM growth_users WHERE email=? LIMIT 1', [email]);
     const user = users[0];
