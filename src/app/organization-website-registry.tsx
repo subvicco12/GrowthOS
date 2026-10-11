@@ -24,6 +24,21 @@ export function OrganizationWebsiteRegistry() {
       .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Website registry unavailable.'); });
     return () => { active = false; };
   }, []);
+  async function disableFeature(websiteId: string, feature: 'automation' | 'auto_publish') {
+    setMessage('');
+    try {
+      const response = await fetch('/api/website-features', {
+        method: 'PATCH', credentials: 'include', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteId, feature, enabled: false })
+      });
+      if (!response.ok) throw new Error('Feature disable request failed.');
+      const refreshed = await fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' });
+      if (!refreshed.ok) throw new Error('Feature disabled, but refresh failed.');
+      setData(await refreshed.json() as Payload);
+      setMessage('Feature disabled. No operation was started.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Feature change failed.'); }
+  }
   async function register(event: import('react').FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
@@ -63,6 +78,10 @@ export function OrganizationWebsiteRegistry() {
             <span>{site.platform} · {site.status} · Automation {site.automationEnabled ? 'enabled' : 'disabled'} · Publishing {site.autoPublishEnabled ? 'enabled' : 'disabled'}</span>
           </div>
           <span className="healthBadge">{site.status}</span>
+          {['owner','admin'].includes(data.organization.role) && <div className="approvalActions">
+            {site.automationEnabled && <button type="button" onClick={() => void disableFeature(site.id, 'automation')}>Disable automation</button>}
+            {site.autoPublishEnabled && <button type="button" onClick={() => void disableFeature(site.id, 'auto_publish')}>Disable publishing</button>}
+          </div>
         </article>)}
         {!data.websites.length && <p>No websites registered in this workspace.</p>}
       </div>
