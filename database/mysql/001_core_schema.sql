@@ -22,6 +22,7 @@ CREATE TABLE growth_websites (
  platform ENUM('wordpress','nextjs','react','static','custom') NOT NULL,
  status ENUM('draft','verifying','connected','auditing','active','paused','archived') NOT NULL DEFAULT 'draft',
  timezone VARCHAR(80) NOT NULL DEFAULT 'UTC', verified_at DATETIME NULL,
+ monthly_budget_minor BIGINT UNSIGNED NOT NULL DEFAULT 0,
  automation_enabled BOOLEAN NOT NULL DEFAULT FALSE,
  auto_publish_enabled BOOLEAN NOT NULL DEFAULT FALSE,
  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
