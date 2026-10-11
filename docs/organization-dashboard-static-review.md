@@ -12,9 +12,9 @@ Scope: feature branch feat/ci-cost-guardrails-20261011. Source inspection only. 
 
 ## Open issues and required gates
 1. Database integration tests remain paused. Query compatibility and actual tenant isolation have not been demonstrated against MariaDB.
-2. No typecheck, Next.js build, or browser regression has been run. Source inspection is not certification.
+2. Isolated TypeScript syntax parsing was previously reported for 187 files; complete typecheck, Next.js build, and browser regression remain unverified because dependencies could not be installed. Source inspection and syntax parsing are not certification.
 3. Approval decisions and immutable audit workflow remain inactive and untested.
-4. Feature-disable changes are not yet independently recorded in a dedicated audit trail. Add one before production release.
+4. Feature-disable transitions now have a dedicated audit table in migration 009 and a tenant-scoped transactional endpoint. Their behavior still requires isolated MariaDB integration tests before release.
 5. The website domain validator checks DNS label syntax but not domain ownership, DNS verification, or public suffix validity.
 6. The read-only Settings tab is intentionally a placeholder; tenant-scoped settings mutations remain unavailable.
 7. The organization dashboard lists at most 100 websites but now queries a separate total count. Pagination remains to be implemented.
