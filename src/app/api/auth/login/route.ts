@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { loginWithPassword } from '../../../../server/mysql-login';
 import { SESSION_COOKIE_NAME } from '../../../../server/authenticated-website-access';
+import { ORGANIZATION_COOKIE_NAME } from '../../../../server/organization-context';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,7 @@ export async function POST(request: Request): Promise<Response> {
     const response = Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
     response.headers.append('Set-Cookie',
       `${SESSION_COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${expiresAt.toUTCString()}`);
+    response.headers.append('Set-Cookie', `${ORGANIZATION_COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
     return response;
   } catch (error) {
     const code = error instanceof Error ? error.message : 'SERVICE_UNAVAILABLE';
