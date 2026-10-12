@@ -18,7 +18,19 @@ export async function PATCH(request: Request): Promise<Response> {
     const { userId, organization } = await getAuthenticatedOrganizationContext(request);
     if (!canDisableWebsiteFeature(organization.role))
       return Response.json({ ok: false, code: 'INSUFFICIENT_ROLE' }, { status: 403 });
-    const parsed = websiteFeaturePatchSchema.safeParse(await request.json());
+    const declaredLength = request.headers.get('content-length');
+    if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > 4096))
+      return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
+    let raw: unknown;
+    try {
+      const body = await request.text();
+      if (Buffer.byteLength(body, 'utf8') > 4096)
+        return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
+      raw = JSON.parse(body);
+    } catch {
+      return Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 });
+    }
+    const parsed = websiteFeaturePatchSchema.safeParse(raw);
     if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_FEATURE_CHANGE' }, { status: 400 });
     const column = parsed.data.feature === 'automation' ? 'automation_enabled' : 'auto_publish_enabled';
     const connection = await getMySQLPool().getConnection();
