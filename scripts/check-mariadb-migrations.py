@@ -10,7 +10,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "database" / "mysql"
-EXPECTED = [f"{n:03d}" for n in range(1, 9)]
+EXPECTED = [f"{n:03d}" for n in range(1, 10)]
 def fail(message):
     print("FAIL:", message)
     return 1
