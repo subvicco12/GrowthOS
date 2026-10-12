@@ -19,7 +19,7 @@ export async function PATCH(request: Request): Promise<Response> {
     if (!canDisableWebsiteFeature(organization.role))
       return Response.json({ ok: false, code: 'INSUFFICIENT_ROLE' }, { status: 403 });
     const declaredLength = request.headers.get('content-length');
-    if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > 4096))
+    if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > 4096))
       return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
     let raw: unknown;
     try {
