@@ -9,7 +9,7 @@ const js = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
 }).outputText;
 
-async function runCase({ enabled = 1, found = true, role = 'owner', failInsert = false }) {
+async function runCase({ enabled = 1, found = true, role = 'owner', failInsert = false, body = null, declaredLength = null }) {
   const calls = [];
   let committed = 0, rolled = 0, released = 0;
   const connection = {
@@ -38,12 +38,12 @@ async function runCase({ enabled = 1, found = true, role = 'owner', failInsert =
   };
   const module = { exports: {} };
   vm.runInNewContext(js, {
-    module, exports: module.exports, Response, URL,
+    module, exports: module.exports, Response, URL, Buffer,
     require: id => id === 'node:crypto' ? require(id) : (mocks[id] || (() => { throw Error('Missing mock ' + id); })())
   });
   const request = {
-    headers: new Headers({ origin: 'https://growthos.example', host: 'growthos.example' }),
-    json: async () => ({ websiteId: 'site-1', feature: 'automation', enabled: false })
+    headers: new Headers({ origin: 'https://growthos.example', host: 'growthos.example', ...(declaredLength === null ? {} : { 'content-length': declaredLength }) }),
+    text: async () => body === null ? JSON.stringify({ websiteId: 'site-1', feature: 'automation', enabled: false }) : body
   };
   const response = await module.exports.PATCH(request);
   return { status: response.status, calls, committed, rolled, released };
@@ -81,4 +81,19 @@ async function runCase({ enabled = 1, found = true, role = 'owner', failInsert =
   assert.equal(r.committed, 0);
   assert.equal(r.rolled, 1);
   console.log('PASS audit failure rolls back');
+
+  r = await runCase({ body: '{broken' });
+  assert.equal(r.status, 400);
+  assert.equal(r.calls.length, 0);
+  console.log('PASS malformed JSON refused before DB access');
+
+  r = await runCase({ body: 'x'.repeat(4097) });
+  assert.equal(r.status, 413);
+  assert.equal(r.calls.length, 0);
+  console.log('PASS oversized actual body refused before DB access');
+
+  r = await runCase({ declaredLength: '4097' });
+  assert.equal(r.status, 413);
+  assert.equal(r.calls.length, 0);
+  console.log('PASS oversized declared body refused before DB access');
 })().catch(error => { console.error(error); process.exitCode = 1; });
