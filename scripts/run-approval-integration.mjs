@@ -6,6 +6,10 @@ if (process.env.GROWTHOS_TEST_DB_DISPOSABLE !== 'YES' ||
   console.error('REFUSED: set GROWTHOS_TEST_DB_DISPOSABLE=YES and a disposable growthos_test_* database name.');
   process.exit(2);
 }
+if (!['127.0.0.1', 'localhost', '::1'].includes(process.env.GROWTHOS_DB_HOST ?? '')) {
+  console.error('REFUSED: disposable MariaDB integration requires a local loopback host.');
+  process.exit(2);
+}
 for (const key of ['GROWTHOS_DB_HOST','GROWTHOS_DB_USER','GROWTHOS_DB_PASSWORD']) {
   if (!process.env[key]) {
     console.error('REFUSED: missing ' + key);
