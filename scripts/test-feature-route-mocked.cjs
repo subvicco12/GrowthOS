@@ -96,4 +96,9 @@ async function runCase({ enabled = 1, found = true, role = 'owner', failInsert =
   assert.equal(r.status, 413);
   assert.equal(r.calls.length, 0);
   console.log('PASS oversized declared body refused before DB access');
+
+  r = await runCase({ declaredLength: '68' });
+  assert.equal(r.status, 200);
+  assert.equal(r.committed, 1);
+  console.log('PASS ordinary numeric Content-Length accepted');
 })().catch(error => { console.error(error); process.exitCode = 1; });
