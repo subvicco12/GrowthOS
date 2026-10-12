@@ -7,7 +7,8 @@ import { decideInternalApproval } from '../../server/mysql-approval-decision';
 // Requires an explicitly designated disposable MySQL database with migrations 001-008.
 // Never run against production. Fixtures intentionally remain for audit traceability.
 const enabled = process.env.GROWTHOS_TEST_DB_DISPOSABLE === 'YES' &&
-  process.env.GROWTHOS_DB_NAME?.startsWith('growthos_test_') === true;
+  /^growthos_test_[a-zA-Z0-9_]+$/.test(process.env.GROWTHOS_DB_NAME ?? '') &&
+  ['127.0.0.1', 'localhost', '::1'].includes(process.env.GROWTHOS_DB_HOST ?? '');
 const integration = enabled ? test : test.skip;
 if (enabled) after(async () => { await getMySQLPool().end(); });
 
