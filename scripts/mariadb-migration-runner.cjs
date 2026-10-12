@@ -32,6 +32,12 @@ if (process.env.GROWTHOS_MIGRATION_TEST_DISPOSABLE !== 'YES' ||
     db === 'u917733804_BtNpX') {
   throw Error('REFUSED: execution requires explicit disposable test schema growthos_test_* and confirmation');
 }
+// A disposable schema name does not prove that the server is disposable.
+// Require loopback transport; Docker/container service names must be forwarded locally.
+const testHost = process.env.GROWTHOS_DB_HOST || '127.0.0.1';
+if (!['127.0.0.1', 'localhost', '::1'].includes(testHost)) {
+  throw Error('REFUSED: disposable MariaDB testing requires a local loopback host');
+}
 (async()=>{
   const mysql = require('mysql2/promise');
   const conn = await mysql.createConnection({
