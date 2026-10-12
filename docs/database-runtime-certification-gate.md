@@ -1,12 +1,12 @@
 # GrowthOS — database runtime certification gate
 
-Status: **BLOCKED — do not deploy**. Last verified Work report: `docs/isolated-mariadb-readiness-20261012.md` (commit `83262d5`). This is a plan, not evidence that database tests passed.
+Status: **local MariaDB 11.8 certification passed; production release remains blocked**. See `docs/isolated-mariadb-runtime-20261012.md` for the executed test results. This document retains the separate production release gates.
 
 ## Confirmed evidence
 - Isolated npm test: 214 passed, one database test skipped; TypeScript and Next.js build passed in the preceding isolated Work run.
 - Offline migration planning and parsing for 001–009 passed.
 - MariaDB 10.11 bootstrap succeeded, but server startup failed with `EPERM` when creating an AF_UNIX socket; migrations and approval assertions **did not run**.
-- MariaDB 11.8 runtime compatibility is **not verified**.
+- A subsequent isolated MariaDB 11.8.5 run applied migrations 001–009 and passed the approval integration suite after the verified fixes in `docs/isolated-mariadb-runtime-20261012.md`.
 
 ## Execution environment
 Use an isolated machine or container runtime that permits **local loopback TCP or Unix sockets**, with MariaDB **11.8.x**, Node.js and installed project dependencies. Never reuse production credentials, connect to Hostinger, or run against the production database `u917733804_BtNpX`.

@@ -19,7 +19,7 @@ export interface DecisionInput {
  */
 export async function decideInternalApproval(input: DecisionInput): Promise<{ decisionId: string; status: ApprovalDecision; replay: boolean }> {
   const { organizationId, websiteId, approvalId, actorId, idempotencyKey, decision } = input;
-  if (![organizationId,websiteId,approvalId,actorId].every(v => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) ||
+  if (![organizationId,websiteId,approvalId,actorId].every(v => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) ||
       !/^[a-zA-Z0-9_-]{8,128}$/.test(idempotencyKey) ||
       !['approved','rejected','deferred'].includes(decision) ||
       (input.note?.length ?? 0) > 2000) throw new Error('INVALID_DECISION');
