@@ -11,7 +11,8 @@
     "test:approval:mysql": "node scripts/run-approval-integration.mjs",
     "test:security:offline": "node scripts/validate-security-offline.cjs",
     "migration:plan": "node scripts/mariadb-migration-runner.cjs",
-    "test:db-guards:offline": "node scripts/test-disposable-db-guards.cjs"
+    "test:db-guards:offline": "node scripts/test-disposable-db-guards.cjs",
+    "test:auth-cookies:offline": "node scripts/test-auth-cookie-routes-mocked.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
