@@ -15,7 +15,9 @@ const expectedCounts = [7,1,1,1,2,1,1,2,3];
 const expectedTables = [
   'growth_organizations','growth_users','growth_memberships','growth_websites',
   'growth_content_policies','growth_organization_budgets','growth_ai_reservations',
-  'growth_schema_migrations','growth_approval_decisions','growth_website_feature_audit'
+  'growth_budget_incidents','growth_sessions','growth_login_throttles',
+  'growth_installation_state','growth_approval_queue','growth_approval_decisions',
+  'growth_website_feature_audit'
 ];
 const manifest = [];
 const seenTables = new Set();
@@ -42,6 +44,7 @@ for (let n = 1; n <= 9; n++) {
   manifest.push({file, sha256:crypto.createHash('sha256').update(sql).digest('hex'), statements:statements.length, tables, triggers});
 }
 for (const name of ['growth_approval_decisions','growth_website_feature_audit']) assert(seenTables.has(name), 'missing audit table '+name);
+assert.deepEqual([...seenTables].sort(), [...expectedTables].sort(), 'migration table inventory mismatch');
 for (const name of ['approval_audit_update_guard','approval_audit_delete_guard','growth_feature_audit_no_update','growth_feature_audit_no_delete'])
   assert(seenTriggers.has(name), 'missing immutable audit trigger '+name);
 const ledger = fs.readFileSync(path.join(dir, '000_migration_ledger.sql'),'utf8');
