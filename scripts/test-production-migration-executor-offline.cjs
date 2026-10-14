@@ -26,7 +26,7 @@ const negative=[
 for(const [env,message] of negative){
  const r=run(['--test-disposable'],env);
  assert.notEqual(r.status,0);
- assert.match(r.stderr,new RegExp(message.replace(/[.*+?^$\{\}()|[\]\\]/g,'\\$&')));
+ assert.ok(r.stderr.includes(message),r.stderr);
 }
 const unknown=run(['--production']);
 assert.notEqual(unknown.status,0);
