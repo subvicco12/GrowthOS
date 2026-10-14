@@ -5,10 +5,23 @@
 // This file does not modify the existing mariadb-migration-runner.cjs.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),dir=path.join(root,'database/mysql');
+// Independently reviewed migration bytes. Keep these pins separate from the
+// manifest generator so a changed SQL file cannot silently become trusted.
+const reviewedHashes=[
+ 'b67ab03511cd972ee07f7e891d35134e84c0e0ac00ff8f27614f5fcf479108c6',
+ '2b5d77e9120b23debd57f39439ceee3fafee7b46c1c5c26c22c1597aebddab2e',
+ 'c2bcabc28b3c26827ea0e1f5e01b6e6c0ce0c7d9797f6c5ed9c4c60150b0b4c7',
+ '4bf0afc1e375720abaadf5b3bc282ed0b7d5c83cd56e58f37b3b557133f1c179',
+ '4c020458375497ba0808a65ac76baaa839c13697de054608f5c42556ad14919b',
+ '763ee4dd6b9461a799bffc1f314bc0ff69bc6dd84a52f9e96841342051f01019',
+ '8f4fd143f23761e62f381cfcb736efe9380159bb786be07f46e9cee3d28add6f',
+ '7ad741a87d29157ed1236aacd9daef1f855b5c38f2351bb5e5cf9e305502c672',
+ 'b8d26a4f7f9ce93407d3a3a5c63415bf3ca32a1843275ef5a3b99ba8ff15285c'
+];
 const names=fs.readdirSync(dir).filter(n=>/^00[1-9]_.*\.sql$/.test(n)).sort();
 function requireSafe(ok,msg){if(!ok)throw Error('REFUSED: '+msg);}
 requireSafe(names.length===9&&names.every((n,i)=>n.startsWith(String(i+1).padStart(3,'0')+'_')),'expected exactly migrations 001..009');
-const migrations=names.map(file=>{const sql=fs.readFileSync(path.join(dir,file),'utf8');return {file,sql,hash:crypto.createHash('sha256').update(sql).digest('hex')};});
+const migrations=names.map((file,i)=>{const sql=fs.readFileSync(path.join(dir,file),'utf8');const hash=crypto.createHash('sha256').update(sql).digest('hex');requireSafe(hash===reviewedHashes[i],'reviewed SHA-256 mismatch in '+file);return {file,sql,hash};});
 const ledger=fs.readFileSync(path.join(dir,'000_migration_ledger.sql'),'utf8').trim();
 function statements(m){
  const clean=m.sql.split('\n').filter(line=>!/^\s*--/.test(line)).join('\n');
