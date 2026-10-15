@@ -10,6 +10,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
 const mysql=require('mysql2/promise');
+const {validateDump}=require('./disposable-dump-guard.cjs');
 function refuse(message){throw Error('REFUSED: '+message);}
 function assert(condition,message){if(!condition)refuse(message);}
 const mode=process.argv[2];
@@ -85,15 +86,18 @@ function command(bin,args,options){
   fs.chmodSync(temp,0o700);
   const dumpPath=path.join(temp,'synthetic.sql');
   const env={...process.env,MYSQL_PWD:password};
-  const common=['--protocol=TCP','--host='+host,'--port='+port,'--user='+user];
+  const common=['--no-defaults','--protocol=TCP','--host='+host,'--port='+port,'--user='+user];
   const start=process.hrtime.bigint();
-  const dump=command('mariadb-dump',[...common,'--single-transaction','--triggers','--skip-add-drop-table','--skip-add-locks','--skip-lock-tables','--no-create-db',source],{env,encoding:null});
+  const dump=command('mariadb-dump',[...common,'--single-transaction','--triggers','--skip-comments','--skip-add-drop-table','--skip-add-locks','--skip-lock-tables','--no-create-db',source],{env,encoding:null});
   fs.writeFileSync(dumpPath,dump.stdout,{mode:0o600,flag:'wx'});
   assert(fs.statSync(dumpPath).size>0,'empty dump');
+  validateDump(dump.stdout,source,dest);
+  const saved=fs.readFileSync(dumpPath);
+  assert(crypto.createHash('sha256').update(saved).digest('hex')===crypto.createHash('sha256').update(dump.stdout).digest('hex'),'backup changed before restore');
   const backupMs=Number(process.hrtime.bigint()-start)/1e6;
   // Restore only to the independently verified empty disposable destination.
   const restoreStart=process.hrtime.bigint();
-  command('mariadb',[...common,dest],{env,input:fs.readFileSync(dumpPath),encoding:null});
+  command('mariadb',[...common,dest],{env,input:saved,encoding:null});
   const restoreMs=Number(process.hrtime.bigint()-restoreStart)/1e6;
   const after=await verify(destConn,dest);
   assert(JSON.stringify(before.inv)===JSON.stringify(after.inv),'schema inventory differs');
