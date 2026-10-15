@@ -58,12 +58,14 @@ async function verify(conn,db){
  assert(inv.fks.length===23,'23 foreign-key columns required');
  const [ledger]=await conn.query('SELECT migration_id,sha256 FROM growth_schema_migrations ORDER BY migration_id');
  assert(ledger.length===9&&ledger.every((r,i)=>r.migration_id===fileNames[i]&&r.sha256===reviewedHashes[i]),'migration ledger mismatch');
- const counts={};
+ const counts={},digests={};
  for(const row of inv.tables){
-  const [r]=await conn.query('SELECT COUNT(*) AS n FROM `'+row.TABLE_NAME+'`');
-  counts[row.TABLE_NAME]=Number(r[0].n);
+  const [records]=await conn.query('SELECT * FROM `'+row.TABLE_NAME+'`');
+  counts[row.TABLE_NAME]=records.length;
+  const canonical=records.map(row=>JSON.stringify(row,(_,v)=>typeof v==='bigint'?v.toString():v)).sort().join('\n');
+  digests[row.TABLE_NAME]=crypto.createHash('sha256').update(canonical).digest('hex');
  }
- return {inv,counts};
+ return {inv,counts,digests};
 }
 function command(bin,args,options){
  const r=spawnSync(bin,args,{...options,timeout:120000,maxBuffer:32*1024*1024});
@@ -76,6 +78,7 @@ function command(bin,args,options){
   sourceConn=await mysql.createConnection({...dbOptions,database:source});
   destConn=await mysql.createConnection({...dbOptions,database:dest});
   const before=await verify(sourceConn,source);
+  assert(Object.entries(before.counts).some(([table,n])=>table!=='growth_schema_migrations'&&n>0),'source lacks synthetic fixture rows');
   const empty=await inventory(destConn,dest);
   assert(empty.tables.length===0&&empty.triggers.length===0,'restore destination must be empty');
   temp=fs.mkdtempSync(path.join(os.tmpdir(),'growthos-disposable-restore-'));
@@ -95,6 +98,7 @@ function command(bin,args,options){
   const after=await verify(destConn,dest);
   assert(JSON.stringify(before.inv)===JSON.stringify(after.inv),'schema inventory differs');
   assert(JSON.stringify(before.counts)===JSON.stringify(after.counts),'row counts differ');
+  assert(JSON.stringify(before.digests)===JSON.stringify(after.digests),'row content digests differ');
   console.log(JSON.stringify({status:'PASS',backupMs,restoreMs,dumpSha256:crypto.createHash('sha256').update(fs.readFileSync(dumpPath)).digest('hex'),tableCount:15,triggerCount:4,fkColumns:23,ledgerCount:9,rowCounts:after.counts}));
  }finally{
   if(sourceConn)await sourceConn.end();
