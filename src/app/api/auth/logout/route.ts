@@ -1,4 +1,4 @@
-import { rejectUntrustedOrigin, readBoundedJson } from '../../../../server/request-security';
+import { rejectUntrustedOrigin } from '../../../../server/request-security';
 import { cookies } from 'next/headers';
 import { revokeMySQLSession } from '../../../../server/mysql-session';
 import { SESSION_COOKIE_NAME } from '../../../../server/authenticated-website-access';

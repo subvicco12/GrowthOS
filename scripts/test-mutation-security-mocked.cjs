@@ -9,7 +9,7 @@ function load(file, mocks = {}) {
   const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(js, { module, exports: module.exports, Response, URL, Buffer, process, Error,
+  vm.runInNewContext(js, { module, exports: module.exports, Response, URL, Buffer, TextDecoder, process, Error,
     require: name => { if (!(name in mocks)) throw Error('Missing mock: ' + name); return mocks[name]; } });
   return module.exports;
 }
@@ -55,5 +55,24 @@ const req = (body, h = headers()) => new Request('https://growthos.example/test'
   process.env.GROWTHOS_APP_ORIGIN = 'https://growthos.example';
   assert.equal((await security.readBoundedJson(req('{}', { ...headers(), 'content-length': 'not-a-number' }))).error.status, 413); count++;
   console.log('PASS missing/invalid canonical configuration and malformed length fail closed');
+  for (const length of ['-1', '1.5', '1e3', '9007199254740992']) {
+    assert.equal((await security.readBoundedJson(req('{}', { ...headers(), 'content-length': length }))).error.status, 413); count++;
+  }
+  const malformedUtf8 = new Request('https://growthos.example/test', {
+    method: 'POST', body: Uint8Array.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xc3, 0x28, 0x22, 0x7d])
+  });
+  assert.equal((await security.readBoundedJson(malformedUtf8)).error.status, 400); count++;
+  const failedStream = new ReadableStream({ start(controller) { controller.error(new Error('synthetic stream failure')); } });
+  assert.equal((await security.readBoundedJson({ headers: new Headers(), body: failedStream })).error.status, 400); count++;
+  const aborted = new ReadableStream({ start(controller) { controller.error(new DOMException('aborted', 'AbortError')); } });
+  assert.equal((await security.readBoundedJson({ headers: new Headers(), body: aborted })).error.status, 400); count++;
+  let canceled = false;
+  const oversizedStream = new ReadableStream({
+    pull(controller) { controller.enqueue(new Uint8Array(2049)); },
+    cancel() { canceled = true; }
+  });
+  assert.equal((await security.readBoundedJson({ headers: new Headers(), body: oversizedStream })).error.status, 413); count++;
+  assert.equal(canceled, true); count++;
+  console.log('PASS malformed Content-Length, invalid UTF-8, stream failures, aborts and streaming size cap');
   console.log(`PASS ${count} offline mutation security assertions`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

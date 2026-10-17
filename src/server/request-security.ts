@@ -34,7 +34,8 @@ export async function readBoundedJson(request: Request, limit = 4096): Promise<{
       }
       chunks.push(value);
     }
-    return { value: JSON.parse(Buffer.concat(chunks).toString('utf8')) };
+    // Buffer.toString silently replaces malformed UTF-8, which can change JSON keys or values.
+    return { value: JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))) };
   } catch {
     return { error: Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 }) };
   }

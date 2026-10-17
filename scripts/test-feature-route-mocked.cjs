@@ -8,7 +8,7 @@ const file = require('node:path').join(__dirname, '../src/app/api/website-featur
 process.env.GROWTHOS_APP_ORIGIN = 'https://growthos.example';
 const helperFile = require('node:path').join(__dirname, '../src/server/request-security.ts');
 const helperModule = { exports: {} };
-vm.runInNewContext(ts.transpileModule(fs.readFileSync(helperFile, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { module: helperModule, exports: helperModule.exports, Response, URL, Buffer, process });
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(helperFile, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, { module: helperModule, exports: helperModule.exports, Response, URL, Buffer, TextDecoder, process });
 const js = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
 }).outputText;
