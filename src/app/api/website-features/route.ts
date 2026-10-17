@@ -1,3 +1,4 @@
+import { rejectUntrustedOrigin, readBoundedJson } from '../../../server/request-security';
 import { randomUUID } from 'node:crypto';
 import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
 import { getMySQLPool } from '../../../server/mysql';
@@ -8,29 +9,15 @@ export const dynamic = 'force-dynamic';
 
 /** Disabling is the only allowed mutation. This route cannot enable jobs or publishing. */
 export async function PATCH(request: Request): Promise<Response> {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  try {
-    if (!origin || !host || new URL(origin).protocol !== 'https:' || new URL(origin).host !== host)
-      return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-  } catch { return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 }); }
+  const originError = rejectUntrustedOrigin(request);
+  if (originError) return originError;
   try {
     const { userId, organization } = await getAuthenticatedOrganizationContext(request);
     if (!canDisableWebsiteFeature(organization.role))
       return Response.json({ ok: false, code: 'INSUFFICIENT_ROLE' }, { status: 403 });
-    const declaredLength = request.headers.get('content-length');
-    if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > 4096))
-      return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
-    let raw: unknown;
-    try {
-      const body = await request.text();
-      if (Buffer.byteLength(body, 'utf8') > 4096)
-        return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
-      raw = JSON.parse(body);
-    } catch {
-      return Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 });
-    }
-    const parsed = websiteFeaturePatchSchema.safeParse(raw);
+    const body = await readBoundedJson(request);
+    if (body.error) return body.error;
+    const parsed = websiteFeaturePatchSchema.safeParse(body.value);
     if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_FEATURE_CHANGE' }, { status: 400 });
     const column = parsed.data.feature === 'automation' ? 'automation_enabled' : 'auto_publish_enabled';
     const connection = await getMySQLPool().getConnection();

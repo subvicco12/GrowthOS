@@ -1,3 +1,4 @@
+import { rejectUntrustedOrigin, readBoundedJson } from '../../../../../server/request-security';
 import { z } from 'zod';
 import { requireWebsiteAccess } from '../../../../../server/authenticated-website-access';
 import { decideInternalApproval } from '../../../../../server/mysql-approval-decision';
@@ -14,25 +15,11 @@ const schema = z.object({
 }).strict();
 
 export async function POST(request: Request): Promise<Response> {
-  const expected = process.env.GROWTHOS_APP_ORIGIN;
-  const origin = request.headers.get('origin');
-  if (!expected || !origin || !expected.startsWith('https://') || origin !== expected) {
-    return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
-  }
-  const contentLength = Number(request.headers.get('content-length') ?? 0);
-  if (!Number.isFinite(contentLength) || contentLength > 4096) {
-    return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
-  }
-  let payload: unknown;
-  try {
-    const text = await request.text();
-    if (Buffer.byteLength(text, 'utf8') > 4096) {
-      return Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 });
-    }
-    payload = JSON.parse(text);
-  } catch {
-    return Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 });
-  }
+  const originError = rejectUntrustedOrigin(request);
+  if (originError) return originError;
+  const body = await readBoundedJson(request);
+  if (body.error) return body.error;
+  const payload = body.value;
   const parsed = schema.safeParse(payload);
   if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_DECISION' }, { status: 400 });
   try {

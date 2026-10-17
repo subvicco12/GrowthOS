@@ -13,7 +13,7 @@ const transpile = (relative, mocks) => {
   }).outputText;
   const module = { exports: {} };
   vm.runInNewContext(compiled, {
-    module, exports: module.exports, Response, URL, Buffer,
+    module, exports: module.exports, Response, URL, Buffer, process,
     require: id => {
       if (!(id in mocks)) throw Error('Unmocked dependency: ' + id);
       return mocks[id];
@@ -21,6 +21,8 @@ const transpile = (relative, mocks) => {
   });
   return module.exports;
 };
+process.env.GROWTHOS_APP_ORIGIN = 'https://growthos.example';
+const requestSecurity = transpile('src/server/request-security.ts', {});
 const originHeaders = new Headers({ origin: 'https://growthos.example', host: 'growthos.example' });
 const cookieName = 'growthos_session';
 const organizationCookie = 'growthos_organization';
@@ -42,9 +44,10 @@ async function run() {
       return { token: 'synthetic-token', expiresAt: new Date('2030-01-01T00:00:00Z') };
     } },
     '../../../../server/authenticated-website-access': { SESSION_COOKIE_NAME: cookieName },
-    '../../../../server/organization-context': { ORGANIZATION_COOKIE_NAME: organizationCookie }
+    '../../../../server/organization-context': { ORGANIZATION_COOKIE_NAME: organizationCookie },
+    '../../../../server/request-security': requestSecurity
   });
-  let result = await login.POST({ headers: originHeaders, json: async () => ({ email: 'test@example.invalid', password: 'synthetic' }) });
+  let result = await login.POST(new Request('https://growthos.example/api/auth/login', { method: 'POST', headers: originHeaders, body: JSON.stringify({ email: 'test@example.invalid', password: 'synthetic' }) }));
   assert.equal(result.status, 200);
   const loginCookies = result.headers.get('set-cookie') || '';
   assert.match(loginCookies, /growthos_session=synthetic-token/);
@@ -54,7 +57,7 @@ async function run() {
   assert.match(loginCookies, /growthos_organization=;[^,]*Max-Age=0/i);
   console.log('PASS login sets secure session and clears organization cookie');
 
-  result = await login.POST({ headers: new Headers({ origin: 'https://evil.example', host: 'growthos.example' }), json: async () => ({ email: 'test@example.invalid', password: 'synthetic' }) });
+  result = await login.POST(new Request('https://growthos.example/api/auth/login', { method: 'POST', headers: { origin: 'https://evil.example', host: 'growthos.example' }, body: '{}' }));
   assert.equal(result.status, 403);
   assert.equal(loginCount, 1);
   console.log('PASS cross-origin login refused before authentication');
@@ -68,7 +71,8 @@ async function run() {
     }) },
     '../../../../server/mysql-session': { revokeMySQLSession: async token => revoked.push(token) },
     '../../../../server/authenticated-website-access': { SESSION_COOKIE_NAME: cookieName },
-    '../../../../server/organization-context': { ORGANIZATION_COOKIE_NAME: organizationCookie }
+    '../../../../server/organization-context': { ORGANIZATION_COOKIE_NAME: organizationCookie },
+    '../../../../server/request-security': requestSecurity
   });
   result = await logout.POST({ headers: originHeaders });
   assert.equal(result.status, 200);
@@ -79,5 +83,9 @@ async function run() {
   assert.equal(result.status, 403);
   assert.equal(revoked.length, 1);
   console.log('PASS cross-origin logout refused before revocation');
+  result = await logout.POST({ headers: new Headers({ origin: 'https://growthos.example', host: 'evil.example', 'x-forwarded-host': 'growthos.example' }) });
+  assert.equal(result.status, 403);
+  assert.equal(revoked.length, 1);
+  console.log('PASS forged Host logout refused before revocation');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

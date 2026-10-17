@@ -1,3 +1,4 @@
+import { rejectUntrustedOrigin, readBoundedJson } from '../../../../server/request-security';
 import { getAuthenticatedOrganizationChoices, getAuthenticatedOrganizationContext, ORGANIZATION_COOKIE_NAME } from '../../../../server/organization-context';
 
 export const runtime = 'nodejs';
@@ -16,16 +17,13 @@ export async function GET(request: Request): Promise<Response> {
 
 /** Only switches scope; does not grant permissions. Every subsequent operation must recheck membership. */
 export async function POST(request: Request): Promise<Response> {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  if (!origin || !host) return Response.json({ ok: false, code: 'ORIGIN_REQUIRED' }, { status: 403 });
-  try {
-    const url = new URL(origin);
-    if (url.protocol !== 'https:' || url.host !== host) return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-  } catch { return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 }); }
+  const originError = rejectUntrustedOrigin(request);
+  if (originError) return originError;
   try {
     const { organizations } = await getAuthenticatedOrganizationChoices(request);
-    const raw: unknown = await request.json();
+    const bodyResult = await readBoundedJson(request);
+    if (bodyResult.error) return bodyResult.error;
+    const raw = bodyResult.value;
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return Response.json({ ok: false, code: 'INVALID_REQUEST' }, { status: 400 });
     const body = raw as Record<string, unknown>;
     if (Object.keys(body).length !== 1 || typeof body.organizationId !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.organizationId)) return Response.json({ ok: false, code: 'INVALID_REQUEST' }, { status: 400 });

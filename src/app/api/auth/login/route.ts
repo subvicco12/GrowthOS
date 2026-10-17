@@ -1,3 +1,4 @@
+import { rejectUntrustedOrigin, readBoundedJson } from '../../../../server/request-security';
 import { z } from 'zod';
 import { loginWithPassword } from '../../../../server/mysql-login';
 import { SESSION_COOKIE_NAME } from '../../../../server/authenticated-website-access';
@@ -12,21 +13,11 @@ const inputSchema = z.object({
 }).strict();
 
 export async function POST(request: Request): Promise<Response> {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  if (!origin || !host) return Response.json({ ok: false, code: 'ORIGIN_REQUIRED' }, { status: 403 });
-  try {
-    const url = new URL(origin);
-    if (url.protocol !== 'https:' || url.host !== host) {
-      return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-    }
-  } catch {
-    return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-  }
-  let raw: unknown;
-  try { raw = await request.json(); }
-  catch { return Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 }); }
-  const parsed = inputSchema.safeParse(raw);
+  const originError = rejectUntrustedOrigin(request);
+  if (originError) return originError;
+  const body = await readBoundedJson(request);
+  if (body.error) return body.error;
+  const parsed = inputSchema.safeParse(body.value);
   if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 401 });
   try {
     const { token, expiresAt } = await loginWithPassword(parsed.data.email, parsed.data.password);

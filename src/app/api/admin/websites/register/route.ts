@@ -1,3 +1,4 @@
+import { rejectUntrustedOrigin, readBoundedJson } from '../../../../../server/request-security';
 import { z } from 'zod';
 import { requireWebsiteAccess } from '../../../../../server/authenticated-website-access';
 import { registerMySQLWebsite } from '../../../../../server/mysql-website-registry';
@@ -14,21 +15,11 @@ const schema = z.object({
 
 export async function POST(request: Request): Promise<Response> {
   // Defense-in-depth for cookie-authenticated writes; never rely on SameSite alone.
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  if (!origin || !host) return Response.json({ ok: false, code: 'ORIGIN_REQUIRED' }, { status: 403 });
-  try {
-    const parsedOrigin = new URL(origin);
-    if (parsedOrigin.protocol !== 'https:' || parsedOrigin.host !== host) {
-      return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-    }
-  } catch {
-    return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-  }
-  let payload: unknown;
-  try { payload = await request.json(); }
-  catch { return Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 }); }
-  const input = schema.safeParse(payload);
+  const originError = rejectUntrustedOrigin(request);
+  if (originError) return originError;
+  const body = await readBoundedJson(request);
+  if (body.error) return body.error;
+  const input = schema.safeParse(body.value);
   if (!input.success) return Response.json({ ok: false, code: 'INVALID_WEBSITE' }, { status: 400 });
   try {
     await requireWebsiteAccess(input.data.organizationId, 'register');

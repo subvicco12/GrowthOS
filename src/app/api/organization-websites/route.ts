@@ -1,3 +1,4 @@
+import { rejectUntrustedOrigin, readBoundedJson } from '../../../server/request-security';
 import { websiteDomainSchema } from '../../../core/website-domain-schema';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -47,16 +48,14 @@ const registerSchema = z.object({
 
 /** Registration is draft-only; it never verifies ownership or enables automation. */
 export async function POST(request: Request): Promise<Response> {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host');
-  try {
-    if (!origin || !host || new URL(origin).protocol !== 'https:' || new URL(origin).host !== host)
-      return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 });
-  } catch { return Response.json({ ok: false, code: 'ORIGIN_FORBIDDEN' }, { status: 403 }); }
+  const originError = rejectUntrustedOrigin(request);
+  if (originError) return originError;
   try {
     const { userId, organization } = await getAuthenticatedOrganizationContext(request);
     assertWebsiteAdminAccess({ userId, organizationId: organization.id, role: organization.role, active: true }, organization.id, 'register');
-    const parsed = registerSchema.safeParse(await request.json());
+    const body = await readBoundedJson(request);
+    if (body.error) return body.error;
+    const parsed = registerSchema.safeParse(body.value);
     if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_WEBSITE' }, { status: 400 });
     const id = randomUUID();
     await getMySQLPool().execute(
