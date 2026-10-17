@@ -88,10 +88,10 @@ function command(bin,args,options){
   const env={...process.env,MYSQL_PWD:password};
   const common=['--no-defaults','--protocol=TCP','--host='+host,'--port='+port,'--user='+user];
   const start=process.hrtime.bigint();
-  const dump=command('mariadb-dump',[...common,'--single-transaction','--triggers','--skip-comments','--skip-add-drop-table','--skip-add-locks','--skip-lock-tables','--no-create-db',source],{env,encoding:null});
+  const dump=command('mariadb-dump',[...common,'--single-transaction','--triggers','--skip-comments','--skip-add-drop-table','--skip-add-locks','--skip-lock-tables','--skip-disable-keys','--skip-no-autocommit','--no-create-db',source],{env,encoding:null});
   fs.writeFileSync(dumpPath,dump.stdout,{mode:0o600,flag:'wx'});
   assert(fs.statSync(dumpPath).size>0,'empty dump');
-  validateDump(dump.stdout,source,dest);
+  validateDump(dump.stdout,source,dest,user);
   const saved=fs.readFileSync(dumpPath);
   assert(crypto.createHash('sha256').update(saved).digest('hex')===crypto.createHash('sha256').update(dump.stdout).digest('hex'),'backup changed before restore');
   const backupMs=Number(process.hrtime.bigint()-start)/1e6;
