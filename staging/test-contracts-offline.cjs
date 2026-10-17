@@ -1,0 +1,14 @@
+'use strict';
+const fs=require('node:fs');const assert=require('node:assert/strict');const path=require('node:path');
+const read=p=>fs.readFileSync(path.join(__dirname,p),'utf8');
+const compose=read('compose.yaml'), proxy=read('proxy.cjs'),preflight=read('preflight.cjs'),seed=read('seed.mjs'),e2e=read('e2e.mjs'),dockerignore=read('../.dockerignore');
+assert.match(compose,/127\.0\.0\.1:33317:3306/);assert.match(compose,/127\.0\.0\.1:34443:34443/);
+assert.match(compose,/internal: true/);assert.match(compose,/tmpfs:/);assert.match(compose,/expose: \["3000"\]/);
+assert.doesNotMatch(compose,/3000:3000/);assert.match(preflight,/growthos_test_/);
+assert.match(preflight,/@sha256:/);assert.match(preflight,/unix:\/\//);
+assert.match(proxy,/req\.headers\.host !== expected/);assert.match(proxy,/writeHead\(421/);
+assert.match(seed,/automation_enabled,auto_publish_enabled/);assert.match(seed,/FALSE,FALSE/);
+assert.match(e2e,/approval replay idempotent/);assert.match(e2e,/revoked session denied/);
+assert.match(e2e,/cross-tenant website mutation denied/);assert.match(e2e,/direct backend not published/);
+assert.match(dockerignore,/staging\/certs/);
+console.log('PASS 18 offline staging contract assertions; no containers, database or HTTP started');

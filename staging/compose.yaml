@@ -1,0 +1,49 @@
+name: growthos-synthetic-staging
+services:
+  db:
+    image: ${GROWTHOS_STAGING_MARIADB_IMAGE:?Pinned MariaDB 11.8 digest required}
+    environment:
+      MARIADB_DATABASE: ${GROWTHOS_DB_NAME:?Disposable growthos_test schema required}
+      MARIADB_USER: ${GROWTHOS_DB_USER:?Synthetic user required}
+      MARIADB_PASSWORD: ${GROWTHOS_DB_PASSWORD:?Synthetic password required}
+      MARIADB_ROOT_PASSWORD: ${GROWTHOS_STAGING_ROOT_PASSWORD:?Synthetic root password required}
+    ports: ["127.0.0.1:33317:3306"]
+    tmpfs: ["/var/lib/mysql"]
+    networks: [private]
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+  app:
+    build:
+      context: ..
+      dockerfile: staging/Dockerfile
+      args:
+        NODE_IMAGE: ${GROWTHOS_STAGING_NODE_IMAGE:?Pinned Node 22 digest required}
+    environment:
+      GROWTHOS_DB_HOST: db
+      GROWTHOS_DB_PORT: "3306"
+      GROWTHOS_DB_NAME: ${GROWTHOS_DB_NAME:?}
+      GROWTHOS_DB_USER: ${GROWTHOS_DB_USER:?}
+      GROWTHOS_DB_PASSWORD: ${GROWTHOS_DB_PASSWORD:?}
+      GROWTHOS_APP_ORIGIN: https://growthos.test:34443
+    expose: ["3000"]
+    networks: [private]
+    depends_on:
+      db: { condition: service_healthy }
+  proxy:
+    image: ${GROWTHOS_STAGING_NODE_IMAGE:?Pinned Node 22 digest required}
+    command: ["node", "/staging/proxy.cjs"]
+    environment:
+      GROWTHOS_STAGING_PROXY_HOST: growthos.test:34443
+      GROWTHOS_STAGING_BACKEND: http://app:3000
+    volumes:
+      - ./proxy.cjs:/staging/proxy.cjs:ro
+      - ${GROWTHOS_STAGING_CERT_DIR:?Disposable certificate directory required}:/certs:ro
+    ports: ["127.0.0.1:34443:34443"]
+    networks: [private]
+    depends_on: [app]
+networks:
+  private:
+    internal: true
