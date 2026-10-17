@@ -1,65 +1,56 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect,useState } from 'react';
 import { OrganizationSelector } from './organization-selector';
 import { OrganizationWebsiteRegistry } from './organization-website-registry';
 import { OrganizationApprovalInbox } from './organization-approval-inbox';
 import { OrganizationDashboard } from './organization-dashboard';
 import { OrganizationAutomationStatus } from './organization-automation-status';
+import { AuthPanel } from './auth-panel';
+import { CostCenter } from './cost-center';
+import { GovernancePanel } from './governance-panel';
+import { ConnectorsPanel } from './connectors-panel';
 
-type Section = 'home' | 'websites' | 'growth' | 'automation' | 'settings';
-const navigation: { id: Section; label: string; icon: string }[] = [
-  { id: 'home', label: 'Home', icon: '⌂' },
-  { id: 'websites', label: 'Websites', icon: '▦' },
-  { id: 'growth', label: 'Growth', icon: '↗' },
-  { id: 'automation', label: 'Automation', icon: '▶' },
-  { id: 'settings', label: 'Settings', icon: '⚙' }
+type Section='home'|'websites'|'approvals'|'costs'|'automation'|'connectors'|'governance';
+const navigation:{id:Section;label:string}[]=[
+  {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'approvals',label:'Approvals'},
+  {id:'costs',label:'Cost center'},{id:'automation',label:'Controls'},
+  {id:'connectors',label:'Connectors'},{id:'governance',label:'Governance'}
 ];
-
-function OrganizationSettings() {
-  return <section className="panel">
-    <h2>Workspace settings</h2>
-    <p>Settings are read-only until organization-scoped administration, auditing, and safety checks are verified.</p>
-    <p>No feature activation, budget changes, publishing, or paid operations are available.</p>
-  </section>;
-}
-
-export default function Dashboard() {
-  const [section, setSection] = useState<Section>('home');
-  useEffect(() => {
-    const initial = window.location.hash.slice(1);
-    if (navigation.some(item => item.id === initial)) setSection(initial as Section);
-  }, []);
-  function navigate(next: Section) {
-    setSection(next);
-    window.history.replaceState(null, '', '#' + next);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+export default function Dashboard(){
+  const [section,setSection]=useState<Section>('home');
+  const [auth,setAuth]=useState<'loading'|'ready'|'signed-out'|'unavailable'>('loading');
+  useEffect(()=>{
+    const initial=window.location.hash.slice(1);
+    if(navigation.some(item=>item.id===initial))setSection(initial as Section);
+    void checkAuth();
+  },[]);
+  async function checkAuth(){
+    try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});
+      setAuth(response.ok?'ready':response.status===401?'signed-out':'unavailable');
+    }catch{setAuth('unavailable');}
   }
-  const title = navigation.find(item => item.id === section)?.label ?? 'Home';
+  async function logout(){
+    try{const response=await fetch('/api/auth/logout',{method:'POST',credentials:'include',cache:'no-store'});
+      if(!response.ok)throw Error('Logout failed.');setAuth('signed-out');
+    }catch{setAuth('unavailable');}
+  }
+  function navigate(next:Section){setSection(next);window.history.replaceState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
+  if(auth==='loading')return <main className="authShell" role="status">Checking session…</main>;
+  if(auth==='signed-out')return <AuthPanel onAuthenticated={()=>{setAuth('ready');window.location.reload();}}/>;
+  if(auth==='unavailable')return <main className="authShell"><div className="panel"><h1>Workspace unavailable</h1><p>Authentication status could not be verified. No workspace data is shown.</p><button onClick={()=>void checkAuth()}>Retry</button></div></main>;
+  const title=navigation.find(x=>x.id===section)?.label??'Portfolio';
   return <main className="appShell">
-    <aside className="appSidebar">
-      <div className="brandMark"><span>G</span><div><strong>GrowthOS</strong><small>Website growth control plane</small></div></div>
-      <nav aria-label="Primary navigation">
-        {navigation.map(item => <button type="button" key={item.id} className={section === item.id ? 'sideNav active' : 'sideNav'} onClick={() => navigate(item.id)}>
-          <span aria-hidden="true">{item.icon}</span>{item.label}
-        </button>)}
-      </nav>
-      <div className="sidebarFooter"><span className="statusDot" />Control plane</div>
+    <aside className="appSidebar"><div className="brandMark"><span>G</span><div><strong>GrowthOS</strong><small>Private control plane</small></div></div>
+      <nav aria-label="Primary navigation">{navigation.map(item=><button type="button" key={item.id} aria-current={section===item.id?'page':undefined} className={section===item.id?'sideNav active':'sideNav'} onClick={()=>navigate(item.id)}>{item.label}</button>)}</nav>
+      <div className="sidebarFooter">Publishing and automation are not started here.</div>
     </aside>
-    <section className="appContent">
-      <header className="appHeader"><div><p className="eyebrow">WORKSPACE</p><h1>{title}</h1>
-        <p className="lede">Organization-scoped controls and read-only operational status.</p></div>
-        <OrganizationSelector />
-      </header>
-      {section === 'home' && <OrganizationDashboard />}
-      {section === 'websites' && <OrganizationWebsiteRegistry />}
-      {section === 'growth' && <OrganizationApprovalInbox />}
-      {section === 'automation' && <OrganizationAutomationStatus />}
-      {section === 'settings' && <OrganizationSettings />}
+    <section className="appContent"><header className="appHeader"><div><p className="eyebrow">FIRST-PARTY ADMIN</p><h1>{title}</h1><p className="lede">Selected organization scope. Unknown metrics are shown as unavailable.</p></div>
+      <div className="headerActions"><OrganizationSelector/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
+      {section==='home'&&<OrganizationDashboard/>}{section==='websites'&&<OrganizationWebsiteRegistry/>}
+      {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
+      {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
+      {section==='governance'&&<GovernancePanel/>}
     </section>
-    <nav className="mobileNav" aria-label="Mobile navigation">
-      {navigation.map(item => <button type="button" key={item.id} className={section === item.id ? 'active' : ''} onClick={() => navigate(item.id)}>
-        <span aria-hidden="true">{item.icon}</span><small>{item.label}</small>
-      </button>)}
-    </nav>
+    <nav className="mobileNav" aria-label="Mobile navigation">{navigation.map(item=><button type="button" key={item.id} aria-current={section===item.id?'page':undefined} className={section===item.id?'active':''} onClick={()=>navigate(item.id)}>{item.label}</button>)}</nav>
   </main>;
 }

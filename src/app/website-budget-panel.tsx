@@ -1,4 +1,5 @@
 'use client';
+import * as React from 'react';
 import { useState } from 'react';
 
 export interface WebsiteBudgetRow {
@@ -10,13 +11,11 @@ export interface WebsiteBudgetRow {
   weeklyUnits: number;
   configuredMonthlyMinor: number;
 }
-export function WebsiteBudgetPanel({ rows, currency = 'USD' }: {
+export function WebsiteBudgetPanel({ rows }: {
   rows: readonly WebsiteBudgetRow[];
-  currency?: string;
 }) {
   const [search, setSearch] = useState('');
   const filtered = rows.filter(row => row.domain.toLowerCase().includes(search.trim().toLowerCase()));
-  const money = (minor: number) => new Intl.NumberFormat('en', { style: 'currency', currency }).format(minor / 100);
   return <section aria-labelledby="website-budget-heading" style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
     <h2 id="website-budget-heading">Website AI budgets</h2>
     <p>Read-only overview. Budget changes and production are unavailable until secure database integration is certified.</p>
@@ -31,7 +30,7 @@ export function WebsiteBudgetPanel({ rows, currency = 'USD' }: {
         <p>Verification: {row.verified ? 'Verified' : 'Not verified'}</p>
         <p>Enabled content types: {row.enabledContentTypes}</p>
         <p>Weekly capacity: {row.weeklyUnits}</p>
-        <p>Configured monthly category budgets: {money(row.configuredMonthlyMinor)}</p>
+        <p>Configured monthly category budget total: {new Intl.NumberFormat('en').format(row.configuredMonthlyMinor)} minor units (currency unavailable)</p>
       </article>)}
     </div>
     {filtered.length === 0 && <p>No websites match this search.</p>}

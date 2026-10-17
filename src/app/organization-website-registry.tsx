@@ -13,6 +13,7 @@ export function OrganizationWebsiteRegistry() {
   const [domain, setDomain] = useState('');
   const [platform, setPlatform] = useState<'wordpress'|'nextjs'|'react'|'static'|'custom'>('wordpress');
   const [submitting, setSubmitting] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' })
@@ -58,17 +59,18 @@ export function OrganizationWebsiteRegistry() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Registration failed.'); }
     finally { setSubmitting(false); }
   }
-  return <section aria-label="Organization website registry">
-    <h2>Workspace websites</h2>
+  return <section className="panel" aria-label="Organization website registry">
+    <h2>Websites and onboarding</h2>
+    <p>Registration creates a draft with zero budget and both feature switches off. Ownership verification and connector setup are unavailable.</p>
     {message && <p role="status">{message}</p>}
-    {data && ['owner','admin'].includes(data.organization.role) && <form onSubmit={event => void register(event)}>
-      <label htmlFor="register-domain">Register website (draft only)</label>
-      <input id="register-domain" value={domain} onChange={event => setDomain(event.target.value)} placeholder="example.com" required maxLength={253} />
-      <label htmlFor="register-platform">Platform</label>
+    {data && ['owner','admin'].includes(data.organization.role) && <form className="registryForm" onSubmit={event => void register(event)}>
+      <div><label htmlFor="register-domain">Domain</label>
+      <input id="register-domain" value={domain} onChange={event => setDomain(event.target.value)} placeholder="example.com" required maxLength={253} /></div>
+      <div><label htmlFor="register-platform">Platform</label>
       <select id="register-platform" value={platform} onChange={event => setPlatform(event.target.value as typeof platform)}>
         <option value="wordpress">WordPress</option><option value="nextjs">Next.js</option>
         <option value="react">React</option><option value="static">Static</option><option value="custom">Custom</option>
-      </select>
+      </select></div>
       <button type="submit" disabled={submitting}>{submitting ? 'Registering…' : 'Add draft website'}</button>
     </form>}
     {data && <><p>{data.organization.name} · {data.organization.role} · {data.websites.length} websites</p>
@@ -77,11 +79,13 @@ export function OrganizationWebsiteRegistry() {
           <div className="siteRowMain"><strong>{site.domain}</strong>
             <span>{site.platform} · {site.status} · Automation {site.automationEnabled ? 'enabled' : 'disabled'} · Publishing {site.autoPublishEnabled ? 'enabled' : 'disabled'}</span>
           </div>
-          <span className="healthBadge">{site.status}</span>
-          {['owner','admin'].includes(data.organization.role) && <div className="approvalActions">
-            {site.automationEnabled && <button type="button" onClick={() => void disableFeature(site.id, 'automation')}>Disable automation</button>}
-            {site.autoPublishEnabled && <button type="button" onClick={() => void disableFeature(site.id, 'auto_publish')}>Disable publishing</button>}
-          </div>}
+          <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>setSelected(selected===site.id?null:site.id)}>{selected===site.id?'Hide settings':'View settings'}</button>
+          {selected===site.id&&<div className="websiteDetail"><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
+            <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable.</p>
+            {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
+              {site.automationEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}
+              {site.autoPublishEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'auto_publish')}>Disable publishing</button>}
+            </div>}</div>}
         </article>)}
         {!data.websites.length && <p>No websites registered in this workspace.</p>}
       </div>

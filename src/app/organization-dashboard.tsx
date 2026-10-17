@@ -1,10 +1,13 @@
 'use client';
+import * as React from 'react';
 import { useEffect, useState } from 'react';
 
 type Overview = {
   organization: { name: string };
+  websites: { id: string; domain: string; status: string; platform: string }[];
   websiteCount: number;
   pendingApprovals: number;
+  dataLimitedToFirst100Websites: boolean;
 };
 
 export function OrganizationDashboard() {
@@ -26,6 +29,12 @@ export function OrganizationDashboard() {
       <p>{overview.organization.name}</p>
       <p>Registered websites: {overview.websiteCount}</p>
       <p>Pending approvals: {overview.pendingApprovals}</p>
+      <h3>Website portfolio</h3>
+      {overview.websites.length === 0 && <p>No registered websites in this workspace.</p>}
+      <div className="portfolioGrid">{overview.websites.map(site => <article className="portfolioItem" key={site.id}>
+        <strong>{site.domain}</strong><span>{site.platform} · {site.status}</span>
+      </article>)}</div>
+      {overview.dataLimitedToFirst100Websites && <p>Showing the first 100 websites by domain.</p>}
       <p>Read-only. Automation, publishing and spending are not enabled.</p>
     </div>}
   </section>;
