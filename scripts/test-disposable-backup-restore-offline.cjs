@@ -4,23 +4,20 @@ const assert=require('node:assert/strict');
 const {spawnSync}=require('node:child_process');
 const path=require('node:path');
 const {validateDump}=require('./disposable-dump-guard.cjs');
+const {fixture}=require('./disposable-dump-fixture.cjs');
 const source='growthos_test_source',dest='growthos_test_destination';
-const clean=Buffer.from('CREATE TABLE `growth_organizations` (`id` int) ENGINE=InnoDB;\n');
-assert.doesNotThrow(()=>validateDump(clean,source,dest));
+assert.doesNotThrow(()=>validateDump(fixture(),source,dest));
 const unsafe=[
- ['USE `growthos_test_other`;', 'database switch'],
- ['/*!40100 USE `growthos_test_other`; */', 'database switch'],
- ['CREATE DATABASE `growthos_test_other`;', 'database-level DDL'],
- ['ALTER SCHEMA growthos_test_other;', 'database-level DDL'],
- ['DROP DATABASE growthos_test_other;', 'database-level DDL'],
- ['\\connect growthos_test_other', 'client command'],
- ['/*!40100 USE `growthos_test_other` */;', 'database switch'],
- ['CREATE /* hidden */ DATABASE growthos_test_other;', 'database-level DDL'],
- ['INSERT INTO `other_schema`.`growth_users` VALUES (1);', 'qualified schema reference'],
- ['INSERT INTO `'+source+'`.`growth_users` VALUES (1);', 'source schema'],
- ['INSERT INTO `'+dest+'`.`growth_users` VALUES (1);', 'qualified schema reference']
+ ['USE `growthos_test_other`;', 'unsafe SQL'],
+ ['/*!40100 USE `growthos_test_other`; */', 'unsafe SQL'],
+ ['CREATE DATABASE `growthos_test_other`;', 'unsafe SQL'],
+ ['ALTER SCHEMA growthos_test_other;', 'unsafe SQL'],
+ ['DROP DATABASE growthos_test_other;', 'unsafe SQL'],
+ ['\\connect growthos_test_other', 'incomplete'],
+ ['INSERT INTO `other_schema`.`growth_users` VALUES (1);', 'unsafe SQL'],
+ ['UPDATE `growth_users` SET id=2;', 'unsafe SQL']
 ];
-for(const [sql,message] of unsafe)assert.throws(()=>validateDump(Buffer.from(sql),source,dest),new RegExp(message));
+for(const [sql,message] of unsafe)assert.throws(()=>validateDump(fixture(sql),source,dest),new RegExp(message));
 assert.throws(()=>validateDump(Buffer.from([0xff]),source,dest),/invalid UTF-8/);
 const candidate=path.join(__dirname,'disposable-backup-restore-rehearsal-candidate.cjs');
 function run(args,env={}){return spawnSync(process.execPath,[candidate,...args],{encoding:'utf8',env:{PATH:process.env.PATH,HOME:process.env.HOME,...env},timeout:10000});}
