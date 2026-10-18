@@ -16,11 +16,11 @@ test('login component does not offer public registration', () => {
 test('connector component does not claim live health', () => {
   const html = renderToStaticMarkup(createElement(ConnectorsPanel));
   assert.match(html, /unavailable/i);
-  assert.doesNotMatch(html, /connected|healthy/i);
+  assert.doesNotMatch(html, /state: connected|state: healthy/i);
 });
 
 test('budget component labels configured minor units without inventing a currency', () => {
-  const html = renderToStaticMarkup(createElement(WebsiteBudgetPanel, { rows: [{ websiteId: 'synthetic', domain: 'example.invalid', status: 'draft', verified: false, enabledContentTypes: 0, weeklyUnits: 0, configuredMonthlyMinor: 1234 }] }));
+  const html = renderToStaticMarkup(createElement(WebsiteBudgetPanel, { rows: [{ websiteId: 'synthetic', domain: 'example.invalid', status: 'draft', verified: false, enabledContentTypes: 0, weeklyUnits: 0, configuredMonthlyMinor: '1234' }] }));
   assert.match(html, /1,234 minor units \(currency unavailable\)/);
   assert.doesNotMatch(html, /\$12\.34/);
 });

@@ -1,15 +1,45 @@
 'use client';
-import { useEffect,useState } from 'react';
-type Entry={id:string;website_id:string;actor_id:string;created_at:string;feature?:string;decision?:string};
-export function GovernancePanel(){
-  const [features,setFeatures]=useState<Entry[]>([]);const [decisions,setDecisions]=useState<Entry[]>([]);
-  const [message,setMessage]=useState('Loading audit history…');
-  useEffect(()=>{let active=true;fetch('/api/organization-governance',{credentials:'include',cache:'no-store'})
-    .then(async response=>{if(!response.ok)throw Error(response.status===403?'Select an authorized workspace.':'Audit history unavailable.');return response.json() as Promise<{features:Entry[];decisions:Entry[]}>;})
-    .then(data=>{if(active){setFeatures(data.features);setDecisions(data.decisions);setMessage('');}})
-    .catch(error=>{if(active)setMessage(error instanceof Error?error.message:'Audit history unavailable.');});return()=>{active=false;};},[]);
-  return <section className="pageStack" aria-label="Governance"><div className="panel"><h2>Governance and audit</h2><p>Read-only latest 100 entries per type. These records do not describe all possible activity.</p>{message&&<p role="status">{message}</p>}</div>
-    <section className="panel"><h3>Feature shutdowns</h3>{features.length?features.map(x=><p key={x.id}>{x.feature} disabled · Website {x.website_id} · {new Date(x.created_at).toLocaleString()}</p>):!message&&<p>No feature shutdown records in this view.</p>}</section>
-    <section className="panel"><h3>Internal decisions</h3>{decisions.length?decisions.map(x=><p key={x.id}>{x.decision} · Website {x.website_id} · {new Date(x.created_at).toLocaleString()}</p>):!message&&<p>No decision records in this view.</p>}</section>
+import { useEffect, useState } from 'react';
+import { workspaceError } from './workspace-response';
+
+type Entry = { id: string; website_id: string; actor_id: string; created_at: string; feature?: string; decision?: string };
+type Stream = 'features' | 'decisions';
+type Page = { items: Entry[]; nextCursor: string | null };
+
+function HistoryStream({ stream, title }: { stream: Stream; title: string }) {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [message, setMessage] = useState('Loading history…');
+  const [busy, setBusy] = useState(false);
+  async function fetchPage(cursor?: string): Promise<Page> {
+    const url = '/api/organization-governance?stream=' + stream + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) throw workspaceError(response, title);
+    return response.json() as Promise<Page>;
+  }
+  useEffect(() => { let active = true;
+    void fetchPage().then(page => { if (active) { setEntries(page.items); setNextCursor(page.nextCursor); setMessage(''); } })
+      .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'History unavailable.'); });
+    return () => { active = false; };
+  }, [stream]);
+  async function more() { if (!nextCursor || busy) return;
+    setBusy(true); setMessage('');
+    try { const page = await fetchPage(nextCursor); setEntries(old => [...old, ...page.items]); setNextCursor(page.nextCursor); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'History unavailable.'); }
+    finally { setBusy(false); }
+  }
+  return <section className="panel" aria-label={title}><h3>{title}</h3>{message && <p role="status">{message}</p>}
+    <div className="auditList">{entries.map(item => <article key={item.id} className="auditEntry">
+      <strong>{stream === 'features' ? item.feature + ' disabled' : item.decision}</strong>
+      <span>Website {item.website_id} · {new Date(item.created_at).toLocaleString()}</span>
+    </article>)}</div>
+    {!entries.length && !message && <p>No records in this view.</p>}
+    {nextCursor && <button type="button" className="secondary" disabled={busy} onClick={() => void more()}>{busy ? 'Loading…' : 'Load older records'}</button>}
   </section>;
 }
+
+export function GovernancePanel() { return <section className="pageStack" aria-label="Governance">
+  <div className="panel"><h2>Governance and audit</h2><p>Read-only internal decision and feature shutdown history. Other activity is not represented by these tables.</p></div>
+  <HistoryStream stream="features" title="Feature shutdowns"/>
+  <HistoryStream stream="decisions" title="Internal decisions"/>
+</section>; }

@@ -6,38 +6,41 @@ import { assertWebsiteAdminAccess } from '../../../core/admin-website-access';
 import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
 import { getMySQLPool } from '../../../server/mysql';
 import type { RowDataPacket } from 'mysql2/promise';
+import { nextPageCursor, PAGE_SIZE, pageError, readPageCursor } from '../../../server/organization-pagination';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type WebsiteRow = RowDataPacket & {
   id: string; domain: string; platform: string; status: string;
-  automation_enabled: number; auto_publish_enabled: number; monthly_budget_minor: string;
+  verified_at: Date | null; automation_enabled: number; auto_publish_enabled: number; monthly_budget_minor: string;
 };
 
 /** Read-only tenant-scoped website registry. No mutations, publishing or AI spending. */
 export async function GET(request: Request): Promise<Response> {
   try {
     const { organization } = await getAuthenticatedOrganizationContext(request);
+    const cursor = readPageCursor(request, organization.id, 'websites');
     const [rows] = await getMySQLPool().execute<WebsiteRow[]>(
-      'SELECT id,domain,platform,status,automation_enabled,auto_publish_enabled,monthly_budget_minor FROM growth_websites WHERE organization_id=? ORDER BY domain,id',
-      [organization.id]
+      'SELECT id,domain,platform,status,verified_at,automation_enabled,auto_publish_enabled,monthly_budget_minor FROM growth_websites WHERE organization_id=?' +
+        (cursor ? ' AND (domain>? OR (domain=? AND id>?))' : '') + ' ORDER BY domain,id LIMIT ?',
+      cursor ? [organization.id, cursor.key, cursor.key, cursor.id, PAGE_SIZE + 1] : [organization.id, PAGE_SIZE + 1]
     );
+    const page = rows.slice(0, PAGE_SIZE);
+    const last = page.at(-1);
     return Response.json({
       ok: true, organization: { id: organization.id, name: organization.name, role: organization.role },
-      websites: rows.map(row => ({
+      websites: page.map(row => ({
         id: row.id, domain: row.domain, platform: row.platform, status: row.status,
+        verifiedAt: row.verified_at,
         automationEnabled: Boolean(row.automation_enabled),
         autoPublishEnabled: Boolean(row.auto_publish_enabled),
         monthlyBudgetMinor: String(row.monthly_budget_minor)
-      }))
+      })),
+      nextCursor: rows.length > PAGE_SIZE && last ? nextPageCursor(organization.id, 'websites', last.domain, last.id) : null
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const code = error instanceof Error ? error.message : '';
-    const status = code === 'AUTHENTICATION_REQUIRED' ? 401 :
-      code === 'ORGANIZATION_REQUIRED' || code === 'ORGANIZATION_FORBIDDEN' ? 403 : 503;
-    return Response.json({ ok: false, code: status === 503 ? 'SERVICE_UNAVAILABLE' : code },
-      { status, headers: { 'Cache-Control': 'no-store' } });
+    return pageError(error);
   }
 }
 

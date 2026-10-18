@@ -1,29 +1,32 @@
 import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
 import { getMySQLPool } from '../../../server/mysql';
 import type { RowDataPacket } from 'mysql2/promise';
+import { nextPageCursor, PAGE_SIZE, pageError, readPageCursor } from '../../../server/organization-pagination';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type ApprovalRow = RowDataPacket & {
-  id: string; website_id: string; title: string; action_type: string; status: string; created_at: Date;
+  id: string; website_id: string; title: string; action_type: string; status: string; created_at: Date; cursor_created_at: string;
 };
 
-/** A safe, read-only review inbox; no decision or publishing endpoint is exposed. */
+/** Tenant-scoped pending queue; decisions use the separately authorized internal endpoint. */
 export async function GET(request: Request): Promise<Response> {
   try {
     const { organization } = await getAuthenticatedOrganizationContext(request);
+    const cursor = readPageCursor(request, organization.id, 'approvals');
     const [rows] = await getMySQLPool().execute<ApprovalRow[]>(
-      'SELECT id,website_id,title,action_type,status,created_at FROM growth_approval_queue WHERE organization_id=? AND status=? ORDER BY created_at,id LIMIT 100',
-      [organization.id, 'pending']
+      "SELECT id,website_id,title,action_type,status,created_at,DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s') AS cursor_created_at FROM growth_approval_queue WHERE organization_id=? AND status=?" +
+        (cursor ? ' AND (created_at>? OR (created_at=? AND id>?))' : '') + ' ORDER BY created_at,id LIMIT ?',
+      cursor ? [organization.id, 'pending', cursor.key, cursor.key, cursor.id, PAGE_SIZE + 1] : [organization.id, 'pending', PAGE_SIZE + 1]
     );
-    return Response.json({ ok: true, items: rows, role: organization.role, decisionsEnabled: false },
+    const page = rows.slice(0, PAGE_SIZE);
+    const last = page.at(-1);
+    return Response.json({ ok: true, items: page.map(({ cursor_created_at: _cursor, ...item }) => item), role: organization.role,
+      internalDecisionsAvailable: ['owner','admin','editor'].includes(organization.role),
+      nextCursor: rows.length > PAGE_SIZE && last ? nextPageCursor(organization.id, 'approvals', last.cursor_created_at, last.id) : null },
       { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const code = error instanceof Error ? error.message : '';
-    const status = code === 'AUTHENTICATION_REQUIRED' ? 401 :
-      code === 'ORGANIZATION_REQUIRED' || code === 'ORGANIZATION_FORBIDDEN' ? 403 : 503;
-    return Response.json({ ok: false, code: status === 503 ? 'SERVICE_UNAVAILABLE' : code },
-      { status, headers: { 'Cache-Control': 'no-store' } });
+    return pageError(error);
   }
 }

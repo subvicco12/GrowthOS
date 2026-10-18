@@ -16,7 +16,7 @@ export async function listMySQLWebsiteBudgets(organizationId: string): Promise<W
            (w.verified_at IS NOT NULL) AS verified,
            COUNT(p.website_id) AS enabledContentTypes,
            COALESCE(SUM(p.weekly_limit),0) AS weeklyUnits,
-           COALESCE(SUM(p.monthly_budget_minor),0) AS configuredMonthlyMinor
+           CAST(COALESCE(SUM(p.monthly_budget_minor),0) AS CHAR) AS configuredMonthlyMinor
     FROM growth_websites w
     LEFT JOIN growth_content_policies p
       ON p.organization_id = w.organization_id AND p.website_id = w.id AND p.enabled = TRUE
@@ -29,6 +29,6 @@ export async function listMySQLWebsiteBudgets(organizationId: string): Promise<W
     verified: Boolean(row.verified),
     enabledContentTypes: Number(row.enabledContentTypes),
     weeklyUnits: Number(row.weeklyUnits),
-    configuredMonthlyMinor: Number(row.configuredMonthlyMinor)
+    configuredMonthlyMinor: String(row.configuredMonthlyMinor)
   }));
 }

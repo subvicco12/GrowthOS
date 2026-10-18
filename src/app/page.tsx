@@ -20,9 +20,12 @@ export default function Dashboard(){
   const [section,setSection]=useState<Section>('home');
   const [auth,setAuth]=useState<'loading'|'ready'|'signed-out'|'unavailable'>('loading');
   useEffect(()=>{
+    const expired=()=>setAuth('signed-out');
+    window.addEventListener('growthos-session-expired',expired);
     const initial=window.location.hash.slice(1);
     if(navigation.some(item=>item.id===initial))setSection(initial as Section);
     void checkAuth();
+    return()=>window.removeEventListener('growthos-session-expired',expired);
   },[]);
   async function checkAuth(){
     try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});

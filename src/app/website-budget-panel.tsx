@@ -9,7 +9,9 @@ export interface WebsiteBudgetRow {
   verified: boolean;
   enabledContentTypes: number;
   weeklyUnits: number;
-  configuredMonthlyMinor: number;
+  configuredMonthlyMinor: string;
+  recordedCompletedMinor?: string;
+  completedReservationCount?: number;
 }
 export function WebsiteBudgetPanel({ rows }: {
   rows: readonly WebsiteBudgetRow[];
@@ -30,7 +32,9 @@ export function WebsiteBudgetPanel({ rows }: {
         <p>Verification: {row.verified ? 'Verified' : 'Not verified'}</p>
         <p>Enabled content types: {row.enabledContentTypes}</p>
         <p>Weekly capacity: {row.weeklyUnits}</p>
-        <p>Configured monthly category budget total: {new Intl.NumberFormat('en').format(row.configuredMonthlyMinor)} minor units (currency unavailable)</p>
+        <p>Configured monthly category budget total: {/^\d+$/.test(row.configuredMonthlyMinor) ? new Intl.NumberFormat('en').format(BigInt(row.configuredMonthlyMinor)) + ' minor units' : 'unavailable'} (currency unavailable)</p>
+        <p>Recorded completed reservation cost this UTC month: {row.completedReservationCount ? `${row.recordedCompletedMinor} minor units across ${row.completedReservationCount} reservations` : 'No completed reservation costs recorded'}</p>
+        <p>Provider billed spend and currency: unavailable</p>
       </article>)}
     </div>
     {filtered.length === 0 && <p>No websites match this search.</p>}

@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { workspaceError } from './workspace-response';
 
 type Website = {
   id: string; domain: string; platform: string; status: string;
   automationEnabled: boolean; autoPublishEnabled: boolean; monthlyBudgetMinor: string;
+  verifiedAt: string | null;
 };
-type Payload = { organization: { id: string; name: string; role: string }; websites: Website[] };
+type Payload = { organization: { id: string; name: string; role: string }; websites: Website[]; nextCursor: string | null };
 
 export function OrganizationWebsiteRegistry() {
   const [data, setData] = useState<Payload | null>(null);
@@ -14,14 +16,25 @@ export function OrganizationWebsiteRegistry() {
   const [platform, setPlatform] = useState<'wordpress'|'nextjs'|'react'|'static'|'custom'>('wordpress');
   const [submitting, setSubmitting] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  async function getPage(cursor?: string): Promise<Payload> {
+    const response = await fetch('/api/organization-websites' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) throw workspaceError(response, 'Website registry');
+    return response.json() as Promise<Payload>;
+  }
+  async function loadMore() { if (!nextCursor || loadingMore) return;
+    setLoadingMore(true); setMessage('');
+    try { const result = await getPage(nextCursor);
+      if (data && result.organization.id !== data.organization.id) throw Error('Workspace changed. Refresh the page.');
+      setData(previous => previous ? { ...previous, websites: [...previous.websites, ...result.websites] } : result);
+      setNextCursor(result.nextCursor);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Website registry unavailable.'); }
+    finally { setLoadingMore(false); }
+  }
   useEffect(() => {
     let active = true;
-    fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' })
-      .then(async response => {
-        if (!response.ok) throw new Error(response.status === 401 ? 'Sign in required.' : response.status === 403 ? 'Select an authorized workspace.' : 'Website registry unavailable.');
-        return response.json() as Promise<Payload>;
-      })
-      .then(result => { if (active) { setData(result); setMessage(''); } })
+    getPage().then(result => { if (active) { setData(result); setNextCursor(result.nextCursor); setMessage(''); } })
       .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Website registry unavailable.'); });
     return () => { active = false; };
   }, []);
@@ -33,10 +46,9 @@ export function OrganizationWebsiteRegistry() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ websiteId, feature, enabled: false })
       });
-      if (!response.ok) throw new Error('Feature disable request failed.');
-      const refreshed = await fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' });
-      if (!refreshed.ok) throw new Error('Feature disabled, but refresh failed.');
-      setData(await refreshed.json() as Payload);
+      if (!response.ok) throw workspaceError(response, 'Feature change');
+      const refreshed = await getPage();
+      setData(refreshed); setNextCursor(refreshed.nextCursor);
       setMessage('Feature disabled. No operation was started.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Feature change failed.'); }
   }
@@ -50,10 +62,9 @@ export function OrganizationWebsiteRegistry() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain, platform })
       });
-      if (!response.ok) throw new Error(response.status === 409 ? 'This website is already registered.' : response.status === 403 ? 'Your role cannot register websites.' : 'Registration failed.');
-      const refreshed = await fetch('/api/organization-websites', { credentials: 'include', cache: 'no-store' });
-      if (!refreshed.ok) throw new Error('Website registered, but the list could not be refreshed.');
-      setData(await refreshed.json() as Payload);
+      if (!response.ok) throw response.status === 409 ? Error('This website is already registered.') : workspaceError(response, 'Registration');
+      const refreshed = await getPage();
+      setData(refreshed); setNextCursor(refreshed.nextCursor);
       setDomain('');
       setMessage('Website registered as draft. Verification and automation remain disabled.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Registration failed.'); }
@@ -73,14 +84,14 @@ export function OrganizationWebsiteRegistry() {
       </select></div>
       <button type="submit" disabled={submitting}>{submitting ? 'Registering…' : 'Add draft website'}</button>
     </form>}
-    {data && <><p>{data.organization.name} · {data.organization.role} · {data.websites.length} websites</p>
+    {data && <><p>{data.organization.name} · {data.organization.role} · {data.websites.length} websites shown{nextCursor ? ' (more available)' : ''}</p>
       <div className="siteRows">
         {data.websites.map(site => <article className="siteRow" key={site.id}>
           <div className="siteRowMain"><strong>{site.domain}</strong>
             <span>{site.platform} · {site.status} · Automation {site.automationEnabled ? 'enabled' : 'disabled'} · Publishing {site.autoPublishEnabled ? 'enabled' : 'disabled'}</span>
           </div>
           <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>setSelected(selected===site.id?null:site.id)}>{selected===site.id?'Hide settings':'View settings'}</button>
-          {selected===site.id&&<div className="websiteDetail"><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
+          {selected===site.id&&<div className="websiteDetail"><h3>Onboarding and settings</h3><ol><li>Draft registration: {site.status === 'draft' ? 'current' : 'recorded'}</li><li>Ownership verification: {site.verifiedAt ? 'recorded' : 'not verified'}</li><li>Connector health: unknown until a persisted check is available</li><li>Activation: unavailable from this workspace</li></ol><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
             <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable.</p>
             {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
               {site.automationEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}
@@ -89,6 +100,7 @@ export function OrganizationWebsiteRegistry() {
         </article>)}
         {!data.websites.length && <p>No websites registered in this workspace.</p>}
       </div>
+      {nextCursor&&<button type="button" className="secondary" disabled={loadingMore} onClick={()=>void loadMore()}>{loadingMore?'Loading…':'Load more websites'}</button>}
     </>}
   </section>;
 }

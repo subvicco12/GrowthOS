@@ -33,3 +33,30 @@ Node executable `/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin
 | `git diff --check` | 0 | No whitespace errors. |
 
 The earlier test run failed six cases (two stale shell assertions and four JSX test harness errors); the fixes above were rerun successfully. A first governance mock run failed because the VM used a separate Error realm; the harness now shares Error and all five cases pass. No database, staging, production or live connector test was run. No migration or staging file was edited.
+
+## Work A follow-up — 2026-10-18
+
+| Requirement | Code / contract | Verified scope and remaining gap |
+| --- | --- | --- |
+| Website pages | `src/server/organization-pagination.ts`, `api/organization-websites/route.ts`, `organization-website-registry.tsx` | 25-row `(domain,id)` keyset; every request rechecks session/membership, cursor organization and stream. Browser exposes Load more. Dashboard still summarizes first 100 separately. |
+| Pending approvals | `api/organization-approvals/route.ts`, `organization-approval-inbox.tsx` | 25-row `(created_at,id)` keyset with pending status and organization scope. Decision remains internal and separately authorized; queue may change between requests. |
+| Governance history | `api/organization-governance/route.ts`, `governance-panel.tsx` | Independent 25-row feature and decision streams, descending keyset; no claim of full-activity audit. |
+| Connector evidence | `api/organization-connectors/route.ts`, `connectors-panel.tsx` | Scoped read contract: registered sites show `unknown` with no persisted probe. `disconnected` is reserved for explicit persisted evidence; failed reads show unavailable. No health is inferred from platform or credentials. A probe persistence contract is still missing. |
+| Onboarding/settings | `organization-website-registry.tsx` | Draft registration, verification marker from persisted `verified_at`, read-only lifecycle/budget, disable-only controls. Ownership verification and activation remain unavailable. |
+| Cost center | `api/organization-costs/route.ts`, `cost-center.tsx`, `website-budget-panel.tsx`, `mysql-budget-overview.ts` | Scoped completed `actual_cost_minor` reservation totals for current UTC month, exact budget integer strings; neither provider invoices nor currency are asserted. No completed rows explicitly shown as such. |
+| UI states and responsive access | `workspace-response.ts`, `page.tsx`, page components, `globals.css` | Loading/empty/403/401/503 labels, 401 returns to sign-in; keyboard focus, 44px targets and 760px layout structural checks. Real Chrome/tablet accessibility review remains pending. |
+
+Cursor values are position hints, not permissions. They are length/canonical-encoding/schema checked and bound to organization and stream; each SQL query independently includes authenticated organization ID as a parameter. No migration, staging, engine, publishing, automation or production access was changed.
+
+| Executed command (Node v24.19.0) | Exit | Result |
+| --- | ---: | --- |
+| `npm test` | 0 | 224 tests, 223 pass, 1 skip, 0 fail. |
+| `node scripts/test-governance-route-mocked.cjs` | 0 | Eight grouped route contract cases, including page bounds, tenant/role denial, unknown connector state and persisted costs. |
+| `npm run typecheck` | 0 | TypeScript no emit. |
+| `npm run build` | 0 | Optimized Next.js build; new read routes included. |
+| `npm run test:security:offline` | 0 | Source security checks. |
+| `npm run test:mutation-security:offline` | 0 | 52 assertions. |
+| `npm run test:auth-cookies:offline` | 0 | Five mocked cookie cases. |
+| `node scripts/test-feature-route-mocked.cjs` | 0 | Ten disable/security cases. |
+
+Initial in-progress runs failed on an outdated connector wording assertion and two route mock import dependencies; those test harnesses were corrected and all affected checks rerun. No disposable database or authenticated browser E2E was available or executed in this Work A pass. Node 22 parity, SQL execution with real MariaDB, connector probe evidence, Chrome device review and independent release gates remain open. Production HOLD/NO-GO.

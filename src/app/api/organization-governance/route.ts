@@ -1,31 +1,32 @@
 import type { RowDataPacket } from 'mysql2/promise';
 import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
 import { getMySQLPool } from '../../../server/mysql';
+import { nextPageCursor, PAGE_SIZE, pageError, readPageCursor } from '../../../server/organization-pagination';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-type AuditRow = RowDataPacket & { id: string; website_id: string; actor_id: string; feature: string; created_at: Date };
-type DecisionRow = RowDataPacket & { id: string; website_id: string; actor_id: string; decision: string; created_at: Date };
+type AuditRow = RowDataPacket & { id: string; created_at: Date; cursor_created_at: string };
 
 /** Selected organization comes only from a verified session and membership. */
 export async function GET(request: Request): Promise<Response> {
   try {
     const { organization } = await getAuthenticatedOrganizationContext(request);
-    const pool = getMySQLPool();
-    const [features] = await pool.execute<AuditRow[]>(
-      'SELECT id,website_id,actor_id,feature,created_at FROM growth_website_feature_audit WHERE organization_id=? ORDER BY created_at DESC,id DESC LIMIT 100',
-      [organization.id]
+    const stream = new URL(request.url).searchParams.get('stream');
+    if (stream !== 'features' && stream !== 'decisions') throw Error('INVALID_CURSOR');
+    const cursor = readPageCursor(request, organization.id, stream);
+    const table = stream === 'features' ? 'growth_website_feature_audit' : 'growth_approval_decisions';
+    const fields = stream === 'features' ? 'id,website_id,actor_id,feature,created_at' : 'id,website_id,actor_id,decision,created_at';
+    const [rows] = await getMySQLPool().execute<AuditRow[]>(
+      `SELECT ${fields},DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s') AS cursor_created_at FROM ${table} WHERE organization_id=?` +
+        (cursor ? ' AND (created_at<? OR (created_at=? AND id<?))' : '') + ' ORDER BY created_at DESC,id DESC LIMIT ?',
+      cursor ? [organization.id, cursor.key, cursor.key, cursor.id, PAGE_SIZE + 1] : [organization.id, PAGE_SIZE + 1]
     );
-    const [decisions] = await pool.execute<DecisionRow[]>(
-      'SELECT id,website_id,actor_id,decision,created_at FROM growth_approval_decisions WHERE organization_id=? ORDER BY created_at DESC,id DESC LIMIT 100',
-      [organization.id]
-    );
-    return Response.json({ ok: true, features, decisions, limitedToLatest100PerType: true }, { headers: { 'Cache-Control': 'no-store' } });
+    const page = rows.slice(0, PAGE_SIZE);
+    const last = page.at(-1);
+    return Response.json({ ok: true, stream, items: page.map(({ cursor_created_at: _cursor, ...item }) => item),
+      nextCursor: rows.length > PAGE_SIZE && last ? nextPageCursor(organization.id, stream, last.cursor_created_at, last.id) : null },
+      { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const code = error instanceof Error ? error.message : '';
-    const status = code === 'AUTHENTICATION_REQUIRED' ? 401 :
-      code === 'ORGANIZATION_REQUIRED' || code === 'ORGANIZATION_FORBIDDEN' ? 403 : 503;
-    return Response.json({ ok: false, code: status === 503 ? 'SERVICE_UNAVAILABLE' : code },
-      { status, headers: { 'Cache-Control': 'no-store' } });
+    return pageError(error);
   }
 }
