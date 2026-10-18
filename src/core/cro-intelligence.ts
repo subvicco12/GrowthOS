@@ -5,7 +5,7 @@ export function conversionRate(visitors:number,conversions:number):number{
  return Math.max(0,Math.min(1,conversions/visitors));
 }
 export function findFunnelSignals(steps:FunnelStep[],minimumVisitors=30):CroSignal[]{
- return steps.filter(s=>s.visitors>=minimumVisitors).map(s=>({
+ return steps.filter(s=>Number.isSafeInteger(s.visitors)&&Number.isSafeInteger(s.conversions)&&s.visitors>=minimumVisitors&&s.conversions>=0&&s.conversions<=s.visitors).map(s=>({
   step:s.key,rate:conversionRate(s.visitors,s.conversions),sampleSize:s.visitors,
   title:`Review ${s.name} conversion`,successMetric:`${s.name} conversion rate`
  })).sort((a,b)=>a.rate-b.rate);
