@@ -14,6 +14,7 @@ export function growthApprovalClass(category:GrowthCategory,risk:number):GrowthS
  return 'green';
 }
 export function rankGrowthSignal(input:Omit<GrowthSignal,'approvalClass'>):GrowthSignal{
+ if(![input.impact,input.confidence,input.effort,input.risk,input.recurringCostUsd].every(Number.isFinite))throw new Error('INVALID_GROWTH_SCORE');
  const impact=clamp(input.impact),confidence=clamp(input.confidence),effort=clamp(input.effort),risk=clamp(input.risk),cost=Math.max(0,input.recurringCostUsd);
  return {...input,impact,confidence,effort,risk,recurringCostUsd:cost,approvalClass:growthApprovalClass(input.category,risk)};
 }
@@ -25,5 +26,5 @@ export function rankGrowthSignals(signals:GrowthSignal[]):GrowthSignal[]{
 }
 export interface NextBestAction { signalId:string; title:string; category:GrowthCategory; score:number; approvalClass:GrowthSignal['approvalClass']; successMetric:string; evidenceCount:number; }
 export function buildNextBestActions(signals:GrowthSignal[],limit=7):NextBestAction[]{
- return rankGrowthSignals(signals).slice(0,Math.max(1,limit)).map(s=>({signalId:s.id,title:s.title,category:s.category,score:scoreGrowthSignal(s),approvalClass:s.approvalClass,successMetric:s.successMetric,evidenceCount:s.evidence.length}));
+ return rankGrowthSignals(signals.filter(s=>s.evidence.length>0&&s.evidence.every(e=>Boolean(e.source)&&Boolean(e.observedAt)))).slice(0,Math.max(1,limit)).map(s=>({signalId:s.id,title:s.title,category:s.category,score:scoreGrowthSignal(s),approvalClass:s.approvalClass,successMetric:s.successMetric,evidenceCount:s.evidence.length}));
 }

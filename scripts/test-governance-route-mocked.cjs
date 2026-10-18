@@ -27,6 +27,7 @@ async function run(file, url, { error, sqlError = false, rows = [], organization
       queries.push({ sql, params }); if (sqlError) throw Error('DATABASE_UNAVAILABLE'); return [rows];
     } }) },
     '../../../server/organization-pagination': pagination,
+    '../../../core/connector-health': load('src/core/connector-health.ts'),
     '../../../server/request-security': {}, '../../../core/website-domain-schema': { websiteDomainSchema: require('zod').z.string() },
     'node:crypto': require('node:crypto'), zod: require('zod'),
     '../../../core/admin-website-access': { assertWebsiteAdminAccess: () => {} }
@@ -86,6 +87,11 @@ const auditRows = Array.from({ length: 26 }, (_, i) => ({ id: uuid(i + 10), webs
   r = await run(costs, base, { rows: [{ website_id: uuid(3), recorded_minor: '370', completed_count: 2 }] });
   assert.equal(r.response.status, 200); assert.equal(r.body.currency, null);
   assert.equal(r.body.providerBilledSpendAvailable, false);
+  assert.equal(r.body.organizationId, org);
+  assert.equal(r.body.accountingBasis, 'recorded_completed_reservations');
+  assert.equal(r.body.reservationEstimatesIncluded, false);
+  assert.equal(r.body.cancelledReservationCostsIncluded, false);
+  assert.equal(r.body.settlementStatus, 'unverified');
   assert.equal(r.body.recordedCompletedCosts[0].recordedMinor, '370');
   assert.equal(r.queries[0].params[0], org); assert.equal(r.queries[0].params[2], 'completed');
   assert.match(r.queries[0].sql, /actual_cost_minor IS NOT NULL/);

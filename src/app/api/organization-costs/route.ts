@@ -17,7 +17,8 @@ export async function GET(request: Request): Promise<Response> {
       'WHERE organization_id=? AND month_start=? AND status=? AND actual_cost_minor IS NOT NULL GROUP BY website_id',
       [organization.id, monthStart, 'completed']
     );
-    return Response.json({ ok: true, monthStart, currency: null, providerBilledSpendAvailable: false,
+    return Response.json({ ok: true, organizationId: organization.id, monthStart, currency: null, providerBilledSpendAvailable: false,
+      accountingBasis: 'recorded_completed_reservations', reservationEstimatesIncluded: false, cancelledReservationCostsIncluded: false, settlementStatus: 'unverified',
       recordedCompletedCosts: rows.map(row => ({ websiteId: row.website_id, recordedMinor: row.recorded_minor, completedCount: Number(row.completed_count) })) },
     { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return pageError(error); }

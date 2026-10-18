@@ -23,10 +23,13 @@ export async function reserveMySQLBudget(request: ProductionRequest): Promise<st
     const org = orgRows[0];
     if (!org || org.globally_paused) throw new Error('GLOBAL_PAUSE');
     const [siteRows] = await connection.execute<Row[]>(
-      'SELECT status, automation_enabled, verified_at, monthly_budget_minor FROM growth_websites WHERE organization_id = ? AND id = ? FOR UPDATE',
+      'SELECT status, automation_enabled, verified_at, monthly_budget_minor, timezone FROM growth_websites WHERE organization_id = ? AND id = ? FOR UPDATE',
       [request.organizationId, request.websiteId]);
     const site = siteRows[0];
     if (!site || site.status !== 'active' || !site.automation_enabled || !site.verified_at) throw new Error('WEBSITE_DISABLED');
+    // The current reservation schema has one period key for both site and portfolio caps.
+    // Its UTC calculation cannot certify website-local weeks for non-UTC sites.
+    if (site.timezone !== 'UTC') throw new Error('TIMEZONE_QUOTA_UNSUPPORTED');
     const [policyRows] = await connection.execute<Row[]>(
       'SELECT enabled, weekly_limit, monthly_budget_minor, max_job_cost_minor FROM growth_content_policies WHERE organization_id = ? AND website_id = ? AND content_type = ? FOR UPDATE',
       [request.organizationId, request.websiteId, request.contentType]);

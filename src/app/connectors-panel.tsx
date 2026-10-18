@@ -1,9 +1,10 @@
 'use client';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
+import type { ConnectorState } from '../core/connector-health';
 import { workspaceError } from './workspace-response';
 
-type Connector = { websiteId: string; domain: string; platform: string; state: 'unknown' | 'disconnected' | 'unavailable'; checkedAt: string | null; reason: string };
+type Connector = { websiteId: string; domain: string; platform: string; state: ConnectorState; checkedAt: string | null; reason: string };
 type Page = { connectors: Connector[]; nextCursor: string | null };
 export function ConnectorsPanel() {
   const [entries, setEntries] = useState<Connector[]>([]);

@@ -8,7 +8,10 @@ export function comparePackages(ours:PackageInventory,competitors:CompetitorProf
  const byKey=new Map(ours.features.map(f=>[f.key,f]));
  const candidates=new Map<string,{name:string,count:number,plans:Set<Plan>}>();
  for(const competitor of competitors.filter(c=>c.similarity>=0.5)){
+  const seen=new Set<string>();
   for(const feature of competitor.inventory.features){
+   if(seen.has(feature.key))continue;
+   seen.add(feature.key);
    const row=candidates.get(feature.key)??{name:feature.name,count:0,plans:new Set<Plan>()}; row.count++;
    for(const plan of plans)if(feature.plans[plan])row.plans.add(plan); candidates.set(feature.key,row);
   }
@@ -27,5 +30,6 @@ export function validateCompetitor(profile:CompetitorProfile):string[] {
  if(profile.similarity<0||profile.similarity>1)issues.push('INVALID_SIMILARITY');
  if(!profile.evidence.length)issues.push('EVIDENCE_REQUIRED');
  if(!/^https?:\/\//.test(profile.inventory.evidenceUrl??''))issues.push('PACKAGE_EVIDENCE_URL_REQUIRED');
+ if(!Number.isFinite(Date.parse(profile.inventory.capturedAt)))issues.push('PACKAGE_CAPTURE_TIME_REQUIRED');
  return issues;
 }

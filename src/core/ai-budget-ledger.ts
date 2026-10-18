@@ -35,6 +35,11 @@ export async function reserveProductionBudget(db: BudgetDatabase, request: Produ
   }
   return db.withSerializableBudgetTransaction(request.organizationId, request.websiteId, async tx => {
     const existing = await tx.findExisting(request.organizationId, request.idempotencyKey);
+    // A replay cannot bypass a newly applied pause, revoked connector or disabled site.
+    const policy = await tx.loadPolicy(request);
+    if (!policy || !policy.websiteActive || !policy.automationEnabled) return denied('DISABLED');
+    if (policy.globalPaused) return denied('GLOBAL_PAUSE');
+    if (!policy.connectorReady) return denied('CONNECTOR_UNAVAILABLE');
     if (existing) {
       // Idempotency collisions must be rejected rather than replaying another job's reservation.
       if (existing.websiteId !== request.websiteId || existing.organizationId !== request.organizationId ||
@@ -45,8 +50,6 @@ export async function reserveProductionBudget(db: BudgetDatabase, request: Produ
       if (existing.status !== 'reserved') return denied('DISABLED');
       return { decision: { allowed: true, code: 'APPROVED' }, reservation: existing, replayed: true };
     }
-    const policy = await tx.loadPolicy(request);
-    if (!policy) return denied('DISABLED');
     const decision = evaluateProductionBudget(request, policy);
     if (!decision.allowed) return { decision };
     const reservation = await tx.insertReservation(request);
