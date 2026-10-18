@@ -39,3 +39,20 @@ Runtime: Node v24.19.0 with preinstalled dependencies shared through a worktree 
 | `node scripts/test-feature-route-mocked.cjs` | 0 | Ten disable/security cases. |
 
 An in-progress unit run failed one legacy fixture that used `capturedAt: 'x'`; the fixture was corrected to a dated synthetic timestamp and the full suite passed. The new database-boundary script initially had a CommonJS variable naming error; it was corrected and passed. No MariaDB server, provider sandbox, external integration, end-to-end publish, or staging test was run. Production remains HOLD/NO-GO.
+
+## 2026-10-18 continuation: persistence proposal and mocked adapter
+
+Added server-only `mysql-content-store.ts` with tenant-scoped row locks, version CAS, unique event insertion and transaction rollback; `mysql-publication-claim-store.ts` with persisted budget/site/content/connector/reservation checks, one claim per tenant/site/content/channel, and monotonic status reconciliation; `synthetic-publication-provider.ts` provides only in-memory status fixtures and has no publish/network method. The proposed SQL and non-UTC quota/chargeable settlement plan are in `docs/work-b-persistence-schema-proposal-20261018.md`. Certified migrations remain unchanged, so these adapters **cannot execute successfully on the current schema**. No MariaDB server, migration, or authenticated provider probe was exercised. `reconcile` requires a trusted server caller; provider evidence verification and atomic content-stage synchronization remain release blockers. No publishing was enabled.
+
+| Command | Exit | Evidence |
+| --- | ---: | --- |
+| `node --import=tsx --test src/core/__tests__/mysql-content-persistence.test.ts` | 0 | 5 mocked SQL tests passed: CAS, rollback, tenant mismatch, duplicate claim, gate failure, monotonic status. Not MariaDB execution. |
+| `npm test` | 0 | 229 tests: 228 passed, 1 skipped (before final persisted-quality guard refinement, whose affected focused tests passed again). |
+| `npm run typecheck` | 2 then 0 | Parallel build generated `.next/types` while typecheck read it; sequential rerun passed after build and guard refinement. |
+| `npm run build` | 0 | Production compilation, rerun after guard refinement. |
+| `npm run test:security:offline` | 0 | Offline source checks. |
+| `npm run test:mutation-security:offline` | 0 | 52 offline assertions. |
+| `npm run test:auth-cookies:offline` | 0 | Five cookie cases. |
+| `node scripts/test-feature-route-mocked.cjs` | 0 | Ten feature/security cases. |
+
+Runtime was Node v24.19.0 with the existing worktree dependency symlink; Node 22 parity and genuine MariaDB execution were not performed. A reviewed additive migration, isolated MariaDB concurrency/foreign-key execution, provider evidence attestation, migration rollback plan, and quota settlement changes remain pending. Production HOLD/NO-GO.
