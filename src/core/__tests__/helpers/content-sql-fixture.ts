@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import type { Pool } from 'mysql2/promise';
+import { publicationBridgeFixture } from './publication-bridge-fixture';
 import type { ContentRecord } from '../../content-lifecycle';
 
 type ClaimRow = { organization_id:string; website_id:string; content_id:string; channel:string; claim_hash:string; reservation_id:string; status:string; provider_id?:string|null; publication_url?:string|null };
 /** Serialized SQL simulator, not a MariaDB server or SQL parser. Models rollback and uniqueness only. */
 export function contentSQLFixture(record: ContentRecord, now: number) {
-  let data = { record:structuredClone(record), claim:null as ClaimRow|null, events:new Map<string,unknown[]>(), observations:new Map<string,{payload_hash:unknown}>() };
+  const bridge = publicationBridgeFixture(record,now);
+  let data = { consumed:false, authorizationUses:new Map<string,unknown[]>(), record:structuredClone(record), claim:null as ClaimRow|null, events:new Map<string,unknown[]>(), observations:new Map<string,{payload_hash:unknown}>() };
   let tail: Promise<void> = Promise.resolve();
-  const state = { commits:0,rollbacks:0,queries:[] as {sql:string;params:unknown[]}[], failSQL:'', health:'verified', checkedAt:new Date(now-60000).toISOString(), expiresAt:new Date(now+60000).toISOString(), paused:0, publishing:1, automation:1, policy:1, reservationSite:record.websiteId };
+  const state = { commits:0,rollbacks:0,queries:[] as {sql:string;params:unknown[]}[], failSQL:'', health:'verified', checkedAt:new Date(now-60000).toISOString(), expiresAt:new Date(now+60000).toISOString(), budgetAvailable:true, reservationStatus:'completed', actualCost:'20' as string|null, paused:0, publishing:1, automation:1, policy:1, reservationSite:record.websiteId, approvalEventMissing:false, approvalEventActor:record.approval!.actorId, sessionRevoked:false, sessionExpires:new Date(now+60000).toISOString(), requestorRole:'owner', approverRole:'owner', membership:true, userDisabled:0, approvalRevoked:false, approval:bridge.authorization, destination:bridge.destination, policyRevision:bridge.policy.revision, feature:1, attestation:bridge.signed, connectorRevoked:false, issuerRevoked:0, trustRevision:bridge.issuer.trustRevision };
   const duplicate = () => Object.assign(Error('duplicate'),{code:'ER_DUP_ENTRY'});
   const pool = { getConnection: async () => {
     let release: (()=>void)|undefined;
@@ -21,7 +23,7 @@ export function contentSQLFixture(record: ContentRecord, now: number) {
         state.queries.push({sql,params});
         if(state.failSQL && sql.includes(state.failSQL)) throw Error('SYNTHETIC_SQL_FAILURE');
         let result: unknown = [];
-        if(sql.includes('FROM growth_organization_budgets')) result=params[0]===record.organizationId ? [{globally_paused:state.paused}] : [];
+        if(sql.includes('FROM growth_organization_budgets')) result=params[0]===record.organizationId && state.budgetAvailable ? [{globally_paused:state.paused}] : [];
         else if(sql.includes('FROM growth_websites')) result=params[0]===record.organizationId && params[1]===record.websiteId ? [{status:'active',verified_at:'2026-10-01',auto_publish_enabled:state.publishing,automation_enabled:state.automation}] : [];
         else if(sql.includes('FROM growth_content_records')) {
           assert.match(sql,/organization_id=\? AND website_id=\? AND id=\?/);
@@ -31,7 +33,21 @@ export function contentSQLFixture(record: ContentRecord, now: number) {
         } else if(sql.includes('FROM growth_connector_health')) {
           assert.deepEqual(params,[record.organizationId,record.websiteId,'site']);
           result=[{organization_id:record.organizationId,website_id:record.websiteId,channel:'site',status:state.health,checked_at:state.checkedAt,expires_at:state.expiresAt}];
-        } else if(sql.includes('FROM growth_ai_reservations')) result=params[0]===record.organizationId && params[1]===state.reservationSite ? [{status:'completed',content_type:record.contentType,actual_cost_minor:'20'}] : [];
+        } else if(sql.includes('FROM growth_ai_reservations')) result=params[0]===record.organizationId && params[1]===state.reservationSite ? [{status:state.reservationStatus,content_type:record.contentType,actual_cost_minor:state.actualCost}] : [];
+        else if(sql.includes('FROM growth_content_events')) {
+          assert.deepEqual(params.slice(0,3),[record.organizationId,record.websiteId,record.id]);
+          const approved={...record,stage:'approved',version:record.version-1,eventIds:record.eventIds.slice(0,-1)};delete approved.schedule;
+          result=!state.approvalEventMissing && params[3]===record.eventIds.at(-2) ? [{event_id:params[3],actor_id:state.approvalEventActor,occurred_at:record.approval!.at,version:approved.version,record_json:JSON.stringify(approved)}] : [];
+        }
+        else if(sql.includes('FROM growth_sessions')) result=params[0]===bridge.request.sessionTokenHash ? [{user_id:'requestor1',disabled:state.userDisabled,revoked_at:state.sessionRevoked?'revoked':null,expires_at:state.sessionExpires}] : [];
+        else if(sql.includes('FROM growth_content_authorizations')) result=params[0]===record.organizationId && params[1]===record.websiteId && params[2]===state.approval.id ? [{authorization_json:JSON.stringify(state.approval),revoked_at:state.approvalRevoked?'revoked':null,consumed_at:data.consumed?'consumed':null}] : [];
+        else if(sql.includes('FROM growth_memberships')) result=state.membership ? [{user_id:'requestor1',role:state.requestorRole,disabled:state.userDisabled},{user_id:record.approval!.actorId,role:state.approverRole,disabled:0}] : [];
+        else if(sql.includes('FROM growth_publication_policy_revisions')) result=[{revision:state.policyRevision,feature_enabled:state.feature}];
+        else if(sql.includes('FROM growth_publication_destinations')) result=params[2]===state.destination.id ? [{...state.destination,enabled:state.destination.enabled?1:0}] : [];
+        else if(sql.includes('FROM growth_connector_attestations')) result=[{signed_json:JSON.stringify(state.attestation),revoked_at:state.connectorRevoked?'revoked':null}];
+        else if(sql.includes('FROM growth_connector_issuer_state')) result=[{revision:state.trustRevision,revoked:state.issuerRevoked}];
+        else if(sql.startsWith('UPDATE growth_content_authorizations')) {const matches=!data.consumed && !state.approvalRevoked; if(matches)data.consumed=true;result={affectedRows:matches?1:0};}
+        else if(sql.startsWith('INSERT INTO growth_publication_authorization_uses')) {const key=String(params[2]);if(data.authorizationUses.has(key) || [...data.authorizationUses.values()].some(v=>v[0]===params[0] && v[1]===params[1] && v[3]===params[3] && v[10]===params[10]))throw duplicate();data.authorizationUses.set(key,params);result={affectedRows:1};}
         else if(sql.includes('FROM growth_publication_claims')) {
           assert.match(sql,/organization_id=\? AND website_id=\? AND content_id=\? AND channel=\?/);
           result=data.claim && params[0]===data.claim.organization_id && params[1]===data.claim.website_id && params[2]===data.claim.content_id && params[3]===data.claim.channel && (params.length===4 || params[4]===data.claim.claim_hash) ? [data.claim] : [];
@@ -58,5 +74,5 @@ export function contentSQLFixture(record: ContentRecord, now: number) {
       }
     };
   }} as unknown as Pool;
-  return {pool,state,snapshot:()=>structuredClone(data)};
+  return {pool,state,bridge,snapshot:()=>structuredClone(data)};
 }

@@ -4,6 +4,7 @@ import { MySQLContentStore } from '../../server/mysql-content-store';
 import { MySQLPublicationClaimStore } from '../../server/mysql-publication-claim-store';
 import { createContentRecord, applyContentEvent } from '../content-lifecycle';
 import { SyntheticPublicationStatusProbe } from '../synthetic-publication-provider';
+import { contentSQLFixture } from './helpers/content-sql-fixture';
 import type { Pool } from 'mysql2/promise';
 
 const org = 'org1', site = 'site1', id = 'content1';
@@ -44,34 +45,27 @@ test('content event duplicate and failed CAS roll back together', async () => {
 });
 
 const claim = { organizationId: org, websiteId: site, contentId:id, channel:'site', idempotencyKey:`publish:${org}:${site}:${id}:site`, reservationId:'reservation1' };
-const scheduled = { ...record, stage:'scheduled', approval:{actorId:'owner1',at:'2026-10-17T00:00:00Z'}, quality:{factual:true,original:true,rightsCleared:true,disclosureChecked:true,ymylReviewed:true,notes:'synthetic'}, schedule:{channel:'site',at:'2026-10-17T00:00:00Z'} };
-function claimRows(sql: string): unknown[] {
-  if (sql.includes('FROM growth_organization_budgets')) return [{ globally_paused: 0 }];
-  if (sql.includes('FROM growth_websites')) return [{ status:'active',verified_at:'date',auto_publish_enabled:1,automation_enabled:1 }];
-  if (sql.includes('FROM growth_content_records')) return [{ version:0,record_json:JSON.stringify(scheduled) }];
-  if (sql.includes('FROM growth_content_policies')) return [{ enabled:1,auto_publish:1 }];
-  if (sql.includes('FROM growth_connector_health')) return [{ organization_id:org,website_id:site,channel:'site',status:'verified',checked_at:new Date(Date.now()-60000).toISOString(),expires_at:new Date(Date.now()+60000).toISOString() }];
-  if (sql.includes('FROM growth_ai_reservations')) return [{ status:'completed',content_type:'article',actual_cost_minor:'0' }];
-  if (sql.includes('FROM growth_publication_claims')) return [];
-  return [{ affectedRows:1 }];
-}
-test('publication claim requires persisted gates and unique insert', async () => {
-  const m = mock(claimRows);
-  assert.equal(await new MySQLPublicationClaimStore(m.pool).claimOnce(claim),true);
-  assert.equal(m.state.commits,1);
-  assert.match(m.state.statements.join('\n'),/INSERT INTO growth_publication_claims/);
-  const disabled = mock(sql => sql.includes('FROM growth_organization_budgets') ? [{ globally_paused:1 }] : claimRows(sql));
-  await assert.rejects(() => new MySQLPublicationClaimStore(disabled.pool).claimOnce(claim),/PUBLISHING_DISABLED/);
-  assert.equal(disabled.state.rollbacks,1);
-  await assert.rejects(() => new MySQLPublicationClaimStore(m.pool).claimOnce({...claim,organizationId:'other'}),/INVALID_PUBLICATION_CLAIM/);
+const scheduled = { ...record, version:5,eventIds:['research','draft','quality','approve','schedule'], stage:'scheduled', approval:{actorId:'owner1',at:'2026-10-17T00:00:00Z'}, quality:{factual:true,original:true,rightsCleared:true,disclosureChecked:true,ymylReviewed:true,notes:'synthetic'}, schedule:{channel:'site',at:'2026-10-17T00:00:00Z'} };
+test('publication claim requires transaction-bound authorization; default connector trust denies', async () => {
+  const now=Date.now(), db=contentSQLFixture(scheduled as typeof record,now);
+  const request={...claim,authorization:db.bridge.request};
+  assert.equal(await new MySQLPublicationClaimStore(db.pool,undefined,()=>now,db.bridge.boundary).claimOnce(request),true);
+  assert.equal(db.state.commits,1);
+  assert.equal(db.snapshot().consumed,true);
+  const disabled=contentSQLFixture(scheduled as typeof record,now);disabled.state.paused=1;
+  await assert.rejects(()=>new MySQLPublicationClaimStore(disabled.pool).claimOnce(request),/PUBLISHING_DISABLED/);
+  const unknown=contentSQLFixture(scheduled as typeof record,now);
+  await assert.rejects(()=>new MySQLPublicationClaimStore(unknown.pool,undefined,()=>now).claimOnce(request),/CONNECTOR_TRUST_REVOKED_OR_UNKNOWN/);
+  assert.equal(unknown.snapshot().claim,null);
+  await assert.rejects(()=>new MySQLPublicationClaimStore(db.pool).claimOnce({...claim,organizationId:'other'}),/INVALID_PUBLICATION_CLAIM/);
 });
 test('duplicate claim and SQL failure never return a new claim', async () => {
-  const m = mock((sql,params) => { if (sql.includes('INSERT INTO growth_publication_claims')) throw Object.assign(Error('duplicate'),{code:'ER_DUP_ENTRY'}); return claimRows(sql); });
-  assert.equal(await new MySQLPublicationClaimStore(m.pool).claimOnce(claim),false);
-  assert.equal(m.state.commits,0); assert.equal(m.state.rollbacks,1);
-  const unavailable = mock(sql => { if (sql.includes('FROM growth_connector_health')) throw Error('table absent'); return claimRows(sql); });
-  await assert.rejects(() => new MySQLPublicationClaimStore(unavailable.pool).claimOnce(claim),/table absent/);
-  assert.equal(unavailable.state.commits,0);
+  const now=Date.now(), db=contentSQLFixture(scheduled as typeof record,now);
+  const store=new MySQLPublicationClaimStore(db.pool,undefined,()=>now,db.bridge.boundary), request={...claim,authorization:db.bridge.request};
+  assert.equal(await store.claimOnce(request),true); assert.equal(await store.claimOnce(request),false);
+  const unavailable=contentSQLFixture(scheduled as typeof record,now);unavailable.state.failSQL='FROM growth_connector_attestations';
+  await assert.rejects(()=>new MySQLPublicationClaimStore(unavailable.pool,undefined,()=>now,unavailable.bridge.boundary).claimOnce(request),/SYNTHETIC_SQL_FAILURE/);
+  assert.equal(unavailable.snapshot().consumed,false);assert.equal(unavailable.snapshot().claim,null);
 });
 test('unsigned reconciliation is refused before any SQL and synthetic probe defaults unknown', async () => {
   const probe = new SyntheticPublicationStatusProbe();

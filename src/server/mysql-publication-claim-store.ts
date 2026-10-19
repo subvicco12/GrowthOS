@@ -4,6 +4,8 @@ import type { PublicationClaim, PublicationClaimStore } from '../core/publicatio
 import { transitionContent, type ContentRecord, type ContentEvent } from '../core/content-lifecycle';
 import { projectConnectorHealth, type ConnectorHealthEvidence } from '../core/connector-health';
 import { decodeStoredContent, writeContentTransition } from './mysql-content-store';
+import { exactUnsigned } from './mysql-integer';
+import { MySQLPublicationAuthorization } from './mysql-publication-authorization';
 import { PublicationEvidenceVerifier, publicationClaimHash, type SignedPublicationObservation } from './publication-evidence';
 
 type Row = RowDataPacket & Record<string, unknown>;
@@ -30,7 +32,8 @@ async function advance(connection: PoolConnection, current: ContentRecord, event
 export class MySQLPublicationClaimStore implements PublicationClaimStore {
   constructor(private readonly pool: Pick<Pool, 'getConnection'> = getMySQLPool(),
     private readonly verifier: PublicationEvidenceVerifier = new PublicationEvidenceVerifier([]),
-    private readonly clock: () => number = Date.now) {}
+    private readonly clock: () => number = Date.now,
+    private readonly authorization = new MySQLPublicationAuthorization()) {}
   async claimOnce(claim: PublicationClaim): Promise<boolean> {
     validateClaim(claim);
     const connection = await this.pool.getConnection();
@@ -69,6 +72,12 @@ export class MySQLPublicationClaimStore implements PublicationClaimStore {
         [claim.organizationId,claim.websiteId,claim.reservationId]);
       if (reservation.length !== 1 || reservation[0].status !== 'completed' || reservation[0].content_type !== record.contentType ||
           reservation[0].actual_cost_minor === null || reservation[0].actual_cost_minor === undefined) throw Error('APPROVAL_OR_RESERVATION_REQUIRED');
+      exactUnsigned(reservation[0].actual_cost_minor);
+      const receipt = await this.authorization.authorize(connection,claim,record,{
+        globalPaused:Number(budget[0].globally_paused) !== 0,siteActive:site[0].status === 'active',websiteVerified:Boolean(site[0].verified_at),
+        automationEnabled:Number(site[0].automation_enabled) === 1,publishingEnabled:Number(site[0].auto_publish_enabled) === 1,
+        contentPublishingEnabled:Number(policy[0].enabled) === 1 && Number(policy[0].auto_publish) === 1
+      },this.clock());
       try {
         const [result] = await connection.execute<ResultSetHeader>(
           'INSERT INTO growth_publication_claims (organization_id,website_id,content_id,channel,claim_hash,reservation_id,status) VALUES (?,?,?,?,?,?,?)',
@@ -78,8 +87,9 @@ export class MySQLPublicationClaimStore implements PublicationClaimStore {
         if ((error as { code?: string }).code !== 'ER_DUP_ENTRY') throw error;
         await connection.rollback(); return false;
       }
+      await this.authorization.consume(connection,receipt,publicationClaimHash(claim),this.clock());
       // Commit the one-time claim and the ambiguous content status together, before any potential outbound work.
-      await advance(connection,record,{kind:'publication_unknown',eventId:'claim_'+publicationClaimHash(claim),at:new Date(this.clock()).toISOString()},'publication_claim');
+      await advance(connection,record,{kind:'publication_unknown',eventId:'claim_'+publicationClaimHash(claim),at:new Date(this.clock()).toISOString()},receipt.requestorId);
       await connection.commit(); return true;
     } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
   }

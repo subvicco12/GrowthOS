@@ -34,7 +34,7 @@ function scheduled(){
   for(const event of events)record=transitionContent(record,event,actor);
   return record;
 }
-function setup(){const db=contentSQLFixture(scheduled(),now);return {...db,store:new MySQLPublicationClaimStore(db.pool,new PublicationEvidenceVerifier([issuer]),()=>now)};}
+function setup(){const db=contentSQLFixture(scheduled(),now);return {...db,store:new MySQLPublicationClaimStore(db.pool,new PublicationEvidenceVerifier([issuer]),()=>now,db.bridge.boundary)};}
 const confirmed={kind:'published' as const,providerId:'synthetic_post1',url:'https://example.test/post'};
 
 test('shared connector projection refuses stale, future, wrong-site and absent evidence',()=>{
@@ -47,7 +47,7 @@ test('shared connector projection refuses stale, future, wrong-site and absent e
 });
 test('concurrent publication preparation commits one unique claim and blocks cancellation',async()=>{
   const db=setup(), record=scheduled();
-  const gate={organizationId:'org1',websiteId:'site1',channel:'site',globalPaused:false,publishingEnabled:true,connectorVerified:true,reservationId:'reservation1',approvalVerified:true};
+  const gate={organizationId:'org1',websiteId:'site1',channel:'site',globalPaused:false,publishingEnabled:true,connectorVerified:true,reservationId:'reservation1',approvalVerified:true,authorization:db.bridge.request};
   const results=await Promise.allSettled([preparePublication(record,gate,db.store,new Date(now).toISOString()),preparePublication(record,gate,db.store,new Date(now).toISOString())]);
   assert.equal(results.filter(x=>x.status==='fulfilled').length,1);
   assert.equal(db.snapshot().record.stage,'publication_unknown');assert.equal(db.snapshot().events.size,1);
@@ -56,30 +56,30 @@ test('concurrent publication preparation commits one unique claim and blocks can
 });
 test('claim gates reject stale connector, wrong reservation site, tenant mismatch and disabled publication',async()=>{
   for(const modify of [(db:ReturnType<typeof setup>)=>{db.state.expiresAt=new Date(now-1).toISOString();},(db:ReturnType<typeof setup>)=>{db.state.reservationSite='site2';},(db:ReturnType<typeof setup>)=>{db.state.publishing=0;},(db:ReturnType<typeof setup>)=>{db.state.automation=0;},(db:ReturnType<typeof setup>)=>{db.state.policy=0;},(db:ReturnType<typeof setup>)=>{db.state.paused=1;}]) {
-    const db=setup();modify(db);await assert.rejects(()=>db.store.claimOnce(claim));assert.equal(db.snapshot().claim,null);assert.equal(db.snapshot().record.stage,'scheduled');
+    const db=setup();modify(db);await assert.rejects(()=>db.store.claimOnce({...claim,authorization:db.bridge.request}));assert.equal(db.snapshot().claim,null);assert.equal(db.snapshot().record.stage,'scheduled');
   }
   const db=setup();await assert.rejects(()=>db.store.claimOnce({...claim,organizationId:'org2',idempotencyKey:'publish:org2:site1:content1:site'}));assert.equal(db.snapshot().claim,null);
 });
 test('claim and content rollback together on event persistence failure; safe retry succeeds',async()=>{
   const db=setup();db.state.failSQL='INSERT INTO growth_content_events';
-  await assert.rejects(()=>db.store.claimOnce(claim),/SYNTHETIC_SQL_FAILURE/);
+  await assert.rejects(()=>db.store.claimOnce({...claim,authorization:db.bridge.request}),/SYNTHETIC_SQL_FAILURE/);
   assert.equal(db.snapshot().claim,null);assert.equal(db.snapshot().record.stage,'scheduled');
-  db.state.failSQL='';assert.equal(await db.store.claimOnce(claim),true);
+  db.state.failSQL='';assert.equal(await db.store.claimOnce({...claim,authorization:db.bridge.request}),true);
 });
 test('signed reconciliation commits publication, observation and audit in one transaction; exact replay is idempotent',async()=>{
-  const db=setup();await db.store.claimOnce(claim);const evidence=signed(confirmed);
+  const db=setup();await db.store.claimOnce({...claim,authorization:db.bridge.request});const evidence=signed(confirmed);
   assert.equal(await db.store.reconcile(claim,evidence),'confirmed');
   const saved=db.snapshot();assert.equal(saved.record.stage,'published');assert.equal(saved.claim?.status,'confirmed');assert.equal(saved.events.size,2);assert.equal(saved.observations.size,1);
   assert.equal(await db.store.reconcile(claim,evidence),'confirmed');assert.deepEqual(db.snapshot(),saved);
   await assert.rejects(()=>db.store.reconcile(claim,signed({kind:'absent'},'absence')),/PUBLICATION_STATUS_CONFLICT/);
 });
 test('publication failure rolls back content, audit, observation and claim status then recovers',async()=>{
-  const db=setup();await db.store.claimOnce(claim);const before=db.snapshot();db.state.failSQL='UPDATE growth_publication_claims';
+  const db=setup();await db.store.claimOnce({...claim,authorization:db.bridge.request});const before=db.snapshot();db.state.failSQL='UPDATE growth_publication_claims';
   await assert.rejects(()=>db.store.reconcile(claim,signed(confirmed)),/SYNTHETIC_SQL_FAILURE/);assert.deepEqual(db.snapshot(),before);
   db.state.failSQL='';assert.equal(await db.store.reconcile(claim,signed(confirmed)),'confirmed');
 });
 test('forged, expired, revoked and cross-tenant provider evidence is refused before SQL',async()=>{
-  const db=setup();await db.store.claimOnce(claim);const count=db.state.queries.length;
+  const db=setup();await db.store.claimOnce({...claim,authorization:db.bridge.request});const count=db.state.queries.length;
   const forged=signed(confirmed);forged.signature='0'.repeat(64);
   for(const input of [forged,signed(confirmed,'expired',{expiresAt:new Date(now-1).toISOString()}),signed(confirmed,'foreign',{websiteId:'site2'}),signed(confirmed,'other',{organizationId:'org2'}),signed(confirmed,'reservation',{reservationId:'reservation2'})]) await assert.rejects(()=>db.store.reconcile(claim,input));
   const revoked=new MySQLPublicationClaimStore(db.pool,new PublicationEvidenceVerifier([{...issuer,revoked:true}]),()=>now);
@@ -87,14 +87,14 @@ test('forged, expired, revoked and cross-tenant provider evidence is refused bef
   assert.equal(db.state.queries.length,count);
 });
 test('provider event ID cannot be rebound and verified absence never releases a publication claim',async()=>{
-  const db=setup();await db.store.claimOnce(claim);await db.store.reconcile(claim,signed({kind:'unknown'}));
+  const db=setup();await db.store.claimOnce({...claim,authorization:db.bridge.request});await db.store.reconcile(claim,signed({kind:'unknown'}));
   await assert.rejects(()=>db.store.reconcile(claim,signed(confirmed)),/PUBLICATION_EVIDENCE_REPLAY/);
-  assert.equal(await db.store.reconcile(claim,signed({kind:'absent'},'absence')),'absent');assert.equal(await db.store.claimOnce(claim),false);
+  assert.equal(await db.store.reconcile(claim,signed({kind:'absent'},'absence')),'absent');assert.equal(await db.store.claimOnce({...claim,authorization:db.bridge.request}),false);
 });
 test('provider outage preserves unknown claim and cannot manufacture a published state',async()=>{
-  const db=setup();await db.store.claimOnce(claim);const probe=new SyntheticPublicationStatusProbe();probe.fail(claim.idempotencyKey);
+  const db=setup();await db.store.claimOnce({...claim,authorization:db.bridge.request});const probe=new SyntheticPublicationStatusProbe();probe.fail(claim.idempotencyKey);
   await assert.rejects(()=>probe.probe(claim.idempotencyKey),/SYNTHETIC_PROVIDER_UNAVAILABLE/);
-  assert.equal(db.snapshot().claim?.status,'unknown');assert.equal(db.snapshot().record.stage,'publication_unknown');assert.equal(await db.store.claimOnce(claim),false);
+  assert.equal(db.snapshot().claim?.status,'unknown');assert.equal(db.snapshot().record.stage,'publication_unknown');assert.equal(await db.store.claimOnce({...claim,authorization:db.bridge.request}),false);
 });
 test('content approval replay, viewer, unknown role, other website and organization are denied',async()=>{
   const db=setup(),store=new MySQLContentStore(db.pool), event:ContentEvent={kind:'approve',eventId:'approval',at:new Date(now).toISOString()};
@@ -126,7 +126,7 @@ test('a reserved job replay cannot bypass a newly paused organization or revoked
   policy.globalPaused=false;policy.connectorReady=false;assert.equal((await reserveProductionBudget(db,request)).decision.code,'CONNECTOR_UNAVAILABLE');
 });
 test('generic content persistence refuses caller-asserted provider trust',async()=>{
-  const db=setup();await db.store.claimOnce(claim);
+  const db=setup();await db.store.claimOnce({...claim,authorization:db.bridge.request});
   await assert.rejects(()=>applyContentEvent(new MySQLContentStore(db.pool),'content1',db.snapshot().record.version,
     {kind:'confirm_publication',eventId:'forged',at:new Date(now).toISOString(),providerId:'fake',url:'https://example.test/fake',observedAt:new Date(now).toISOString()},
     {...actor,trustedProviderEvidence:true}),/PUBLICATION_CLAIM_RECONCILIATION_REQUIRED/);

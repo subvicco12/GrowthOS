@@ -4,6 +4,7 @@ import { applyContentEvent, createContentRecord, transitionContent, type Content
 import { preparePublication, type PublicationClaimStore, type PublicationGate } from '../publication-handoff';
 import { reserveProductionBudget, type BudgetDatabase, type BudgetReservation } from '../ai-budget-ledger';
 import type { ProductionPolicy, ProductionRequest } from '../ai-budget-engine';
+import { publicationBridgeFixture } from './helpers/publication-bridge-fixture';
 import { JobRunner, type JobStore } from '../jobs';
 import type { Job } from '../types';
 
@@ -74,7 +75,7 @@ test('publication handoff is single-claim, gated, due, and ambiguous outcomes re
     publishingEnabled: false, connectorVerified: true, reservationId: 'reservation-1', approvalVerified: true };
   await assert.rejects(() => preparePublication(scheduled, gate, store, '2026-10-20T00:00:00Z'), /PUBLISHING_DISABLED/);
   assert.equal(claims.size, 0);
-  const syntheticGate = { ...gate, publishingEnabled: true }; // Pure contract test: no provider is called.
+  const syntheticGate = { ...gate, publishingEnabled: true, authorization:publicationBridgeFixture(scheduled,Date.parse('2026-10-20T00:00:00Z')).request }; // Pure contract test: no provider is called.
   await assert.rejects(() => preparePublication(scheduled, syntheticGate, store, at), /SCHEDULE_NOT_DUE/);
   await assert.rejects(() => preparePublication(scheduled, { ...syntheticGate, connectorVerified: false }, store, '2026-10-20T00:00:00Z'), /CONNECTOR_UNAVAILABLE/);
   const prepared = await preparePublication(scheduled, syntheticGate, store, '2026-10-20T00:00:00Z');
