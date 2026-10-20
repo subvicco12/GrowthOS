@@ -4,6 +4,9 @@ import type {FactoryStore,FactoryTransaction,FactoryScope,FactoryContext,Factory
 import {contentBriefSchema,qualityReportSchema,researchSourceSchema,factoryReviewHash} from '../core/content-factory';
 import type {ContentRecord} from '../core/content-lifecycle';
 import {decodeStoredContent} from './mysql-content-store';
+import {writeContentTransition} from './mysql-content-store';
+import {transitionContent,type ContentEvent,type ContentActor} from '../core/content-lifecycle';
+import {factoryHash} from '../core/content-factory';
 
 type Row=RowDataPacket&Record<string,unknown>;
 type Metadata=Pick<FactoryEnvelope,'schemaVersion'|'brief'|'research'|'quality'|'humanApproval'|'journal'>;
@@ -19,6 +22,8 @@ export interface FactoryDurableAuthorities {
   evidence(connection:PoolConnection,kind:'source'|'quality',value:ResearchSource|FactoryQualityReport,binding:{scope:FactoryScope;reviewedHash:string;at:string;regulated:boolean}):Promise<void>;
   invalidate(connection:PoolConnection,scope:FactoryScope,version:number,reason:string,at:string):Promise<void>;
   currentApprover(connection:PoolConnection,approval:NonNullable<FactoryEnvelope['humanApproval']>,scope:FactoryScope,at:string):Promise<void>;
+  /** Runs after the canonical scheduled record CAS on this connection; must persist its job or refuse. */
+  schedule?(connection:PoolConnection,scope:FactoryScope,record:ContentRecord,at:string):Promise<void>;
 }
 
 export function decodeFactoryEnvelope(row:Row,scope:FactoryScope):FactoryEnvelope {
@@ -45,6 +50,19 @@ export function decodeFactoryEnvelope(row:Row,scope:FactoryScope):FactoryEnvelop
   return envelope;
 }
 const encode=(value:FactoryEnvelope):string=>JSON.stringify({...value.record,_factory:{schemaVersion:1,brief:value.brief,research:value.research,quality:value.quality,humanApproval:value.humanApproval,journal:value.journal}});
+
+/** The caller owns the locked content row and transaction; preserves approved factory metadata and journal. */
+export async function writeFactoryPublicationTransition(c:PoolConnection,current:FactoryEnvelope,event:Extract<ContentEvent,{kind:'publication_unknown'|'confirm_publication'|'cancel'}>,actor:ContentActor):Promise<ContentRecord>{
+  const scope={organizationId:current.record.organizationId,websiteId:current.record.websiteId,contentId:current.record.id};
+  if(!current.humanApproval||!current.record.factoryReviewDigest||current.humanApproval.reviewedHash!==factoryReviewHash(current)||
+    !['scheduled','publication_unknown'].includes(current.record.stage)||current.journal.length!==current.record.version)fail('FACTORY_PUBLICATION_APPROVAL_DENIED');
+  const record=transitionContent(current.record,event,actor);
+  const next:FactoryEnvelope={...current,record,journal:[...current.journal,{eventId:event.eventId,commandHash:factoryHash([scope,event,record.version]),actorId:actor.userId,operation:event.kind,at:event.at,version:record.version}]};
+  const json=encode(next);if(Buffer.byteLength(json)>1024*1024)fail('FACTORY_RECORD_TOO_LARGE');
+  decodeFactoryEnvelope({version:record.version,record_json:json} as Row,scope);
+  await writeContentTransition(c,{...current.record,_factory:{schemaVersion:1,brief:current.brief,research:current.research,quality:current.quality,humanApproval:current.humanApproval,journal:current.journal}} as ContentRecord,JSON.parse(json) as ContentRecord,{event,actor});
+  return record;
+}
 
 /** Explicit pool and complete authorities are mandatory. No route or worker constructs this adapter. */
 export class MySQLContentFactoryStore implements FactoryStore {
@@ -85,7 +103,13 @@ export class MySQLContentFactoryStore implements FactoryStore {
           const [inserted]=await c.execute<ResultSetHeader>('INSERT INTO growth_content_events (organization_id,website_id,content_id,event_id,version,actor_id,event_kind,occurred_at,record_json) VALUES (?,?,?,?,?,?,?,?,?)',[scope.organizationId,scope.websiteId,scope.contentId,event.eventId,next.record.version,event.actorId,event.operation,new Date(event.at),json]);
           if(inserted.affectedRows!==1)fail('FACTORY_EVENT_REPLAY');
           const [updated]=await c.execute<ResultSetHeader>('UPDATE growth_content_records SET version=?,stage=?,record_json=? WHERE organization_id=? AND website_id=? AND id=? AND version=?',[next.record.version,next.record.stage,json,scope.organizationId,scope.websiteId,scope.contentId,version]);
-          if(updated.affectedRows!==1)fail('FACTORY_VERSION_CONFLICT');saved=true;
+          if(updated.affectedRows!==1)fail('FACTORY_VERSION_CONFLICT');
+          if(event.operation==='schedule'){
+            const schedule=this.authorities.schedule;
+            if(typeof schedule!=='function')fail('FACTORY_DURABLE_JOB_SCHEDULER_REQUIRED');
+            await schedule!(c,scope,next.record,event.at);
+          }
+          saved=true;
         }
       };
       const result=await work(tx);if(!saved||!rechecked)fail('FACTORY_TRANSACTION_INCOMPLETE');

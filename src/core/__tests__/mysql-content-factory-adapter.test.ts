@@ -11,12 +11,13 @@ const time=Date.parse('2026-10-20T01:00:00Z'),at=(n=0)=>new Date(time+n).toISOSt
 const source:ResearchSource={id:'s1',url:'https://source.invalid/',claim:'Synthetic claim',observedAt:at(-1000),expiresAt:at(300000),snapshotHash:'b'.repeat(64),verificationId:'verified1'};
 function fixture(){
  const initial=createFactoryEnvelope({id:scope.contentId,organizationId:scope.organizationId,websiteId:scope.websiteId,contentType:'article'});
- const state={record:JSON.stringify(initial.record),version:0,events:[] as {id:string;json:string}[],commits:0,rollbacks:0,queries:[] as string[],revoked:false,enabled:true,policy:'policy1',invalidated:0,invalidatorFails:false,qualityHash:'',sqlFails:'',tail:Promise.resolve()};
+ const state={record:JSON.stringify(initial.record),version:0,events:[] as {id:string;json:string}[],commits:0,rollbacks:0,scheduled:0,queries:[] as string[],revoked:false,enabled:true,policy:'policy1',invalidated:0,invalidatorFails:false,qualityHash:'',sqlFails:'',tail:Promise.resolve()};
  const authorities:FactoryDurableAuthorities={
   policy:async()=>({revision:state.policy,enabled:state.enabled,regulated:false,requiredDisclosures:[]}),
   evidence:async(_,kind,value)=>{if(state.revoked||(kind==='source'&&JSON.stringify(value)!==JSON.stringify(source))||(kind==='quality'&&factoryHash(value)!==state.qualityHash))throw Error('EVIDENCE_DENIED');},
   invalidate:async()=>{state.invalidated++;if(state.invalidatorFails)throw Error('INVALIDATION_DENIED');},
-  currentApprover:async()=>{if(state.revoked)throw Error('APPROVER_REVOKED');}
+  currentApprover:async()=>{if(state.revoked)throw Error('APPROVER_REVOKED');},
+  schedule:async()=>{state.scheduled++;if(state.revoked)throw Error('SCHEDULE_AUTHORITY_REVOKED');}
  };
  const pool={getConnection:async()=>{
   const previous=state.tail;let release!:()=>void;state.tail=new Promise<void>(r=>release=r);await previous;
@@ -61,6 +62,7 @@ test('quality and human approval persist review digest; revision atomically remo
  const q:FactoryQualityReport={id:'qa1',issuer:'synthetic_qa',reviewedHash:digest,checkedAt:at(-1000),expiresAt:at(300000),factual:[{sourceId:'s1',claimHash:factoryHash(source.claim),result:'pass'}],originality:{result:'pass',method:'synthetic',corpusHash:'c'.repeat(64),reportHash:'d'.repeat(64)},rights:[{assetId:'asset1',owner:'Fixture',license:'owned',proofHash:'e'.repeat(64),permittedUses:['publication'],attributionRequired:false,attribution:''}],disclosure:{checked:true,required:false,text:''},regulatedReview:null};
  f.state.qualityHash=factoryHash(q);await f.run({kind:'quality',report:q});await f.run({kind:'approve',reviewedHash:digest,qualityId:q.id,explicitHumanConsent:true});await f.run({kind:'schedule',channel:'wordpress',publishAt:at(600000),reviewedHash:digest});
  assert.equal(f.read().record.factoryReviewDigest,digest);assert.equal(f.read().record.stage,'scheduled');assert.equal(f.read().journal.length,6);
+ assert.equal(f.state.scheduled,1);
  const corrupted=JSON.parse(f.state.record);corrupted.factoryReviewDigest='0'.repeat(64);assert.throws(()=>decodeFactoryEnvelope({version:6,record_json:JSON.stringify(corrupted)} as never,scope),/FACTORY_APPROVAL_CORRUPT/);
  const approved=JSON.parse(f.state.events[4].json);assert.equal(approved._factory.journal.length,5);assert.equal(approved.stage,'approved');
  await f.run({kind:'revise',text:'A revised draft with different verified language.',reason:'Correction'});
@@ -79,6 +81,13 @@ test('disabled or changed policy at the boundary refuses the factory write',asyn
  const g=fixture(),original=g.authorities.evidence;let checks=0;
  g.authorities.evidence=async(...args)=>{await original(...args);if(++checks===2)g.state.policy='policy2';};
  await assert.rejects(()=>g.run({kind:'research',sources:[source]}),/FACTORY_AUTHORIZATION_CHANGED/);assert.equal(g.state.events.length,0);assert.equal(g.state.commits,0);
+});
+test('schedule refuses missing durable job authority and rolls back its content CAS',async()=>{
+ const f=fixture();await f.run({kind:'research',sources:[source]});await f.run({kind:'brief',brief:{topic:'Topic',audience:'Users',objective:'Test',language:'en',requiredDisclosures:[],assetIds:['asset1']}});await f.run({kind:'draft',text:'Synthetic draft with enough text for schedule.'});
+ const digest=factoryReviewHash(f.read());const q:FactoryQualityReport={id:'qa1',issuer:'synthetic_qa',reviewedHash:digest,checkedAt:at(-1000),expiresAt:at(300000),factual:[{sourceId:'s1',claimHash:factoryHash(source.claim),result:'pass'}],originality:{result:'pass',method:'synthetic',corpusHash:'c'.repeat(64),reportHash:'d'.repeat(64)},rights:[{assetId:'asset1',owner:'Fixture',license:'owned',proofHash:'e'.repeat(64),permittedUses:['publication'],attributionRequired:false,attribution:''}],disclosure:{checked:true,required:false,text:''},regulatedReview:null};
+ f.state.qualityHash=factoryHash(q);await f.run({kind:'quality',report:q});await f.run({kind:'approve',reviewedHash:digest,qualityId:q.id,explicitHumanConsent:true});f.authorities.schedule=undefined;
+ await assert.rejects(()=>f.run({kind:'schedule',channel:'wordpress',publishAt:at(600000),reviewedHash:digest}),/FACTORY_DURABLE_JOB_SCHEDULER_REQUIRED/);
+ assert.equal(f.read().record.stage,'approved');assert.equal(f.state.events.length,5);assert.equal(f.state.scheduled,0);
 });
 test('malformed metadata, mismatched approval digest and legacy nonempty content fail closed',()=>{
  const f=fixture(),r=JSON.parse(f.state.record);

@@ -2,6 +2,7 @@ import type { Pool,PoolConnection,RowDataPacket,ResultSetHeader } from 'mysql2/p
 import type { AuthorizationIssuerStore,AuthorizationIssuerTransaction,IssuanceSnapshot } from './authorization-issuance';
 import { publicationAuthorizationSchema, type PublicationAuthorization } from '../core/publication-authorization';
 import { decodeStoredContent } from './mysql-content-store';
+import {decodeFactoryEnvelope} from './mysql-content-factory-store';
 import { MySQLPublicationAuthorization, type PublicationAuthorizationReceipt } from './mysql-publication-authorization';
 import { exactUnsigned } from './mysql-integer';
 type Row=RowDataPacket&Record<string,unknown>;
@@ -30,10 +31,12 @@ export class MySQLAuthorizationIssuerStore implements AuthorizationIssuerStore {
         load:async command=>{
           const [records]=await c.execute<Row[]>('SELECT version,record_json FROM growth_content_records WHERE organization_id=? AND website_id=? AND id=? FOR UPDATE',[scope.organizationId,scope.websiteId,command.contentId]);
           if(records.length!==1)throw Error('CONTENT_NOT_FOUND');
-          const record=decodeStoredContent(records[0] as Row&{version:number;record_json:string},scope.organizationId,scope.websiteId,command.contentId);
+          const stored=decodeStoredContent(records[0] as Row&{version:number;record_json:string},scope.organizationId,scope.websiteId,command.contentId);
+          const record=Object.hasOwn(stored,'_factory')?decodeFactoryEnvelope(records[0],{...scope,contentId:command.contentId}).record:stored;
           const [events]=await c.execute<Row[]>("SELECT event_id,actor_id,occurred_at,version,record_json FROM growth_content_events WHERE organization_id=? AND website_id=? AND content_id=? AND event_id=? AND event_kind='approve' FOR UPDATE",[scope.organizationId,scope.websiteId,record.id,command.approvalEventId]);
           if(events.length!==1)throw Error('CONTENT_APPROVAL_EVENT_REQUIRED');
-          const approvedRecord=decodeStoredContent(events[0] as Row&{version:number;record_json:string},scope.organizationId,scope.websiteId,record.id);
+          const approvedStored=decodeStoredContent(events[0] as Row&{version:number;record_json:string},scope.organizationId,scope.websiteId,record.id);
+          const approvedRecord=Object.hasOwn(approvedStored,'_factory')?decodeFactoryEnvelope(events[0],{...scope,contentId:record.id}).record:approvedStored;
           const [members]=await c.execute<Row[]>('SELECT m.role,u.disabled FROM growth_memberships m JOIN growth_users u ON u.id=m.user_id WHERE m.organization_id=? AND m.user_id=? FOR UPDATE',[scope.organizationId,events[0].actor_id]);
           if(members.length!==1)throw Error('ISSUANCE_MEMBERSHIP_DENIED');
           const [policies]=await c.execute<Row[]>('SELECT enabled,auto_publish FROM growth_content_policies WHERE organization_id=? AND website_id=? AND content_type=? FOR UPDATE',[scope.organizationId,scope.websiteId,record.contentType]);

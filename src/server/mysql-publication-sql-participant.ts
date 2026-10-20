@@ -9,6 +9,7 @@ import type {PublicationClaim} from '../core/publication-handoff';
 import {publicationAuthorizationSchema,contentAuthorizationHash} from '../core/publication-authorization';
 import type {AtomicPublicationTransaction,AtomicPublicationAuthorization,IndependentPublicationFence} from '../core/publication-atomic-integration';
 import {decodeStoredContent,writeContentTransition} from './mysql-content-store';
+import {decodeFactoryEnvelope,writeFactoryPublicationTransition} from './mysql-content-factory-store';
 import {MySQLPublicationAuthorization,type PublicationAuthorizationReceipt} from './mysql-publication-authorization';
 import {publicationClaimHash} from './publication-evidence';
 import {MySQLPublicationJobRecoveryReader} from './mysql-publication-job-recovery-reader';
@@ -46,7 +47,7 @@ export class MySQLPublicationSqlParticipants implements CertifiedAtomicParticipa
  open(c:PoolConnection,scope:FactoryScope,jobId:string,fence:IndependentPublicationFence):AtomicPublicationTransaction {
   if(![scope.organizationId,scope.websiteId,scope.contentId,jobId].every(valid))fail('PUBLICATION_SQL_SCOPE_DENIED');
   const s:[string,string,string]=[scope.organizationId,scope.websiteId,scope.contentId],j:[string,string,string]=[scope.organizationId,scope.websiteId,jobId];
-  let job:PublicationJob|undefined,record:ContentRecord|undefined,receipt:PublicationAuthorizationReceipt|undefined,authRow:Row|undefined,funding:Row|undefined;
+  let job:PublicationJob|undefined,record:ContentRecord|undefined,factory:ReturnType<typeof decodeFactoryEnvelope>|undefined,receipt:PublicationAuthorizationReceipt|undefined,authRow:Row|undefined,funding:Row|undefined;
   let budget:Row|undefined,site:Row|undefined,sessionHash='',fundingId='',claimHash='',policyRevision='';
   const context=()=>{if(!job||!record||!receipt||!authRow||!funding)fail('PUBLICATION_SQL_CONTEXT_REQUIRED');};
   return {
@@ -65,8 +66,11 @@ export class MySQLPublicationSqlParticipants implements CertifiedAtomicParticipa
     if(!job||input.id!==job.id)fail('PUBLICATION_JOB_NOT_LOCKED');
     const row=one(await read(c,'SELECT version,record_json FROM growth_content_records WHERE organization_id=? AND website_id=? AND id=? FOR UPDATE',s),'PUBLICATION_CONTENT_NOT_FOUND');
     const found=decodeStoredContent(row as Row&{record_json:string;version:number},...s);
-    if(Object.hasOwn(found,'_factory')||found.stage!=='scheduled'||found.version!==job!.contentVersion||contentAuthorizationHash(found)!==job!.contentHash)fail('PUBLICATION_CONTENT_CHANGED');
-    record=found;return found;
+    factory=Object.hasOwn(found,'_factory')?decodeFactoryEnvelope(row,scope):undefined;
+    const canonical=factory?.record??found;
+    if(canonical.stage!=='scheduled'||canonical.version!==job!.contentVersion||contentAuthorizationHash(canonical)!==job!.contentHash||
+      (factory&&(!factory.humanApproval||!canonical.factoryReviewDigest)))fail('PUBLICATION_CONTENT_CHANGED');
+    record=canonical;return canonical;
    },
    authorize:async(input,ctx:FactoryContext,at)=>{
     if(!job||!record||input.id!==job.id||ctx.organizationId!==scope.organizationId||!/^[a-f0-9]{64}$/.test(ctx.sessionHash))fail('PUBLICATION_SESSION_DENIED');
@@ -111,7 +115,8 @@ export class MySQLPublicationSqlParticipants implements CertifiedAtomicParticipa
    contentUnknown:async(current,claim,at)=>{
     context();if(current.id!==record!.id||current.version!==record!.version||publicationClaimHash(claim)!==claimHash)fail('PUBLICATION_CONTENT_CHANGED');
     const event={kind:'publication_unknown' as const,eventId:'claim_'+claimHash,at},actor={userId:receipt!.requestorId,organizationId:scope.organizationId,websiteId:scope.websiteId,role:'admin' as const};
-    const next=transitionContent(record!,event,actor);await writeContentTransition(c,record!,next,{event,actor});
+    if(factory)await writeFactoryPublicationTransition(c,factory,event,actor);
+    else {const next=transitionContent(record!,event,actor);await writeContentTransition(c,record!,next,{event,actor});}
    },
    appendAudit:async(input,a,claim)=>{
     context();if(input.id!==job!.id||a.authorizationId!==receipt!.authorization.id||publicationClaimHash(claim)!==claimHash)fail('PUBLICATION_AUDIT_SCOPE_DENIED');

@@ -4,6 +4,7 @@ import type { ContentRecord } from '../core/content-lifecycle';
 import type { PublicationClaim } from '../core/publication-handoff';
 import { assertPublicationAuthorization, publicationAuthorizationRequestSchema, publicationAuthorizationSchema, contentAuthorizationHash, type PublicationAuthorization, type PublicationPolicySnapshot, type PublicationDestination } from '../core/publication-authorization';
 import { decodeStoredContent } from './mysql-content-store';
+import {decodeFactoryEnvelope} from './mysql-content-factory-store';
 import { ConnectorEvidenceVerifier, type SignedConnectorAttestation } from './connector-evidence';
 
 type Row = RowDataPacket & Record<string, unknown>;
@@ -42,7 +43,10 @@ export class MySQLPublicationAuthorization {
       [claim.organizationId,claim.websiteId,claim.contentId,authorization.approvalDecisionId]);
     if (decisions.length !== 1) throw Error('CONTENT_APPROVAL_EVENT_REQUIRED');
     const decision = decisions[0];
-    const approvedRecord = decodeStoredContent(decision as Row & {record_json:string;version:number},claim.organizationId,claim.websiteId,claim.contentId);
+    const approvedStored = decodeStoredContent(decision as Row & {record_json:string;version:number},claim.organizationId,claim.websiteId,claim.contentId);
+    const approvedRecord = Object.hasOwn(approvedStored,'_factory')
+      ? decodeFactoryEnvelope(decision,{organizationId:claim.organizationId,websiteId:claim.websiteId,contentId:claim.contentId}).record
+      : approvedStored;
     if (decision.event_id !== authorization.approvalDecisionId || decision.actor_id !== authorization.approverId ||
         Date.parse(iso(decision.occurred_at)) !== Date.parse(authorization.approvedAt) || approvedRecord.stage !== 'approved' || approvedRecord.version !== record.version-1 ||
         approvedRecord.eventIds.at(-1) !== authorization.approvalDecisionId || record.eventIds.at(-2) !== authorization.approvalDecisionId ||
