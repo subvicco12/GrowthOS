@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "status": "REVIEW_ONLY_UNINSTALLED",
+  "candidate": "013_publication_funding_jobs_candidate.sql",
+  "sha256": "049f16c9c9eb9336c60b9d3ebf42d5f66763257146d4d99714b0f74e7aea481e",
+  "dependencies": {
+    "010": "bb10b32ec0186399ae10b1820541d4330aab500843cd0fcf2a82b4da515c2c5b",
+    "011": "7b9f5b15d2797c13bc6c30d04a08d49b5112a2545f264b543e86ffd5b303362a",
+    "012": "6d32ff6a950e9e90c40a4c5e5892c783914847c0f518faab980f08764bc310a6"
+  },
+  "counts": {"statements":14,"newTables":3,"alteredTables":4,"newTriggers":7,"newForeignKeys":9,"newForeignKeyColumns":41,"declaredIndexes":22},
+  "newTables": ["growth_publication_funding_bindings","growth_publication_jobs","growth_publication_job_events"],
+  "alteredTables": ["growth_publication_claims","growth_content_authorizations","growth_quota_reservations_v2","growth_publication_observations"],
+  "newTriggers": ["growth_pub_binding_no_update","growth_pub_binding_no_delete","growth_pub_job_insert_guard","growth_pub_job_update_guard","growth_pub_job_no_delete","growth_pub_job_event_no_update","growth_pub_job_event_no_delete"],
+  "newForeignKeys": {
+    "fk_pub_auth": 7,
+    "fk_pub_claim": 6,
+    "fk_pub_funding": 5,
+    "fk_pub_destination": 3,
+    "fk_pub_job_content": 3,
+    "fk_pub_job_dest": 3,
+    "fk_pub_job_binding": 7,
+    "fk_pub_job_event": 3,
+    "fk_pub_job_observation": 4
+  },
+  "plannedTotalIfInstalledAfter012": {"tables":34,"triggers":42,"foreignKeyColumns":155,"ledgerEntries":13}
+}

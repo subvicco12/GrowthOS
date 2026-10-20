@@ -16,7 +16,7 @@ export interface AtomicPublicationAuthorization {
   organizationId:string;websiteId:string;contentId:string;contentVersion:number;channel:string;
   destinationId:string;destinationRevision:string;destinationTarget:string;
   authorizationId:string;approvalEventId:string;connectorEvidenceHash:string;policyRevision:string;
-  publicationFundingId:string;expiresAt:string;
+  generationReservationId:string;publicationFundingId:string;expiresAt:string;
 }
 export interface AtomicPublicationTransaction {
   /** Locks portfolio budget, website, policy, content, authorization and funding in reviewed order. */
@@ -30,6 +30,8 @@ export interface AtomicPublicationTransaction {
   insertClaim(claim:PublicationClaim):Promise<void>;
   startFunding(authorization:AtomicPublicationAuthorization,claim:PublicationClaim,at:string):Promise<void>;
   consumeAuthorization(authorization:AtomicPublicationAuthorization,claim:PublicationClaim,at:string):Promise<void>;
+  /** Immutable scoped bridge: claim/auth legacy generation ID and distinct v2 publication ID. */
+  insertFundingBinding(job:PublicationJob,authorization:AtomicPublicationAuthorization,claim:PublicationClaim,at:string):Promise<void>;
   contentUnknown(record:ContentRecord,claim:PublicationClaim,at:string):Promise<void>;
   appendAudit(job:PublicationJob,authorization:AtomicPublicationAuthorization,claim:PublicationClaim,at:string):Promise<void>;
   saveUnknownJob(job:PublicationJob,claim:PublicationClaim,at:string):Promise<void>;
@@ -65,14 +67,16 @@ export class PublicationAtomicCoordinator {
         const a=await tx.authorize(frozen,ctx,now);
         requireState(a.organizationId===scope.organizationId&&a.websiteId===scope.websiteId&&a.contentId===scope.contentId&&a.contentVersion===frozen.contentVersion&&a.channel===frozen.channel&&
           a.destinationId===frozen.destination.id&&a.destinationRevision===frozen.destination.revision&&a.destinationTarget===frozen.destination.target&&
-          /^[a-f0-9]{64}$/.test(a.connectorEvidenceHash)&&[a.authorizationId,a.approvalEventId,a.policyRevision,a.publicationFundingId].every(v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v))&&
+          /^[a-f0-9]{64}$/.test(a.connectorEvidenceHash)&&[a.authorizationId,a.approvalEventId,a.policyRevision,a.generationReservationId,a.publicationFundingId].every(v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v))&&
+          a.generationReservationId.length<=36&&a.generationReservationId!==a.publicationFundingId&&
           Date.parse(a.expiresAt)>Date.parse(now)&&Date.parse(a.expiresAt)<=Date.parse(now)+300000,'PUBLICATION_AUTHORIZATION_CHANGED');
         await tx.checkPublicationFunding(frozen,a,now);
         const claim:PublicationClaim={organizationId:scope.organizationId,websiteId:scope.websiteId,contentId:scope.contentId,channel:frozen.channel,
-          idempotencyKey:`publish:${scope.organizationId}:${scope.websiteId}:${scope.contentId}:${frozen.channel}`,reservationId:a.publicationFundingId};
+          idempotencyKey:`publish:${scope.organizationId}:${scope.websiteId}:${scope.contentId}:${frozen.channel}`,reservationId:a.generationReservationId};
         await tx.insertClaim(claim);
         await tx.startFunding(a,claim,now);
         await tx.consumeAuthorization(a,claim,now);
+        await tx.insertFundingBinding(frozen,a,claim,now);
         await tx.contentUnknown(record,claim,now);
         await tx.appendAudit(frozen,a,claim,now);
         await tx.saveUnknownJob(frozen,claim,now);
