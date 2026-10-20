@@ -1,0 +1,37 @@
+{
+  "format": "growthos-unified-source-lock-v2",
+  "sources": [
+    {
+      "ref": "database",
+      "path": "database/proposals/010_content_persistence_candidate.sql",
+      "sha256": "bb10b32ec0186399ae10b1820541d4330aab500843cd0fcf2a82b4da515c2c5b"
+    },
+    {
+      "ref": "database",
+      "path": "scripts/lib/content-certification-package.cjs",
+      "sha256": "e88fd245626d14af2b9131542be14b28e63a75d59059c4b1b01fb6a24df00aed"
+    },
+    {
+      "ref": "database",
+      "path": "scripts/certify-content-persistence.cjs",
+      "sha256": "e1119eafa4acb51e0d267bcad6907787ad08e0da284f980835fae10154a7c683"
+    },
+    {
+      "ref": "backup",
+      "path": "scripts/lib/expanded-backup-v1.cjs",
+      "sha256": "f1fefb941601729b7c28d736437df8393f04ff35e89fc5f37fff0256192b9f75"
+    },
+    {
+      "ref": "quota",
+      "path": "src/core/quota-periods.ts",
+      "sha256": "10c3abf3b439f0db424925fd050620375f8d88520d705908d5bb4f6c7dc4b273"
+    },
+    {
+      "ref": "quota",
+      "path": "src/core/quota-settlement.ts",
+      "sha256": "63b46c424169b1f4b0d27db3d740d7233445e2a772af5bfc68fbb558a384206b"
+    }
+  ],
+  "sha011": "7b9f5b15d2797c13bc6c30d04a08d49b5112a2545f264b543e86ffd5b303362a",
+  "sha012": "6d32ff6a950e9e90c40a4c5e5892c783914847c0f518faab980f08764bc310a6"
+}

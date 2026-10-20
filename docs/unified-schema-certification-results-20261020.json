@@ -1,0 +1,235 @@
+{
+  "format": "growthos-unified-review-execution-evidence-v2",
+  "production": "HOLD / NO-GO",
+  "liveDatabaseExecuted": false,
+  "unit": {
+    "total": 349,
+    "pass": 348,
+    "skip": 1,
+    "fail": 0
+  },
+  "unifiedOfflineFinal": {
+    "total": 40,
+    "pass": 40,
+    "fail": 0
+  },
+  "runs": [
+    {
+      "command": "node --check scripts/lib/unified-schema-review-v2.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/00.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/lib/unified-recovery-v2.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/01.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/certify-unified-schema-v2.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/02.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/unified-schema-v2-mariadb-tests.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/03.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/test-unified-schema-v2-offline.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/04.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/certify-unified-schema-v2.cjs --plan",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/05.log",
+      "logSha256": "c7fd3c2265cb86ce4c31bb5e07bd0d576ae609a41cd293b5805159320fdd2421",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/certify-unified-schema-v2.cjs --run",
+      "exitCode": 2,
+      "log": "/tmp/growthos-unified-evidence/06.log",
+      "logSha256": "a23530b3d3f89888a165cb8a5d82f432e40e76978e336e9ad0bb2056cc3ebd84",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --test scripts/test-unified-schema-v2-offline.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/07.log",
+      "logSha256": "59a2ae4c583a68f825bbc41c8bc1d84f4f373a44f01369e0d98015812e1decb1",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/08.log",
+      "logSha256": "577d1f1ea0108d63fa8f625bbcd5d69d7b241f5c8b61e4900a1e187e09cc8e89",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/09.log",
+      "logSha256": "030f96e3d7f02595fa125240e5b8d8a3a19a8f310021de68872a54f443e35fd1",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/10.log",
+      "logSha256": "c43e8892d59b3c62e9828ae7e3282ca06b4c6f598fb5eb42d829b8efeae1adc4",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm run test:security:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/11.log",
+      "logSha256": "c421835971e61130fbe630d226421e0af50af271b089b279a6f81218a525fd10",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/12.log",
+      "logSha256": "d38c212643654f5b6c5f4a951215f6b158feb34eee1e0fd2e6cdc95f4a1b6ddc",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm run test:auth-cookies:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/13.log",
+      "logSha256": "3e29ccecc1ef518079ce3cca315161a127683173fcf0dc9e2e15406c40f33b8a",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/14.log",
+      "logSha256": "f21f53009a3ed7db2b58505e51bbe6209a9f54f2663ebb1770b9326e1307c722",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/15.log",
+      "logSha256": "1d9fbdb4a43f080ea81493f8564b530c3d91397427a7957d3e4f67c2d162475c",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/test-governance-route-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/16.log",
+      "logSha256": "38d8415102a11f464fd11eaa4a58c6b22eb523cbd98546ad5e78d64035e5d507",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/test-growth-engine-db-boundary-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/17.log",
+      "logSha256": "58cf37637c88cc390f5c1425ff33a1e6611b5fc64585fb49f15a5da3f501de6f",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/verify-production-migration-package.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/18.log",
+      "logSha256": "b0156ab76588cde4f0630365fcb2623afc409f19f085100c6c59c7b9a87c628b",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/verify-authorization-trust-proposal.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/19.log",
+      "logSha256": "b5815901c086b3d3df8f8f380f67bcf7b486f72d37ab51bb4b2ad8a00dc338a7",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "npm run migration:plan",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/20.log",
+      "logSha256": "dd3497cb6177057bbd87ef5b0c3c187a11ebe21f7f69288ff0fe2d361474c1ff",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/lib/unified-schema-review-v2.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-00.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/lib/unified-recovery-v2.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-01.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/certify-unified-schema-v2.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-02.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/unified-schema-v2-mariadb-tests.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-03.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --check scripts/test-unified-schema-v2-offline.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-04.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/certify-unified-schema-v2.cjs --plan",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-05.log",
+      "logSha256": "2b2a0697e5a8eeca74c4b167868fde3c286443cd62e61547863c89e44de2500e",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node scripts/certify-unified-schema-v2.cjs --run",
+      "exitCode": 2,
+      "log": "/tmp/growthos-unified-evidence/final-06.log",
+      "logSha256": "a23530b3d3f89888a165cb8a5d82f432e40e76978e336e9ad0bb2056cc3ebd84",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "node --test scripts/test-unified-schema-v2-offline.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-07.log",
+      "logSha256": "bf187b22ed31f8c7ac522ccad9393320fcbd97ba966afeadbca72467de3c2cd8",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-08.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    },
+    {
+      "command": "git diff --exit-code 8b0e2d9eb52eb184eb9ecc5ba5b2521eb0acf71d -- database/mysql database/proposals/011_authorization_trust_candidate.sql database/proposals/011_authorization_trust_manifest.json scripts/mariadb-migration-runner.cjs scripts/disposable-dump-guard.cjs scripts/disposable-backup-restore-rehearsal-candidate.cjs scripts/production-migration-executor-candidate.cjs .github/workflows staging",
+      "exitCode": 0,
+      "log": "/tmp/growthos-unified-evidence/final-09.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executedRuntime": "v24.19.0"
+    }
+  ]
+}

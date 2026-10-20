@@ -1,0 +1,3015 @@
+{
+  "format": "growthos-unified-schema-review-v2",
+  "refs": {
+    "primary": "8b0e2d9eb52eb184eb9ecc5ba5b2521eb0acf71d",
+    "database": "e5b2c9678bb57817ba6a18e0f85df681f8c4e8e6",
+    "backup": "3e7d7622cb672beb6025a146cae2396baa3cc063",
+    "quota": "bd4d08c36b4c2c0d2a909d42377be048e9779d47"
+  },
+  "baselineBackupHash": "17ce94be57e677190522341bf011195eba889938a89ec83cce99d8a589e17786",
+  "ledger": [
+    [
+      "001_core_schema.sql",
+      "b67ab03511cd972ee07f7e891d35134e84c0e0ac00ff8f27614f5fcf479108c6"
+    ],
+    [
+      "002_budget_incidents.sql",
+      "2b5d77e9120b23debd57f39439ceee3fafee7b46c1c5c26c22c1597aebddab2e"
+    ],
+    [
+      "003_sessions.sql",
+      "c2bcabc28b3c26827ea0e1f5e01b6e6c0ce0c7d9797f6c5ed9c4c60150b0b4c7"
+    ],
+    [
+      "004_login_throttles.sql",
+      "4bf0afc1e375720abaadf5b3bc282ed0b7d5c83cd56e58f37b3b557133f1c179"
+    ],
+    [
+      "005_installation_state.sql",
+      "4c020458375497ba0808a65ac76baaa839c13697de054608f5c42556ad14919b"
+    ],
+    [
+      "006_approval_queue.sql",
+      "763ee4dd6b9461a799bffc1f314bc0ff69bc6dd84a52f9e96841342051f01019"
+    ],
+    [
+      "007_approval_audit.sql",
+      "8f4fd143f23761e62f381cfcb736efe9380159bb786be07f46e9cee3d28add6f"
+    ],
+    [
+      "008_approval_audit_guards.sql",
+      "7ad741a87d29157ed1236aacd9daef1f855b5c38f2351bb5e5cf9e305502c672"
+    ],
+    [
+      "009_website_feature_audit.sql",
+      "b8d26a4f7f9ce93407d3a3a5c63415bf3ca32a1843275ef5a3b99ba8ff15285c"
+    ],
+    [
+      "010_content_persistence_candidate.sql",
+      "bb10b32ec0186399ae10b1820541d4330aab500843cd0fcf2a82b4da515c2c5b"
+    ],
+    [
+      "011_authorization_trust_candidate.sql",
+      "7b9f5b15d2797c13bc6c30d04a08d49b5112a2545f264b543e86ffd5b303362a"
+    ],
+    [
+      "012_quota_v2_candidate.sql",
+      "6d32ff6a950e9e90c40a4c5e5892c783914847c0f518faab980f08764bc310a6"
+    ]
+  ],
+  "tables": [
+    {
+      "name": "growth_schema_migrations",
+      "columns": [
+        {
+          "name": "migration_id",
+          "definition": "VARCHAR(120) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "sha256",
+          "definition": "CHAR(64) NOT NULL"
+        },
+        {
+          "name": "applied_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "engine_version",
+          "definition": "VARCHAR(120) NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "migration_id"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_organizations",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "name",
+          "definition": "VARCHAR(200) NOT NULL"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_users",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "email",
+          "definition": "VARCHAR(320) NOT NULL UNIQUE"
+        },
+        {
+          "name": "password_hash",
+          "definition": "VARCHAR(255) NOT NULL"
+        },
+        {
+          "name": "disabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT TRUE"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "email",
+          "unique": true,
+          "columns": [
+            "email"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_memberships",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "user_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "role",
+          "definition": "ENUM('owner','admin','editor','viewer') NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id"
+          ],
+          "parent": "growth_organizations",
+          "parentColumns": [
+            "id"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "user_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_websites",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "domain",
+          "definition": "VARCHAR(253) NOT NULL"
+        },
+        {
+          "name": "platform",
+          "definition": "ENUM('wordpress','nextjs','react','static','custom') NOT NULL"
+        },
+        {
+          "name": "status",
+          "definition": "ENUM('draft','verifying','connected','auditing','active','paused','archived') NOT NULL DEFAULT 'draft'"
+        },
+        {
+          "name": "timezone",
+          "definition": "VARCHAR(80) NOT NULL DEFAULT 'UTC'"
+        },
+        {
+          "name": "verified_at",
+          "definition": "DATETIME NULL"
+        },
+        {
+          "name": "monthly_budget_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "automation_enabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        },
+        {
+          "name": "auto_publish_enabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_org_domain",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "domain"
+          ]
+        },
+        {
+          "name": "uq_org_site",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id"
+          ],
+          "parent": "growth_organizations",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_content_policies",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_type",
+          "definition": "VARCHAR(40) NOT NULL"
+        },
+        {
+          "name": "weekly_limit",
+          "definition": "INT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "monthly_budget_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "max_job_cost_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "enabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        },
+        {
+          "name": "auto_publish",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "website_id",
+            "content_type"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_organization_budgets",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "monthly_limit_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "globally_paused",
+          "definition": "BOOLEAN NOT NULL DEFAULT TRUE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id"
+          ],
+          "parent": "growth_organizations",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_ai_reservations",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_type",
+          "definition": "VARCHAR(40) NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "definition": "VARCHAR(200) NOT NULL"
+        },
+        {
+          "name": "week_start",
+          "definition": "DATE NOT NULL"
+        },
+        {
+          "name": "month_start",
+          "definition": "DATE NOT NULL"
+        },
+        {
+          "name": "requested_units",
+          "definition": "INT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "estimated_cost_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "actual_cost_minor",
+          "definition": "BIGINT UNSIGNED NULL"
+        },
+        {
+          "name": "status",
+          "definition": "ENUM('reserved','completed','cancelled') NOT NULL DEFAULT 'reserved'"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_org_idempotency",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_org_month",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "month_start"
+          ]
+        },
+        {
+          "name": "idx_site_month",
+          "unique": false,
+          "columns": [
+            "website_id",
+            "content_type",
+            "month_start"
+          ]
+        },
+        {
+          "name": "idx_site_week",
+          "unique": false,
+          "columns": [
+            "website_id",
+            "content_type",
+            "week_start"
+          ]
+        },
+        {
+          "name": "uq_reservation_scope",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "website_id",
+            "content_type"
+          ],
+          "parent": "growth_content_policies",
+          "parentColumns": [
+            "website_id",
+            "content_type"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_budget_incidents",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "reservation_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "incident_type",
+          "definition": "ENUM('COST_OVERRUN') NOT NULL"
+        },
+        {
+          "name": "estimated_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "actual_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_reservation_incident",
+          "unique": true,
+          "columns": [
+            "reservation_id",
+            "incident_type"
+          ]
+        },
+        {
+          "name": "idx_org_incident",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "created_at"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id"
+          ],
+          "parent": "growth_organizations",
+          "parentColumns": [
+            "id"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "reservation_id"
+          ],
+          "parent": "growth_ai_reservations",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_sessions",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "user_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "token_hash",
+          "definition": "CHAR(64) NOT NULL"
+        },
+        {
+          "name": "expires_at",
+          "definition": "DATETIME NOT NULL"
+        },
+        {
+          "name": "revoked_at",
+          "definition": "DATETIME NULL"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_session_token_hash",
+          "unique": true,
+          "columns": [
+            "token_hash"
+          ]
+        },
+        {
+          "name": "idx_session_user",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "expires_at"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "user_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_login_throttles",
+      "columns": [
+        {
+          "name": "account_key",
+          "definition": "CHAR(64) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "failed_attempts",
+          "definition": "INT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "locked_until",
+          "definition": "DATETIME NULL"
+        },
+        {
+          "name": "updated_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "account_key"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_installation_state",
+      "columns": [
+        {
+          "name": "singleton_id",
+          "definition": "TINYINT UNSIGNED NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "installed",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "singleton_id"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_approval_queue",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "title",
+          "definition": "VARCHAR(240) NOT NULL"
+        },
+        {
+          "name": "action_type",
+          "definition": "VARCHAR(60) NOT NULL"
+        },
+        {
+          "name": "status",
+          "definition": "ENUM('pending','approved','rejected','deferred') NOT NULL DEFAULT 'pending'"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        },
+        {
+          "name": "decided_at",
+          "definition": "DATETIME NULL"
+        },
+        {
+          "name": "decided_by",
+          "definition": "CHAR(36) NULL"
+        },
+        {
+          "name": "decision_note",
+          "definition": "VARCHAR(2000) NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_approval_scope",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "idx_approval_org_status",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "status",
+            "created_at"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "decided_by"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_approval_decisions",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "approval_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "actor_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "definition": "VARCHAR(128) NOT NULL"
+        },
+        {
+          "name": "decision",
+          "definition": "ENUM('approved','rejected','deferred') NOT NULL"
+        },
+        {
+          "name": "note",
+          "definition": "VARCHAR(2000) NULL"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "uq_org_decision_key",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_approval_history",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "approval_id",
+            "created_at"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "approval_id"
+          ],
+          "parent": "growth_approval_queue",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "actor_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_website_feature_audit",
+      "columns": [
+        {
+          "name": "id",
+          "definition": "CHAR(36) NOT NULL PRIMARY KEY"
+        },
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "actor_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "feature",
+          "definition": "ENUM('automation','auto_publish') NOT NULL"
+        },
+        {
+          "name": "enabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "idx_feature_audit_scope",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "created_at"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": null,
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "actor_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "inherited:utf8mb4_uca1400_ai_ci",
+      "rowFormat": "server default"
+    },
+    {
+      "name": "growth_content_records",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "stage",
+          "definition": "ENUM('proposed','researched','drafted','review_required','quality_passed','approved','scheduled','publication_unknown','published','attributed','cancelled') NOT NULL"
+        },
+        {
+          "name": "record_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_content_site",
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_content_events",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "event_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "actor_id",
+          "definition": "VARCHAR(128) NOT NULL"
+        },
+        {
+          "name": "event_kind",
+          "definition": "VARCHAR(40) NOT NULL"
+        },
+        {
+          "name": "occurred_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "record_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "event_id"
+          ]
+        },
+        {
+          "name": "uq_content_version",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "version"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_content_event_record",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id"
+          ],
+          "parent": "growth_content_records",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_connector_health",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "status",
+          "definition": "ENUM('unknown','disconnected','unavailable','verified') NOT NULL DEFAULT 'unknown'"
+        },
+        {
+          "name": "checked_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "expires_at",
+          "definition": "DATETIME(6) NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "channel"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_connector_site",
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_publication_claims",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "claim_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "reservation_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "status",
+          "definition": "ENUM('unknown','confirmed','absent') NOT NULL DEFAULT 'unknown'"
+        },
+        {
+          "name": "provider_id",
+          "definition": "VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL"
+        },
+        {
+          "name": "publication_url",
+          "definition": "VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL"
+        },
+        {
+          "name": "created_at",
+          "definition": "TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "channel"
+          ]
+        },
+        {
+          "name": "uq_claim_hash",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "claim_hash"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_claim_content",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id"
+          ],
+          "parent": "growth_content_records",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_claim_reservation",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id"
+          ],
+          "parent": "growth_ai_reservations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_publication_observations",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "issuer",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "event_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "payload_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "observation_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "issuer",
+            "event_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_observation_claim",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "channel"
+          ],
+          "parent": "growth_publication_claims",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "channel"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_publication_policy_revisions",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_type",
+          "definition": "VARCHAR(40) NOT NULL"
+        },
+        {
+          "name": "revision",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "revision_number",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "feature_enabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_type"
+          ]
+        },
+        {
+          "name": "fk_auth_policy_type_idx",
+          "unique": false,
+          "columns": [
+            "website_id",
+            "content_type"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_auth_policy_site",
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_auth_policy_type",
+          "columns": [
+            "website_id",
+            "content_type"
+          ],
+          "parent": "growth_content_policies",
+          "parentColumns": [
+            "website_id",
+            "content_type"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_publication_destinations",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "revision",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "revision_number",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "target",
+          "definition": "VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "enabled",
+          "definition": "BOOLEAN NOT NULL DEFAULT FALSE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "uq_auth_destination_channel",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_auth_destination_site",
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_connector_issuer_state",
+      "columns": [
+        {
+          "name": "issuer",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "key_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "revision",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "generation",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "revoked",
+          "definition": "BOOLEAN NOT NULL DEFAULT TRUE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "issuer",
+            "key_id"
+          ]
+        }
+      ],
+      "foreignKeys": [],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_connector_evidence_history",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "issuer",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "key_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "event_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "destination_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "sequence",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "previous_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL"
+        },
+        {
+          "name": "payload_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "probe_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "issuer",
+            "key_id",
+            "event_id"
+          ]
+        },
+        {
+          "name": "uq_probe_sequence",
+          "unique": true,
+          "columns": [
+            "issuer",
+            "key_id",
+            "sequence"
+          ]
+        },
+        {
+          "name": "uq_probe_hash",
+          "unique": true,
+          "columns": [
+            "issuer",
+            "key_id",
+            "event_id",
+            "payload_hash"
+          ]
+        },
+        {
+          "name": "fk_probe_destination_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "destination_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_probe_destination",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "destination_id"
+          ],
+          "parent": "growth_publication_destinations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_probe_issuer",
+          "columns": [
+            "issuer",
+            "key_id"
+          ],
+          "parent": "growth_connector_issuer_state",
+          "parentColumns": [
+            "issuer",
+            "key_id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_connector_attestations",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "destination_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "issuer",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "key_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "event_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "sequence",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "payload_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "signed_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "revoked_at",
+          "definition": "DATETIME(6) NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "destination_id"
+          ]
+        },
+        {
+          "name": "uq_current_issuer_key",
+          "unique": true,
+          "columns": [
+            "issuer",
+            "key_id"
+          ]
+        },
+        {
+          "name": "fk_attest_history_idx",
+          "unique": false,
+          "columns": [
+            "issuer",
+            "key_id",
+            "event_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_attest_destination",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "destination_id"
+          ],
+          "parent": "growth_publication_destinations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "channel",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_attest_history",
+          "columns": [
+            "issuer",
+            "key_id",
+            "event_id"
+          ],
+          "parent": "growth_connector_evidence_history",
+          "parentColumns": [
+            "issuer",
+            "key_id",
+            "event_id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_content_authorizations",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "content_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "content_version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "channel",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "approval_event_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "reservation_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "destination_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "approver_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "authorization_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "revoked_at",
+          "definition": "DATETIME(6) NULL"
+        },
+        {
+          "name": "consumed_at",
+          "definition": "DATETIME(6) NULL"
+        },
+        {
+          "name": "claim_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "uq_single_content_approval",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "approval_event_id",
+            "channel"
+          ]
+        },
+        {
+          "name": "uq_auth_source_scope",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id",
+            "content_id",
+            "approval_event_id",
+            "destination_id"
+          ]
+        },
+        {
+          "name": "uq_auth_claim_scope",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id",
+            "claim_hash"
+          ]
+        },
+        {
+          "name": "fk_auth_reservation_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id"
+          ]
+        },
+        {
+          "name": "fk_auth_destination_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "destination_id"
+          ]
+        },
+        {
+          "name": "fk_auth_approver_idx",
+          "unique": false,
+          "columns": [
+            "approver_id"
+          ]
+        },
+        {
+          "name": "fk_auth_claim_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "claim_hash"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_auth_content",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id"
+          ],
+          "parent": "growth_content_records",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_auth_approval_event",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "approval_event_id"
+          ],
+          "parent": "growth_content_events",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "event_id"
+          ]
+        },
+        {
+          "name": "fk_auth_reservation",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id"
+          ],
+          "parent": "growth_ai_reservations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_auth_destination",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "destination_id"
+          ],
+          "parent": "growth_publication_destinations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_auth_approver",
+          "columns": [
+            "approver_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        },
+        {
+          "name": "fk_auth_claim",
+          "columns": [
+            "organization_id",
+            "claim_hash"
+          ],
+          "parent": "growth_publication_claims",
+          "parentColumns": [
+            "organization_id",
+            "claim_hash"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_publication_authorization_events",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "authorization_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "request_key",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "actor_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "operation",
+          "definition": "ENUM('issue','revoke') NOT NULL"
+        },
+        {
+          "name": "occurred_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "authorization_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "request_key"
+          ]
+        },
+        {
+          "name": "idx_auth_event_scope",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id",
+            "occurred_at"
+          ]
+        },
+        {
+          "name": "fk_auth_event_actor_idx",
+          "unique": false,
+          "columns": [
+            "actor_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_auth_event_authorization",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id"
+          ],
+          "parent": "growth_content_authorizations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_auth_event_actor",
+          "columns": [
+            "actor_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_publication_authorization_uses",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "authorization_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "approval_decision_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "claim_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "actor_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "content_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "content_version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "destination_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "policy_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "connector_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "used_at",
+          "definition": "DATETIME(6) NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id"
+          ]
+        },
+        {
+          "name": "uq_approval_use",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id",
+            "approval_decision_id"
+          ]
+        },
+        {
+          "name": "fk_use_auth_source_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id",
+            "content_id",
+            "approval_decision_id",
+            "destination_id"
+          ]
+        },
+        {
+          "name": "fk_use_auth_claim_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id",
+            "claim_hash"
+          ]
+        },
+        {
+          "name": "fk_use_claim_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "claim_hash"
+          ]
+        },
+        {
+          "name": "fk_use_actor_idx",
+          "unique": false,
+          "columns": [
+            "actor_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_use_auth_source",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id",
+            "content_id",
+            "approval_decision_id",
+            "destination_id"
+          ],
+          "parent": "growth_content_authorizations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id",
+            "content_id",
+            "approval_event_id",
+            "destination_id"
+          ]
+        },
+        {
+          "name": "fk_use_auth_claim",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "authorization_id",
+            "claim_hash"
+          ],
+          "parent": "growth_content_authorizations",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id",
+            "claim_hash"
+          ]
+        },
+        {
+          "name": "fk_use_claim",
+          "columns": [
+            "organization_id",
+            "claim_hash"
+          ],
+          "parent": "growth_publication_claims",
+          "parentColumns": [
+            "organization_id",
+            "claim_hash"
+          ]
+        },
+        {
+          "name": "fk_use_actor",
+          "columns": [
+            "actor_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_quota_reservations_v2",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "content_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL"
+        },
+        {
+          "name": "request_key",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "content_type",
+          "definition": "VARCHAR(40) NOT NULL"
+        },
+        {
+          "name": "operation",
+          "definition": "ENUM('generation','publication') NOT NULL"
+        },
+        {
+          "name": "currency",
+          "definition": "CHAR(3) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "timezone_name",
+          "definition": "VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "timezone_rules",
+          "definition": "VARCHAR(80) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "local_week",
+          "definition": "DATE NOT NULL"
+        },
+        {
+          "name": "week_start_utc",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "week_end_utc",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "portfolio_month",
+          "definition": "DATE NOT NULL"
+        },
+        {
+          "name": "reserved_units",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "charged_units",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "estimated_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "charged_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "refunded_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "state",
+          "definition": "ENUM('reserved','executing','completed','failed','cancelled','expired') NOT NULL DEFAULT 'reserved'"
+        },
+        {
+          "name": "expires_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "started_at",
+          "definition": "DATETIME(6) NULL"
+        },
+        {
+          "name": "settled_at",
+          "definition": "DATETIME(6) NULL"
+        },
+        {
+          "name": "reservation_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "uq_quota_request",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "request_key"
+          ]
+        },
+        {
+          "name": "uq_quota_currency_month",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id",
+            "currency",
+            "portfolio_month"
+          ]
+        },
+        {
+          "name": "idx_quota_week",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_type",
+            "week_start_utc",
+            "state"
+          ]
+        },
+        {
+          "name": "idx_quota_month",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "portfolio_month",
+            "currency",
+            "state"
+          ]
+        },
+        {
+          "name": "fk_quota_content_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id"
+          ]
+        },
+        {
+          "name": "fk_quota_policy_idx",
+          "unique": false,
+          "columns": [
+            "website_id",
+            "content_type"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_quota_site",
+          "columns": [
+            "organization_id",
+            "website_id"
+          ],
+          "parent": "growth_websites",
+          "parentColumns": [
+            "organization_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_quota_policy",
+          "columns": [
+            "website_id",
+            "content_type"
+          ],
+          "parent": "growth_content_policies",
+          "parentColumns": [
+            "website_id",
+            "content_type"
+          ]
+        },
+        {
+          "name": "fk_quota_content",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "content_id"
+          ],
+          "parent": "growth_content_records",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_quota_events_v2",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "reservation_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "request_key",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "expected_version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "resulting_version",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "operation",
+          "definition": "ENUM('reserve','start','complete','fail','cancel','expire','charge','refund','settle') NOT NULL"
+        },
+        {
+          "name": "occurred_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "actor_kind",
+          "definition": "ENUM('user','service') NOT NULL"
+        },
+        {
+          "name": "actor_id",
+          "definition": "CHAR(36) NULL"
+        },
+        {
+          "name": "service_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL"
+        },
+        {
+          "name": "authorization_revision",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "policy_revision",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "authorized_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "authorization_expires_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "payload_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "event_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "request_key"
+          ]
+        },
+        {
+          "name": "uq_quota_event_version",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "resulting_version"
+          ]
+        },
+        {
+          "name": "fk_quota_event_actor_idx",
+          "unique": false,
+          "columns": [
+            "actor_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_quota_event_reservation",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id"
+          ],
+          "parent": "growth_quota_reservations_v2",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "fk_quota_event_actor",
+          "columns": [
+            "actor_id"
+          ],
+          "parent": "growth_users",
+          "parentColumns": [
+            "id"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    },
+    {
+      "name": "growth_quota_postings_v2",
+      "columns": [
+        {
+          "name": "organization_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "website_id",
+          "definition": "CHAR(36) NOT NULL"
+        },
+        {
+          "name": "reservation_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "issuer",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "account_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "provider_event_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "kind",
+          "definition": "ENUM('charge','refund','settlement') NOT NULL"
+        },
+        {
+          "name": "original_charge_id",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL"
+        },
+        {
+          "name": "currency",
+          "definition": "CHAR(3) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "portfolio_month",
+          "definition": "DATE NOT NULL"
+        },
+        {
+          "name": "amount_minor",
+          "definition": "BIGINT UNSIGNED NOT NULL"
+        },
+        {
+          "name": "occurred_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "verified_at",
+          "definition": "DATETIME(6) NOT NULL"
+        },
+        {
+          "name": "key_revision",
+          "definition": "VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        },
+        {
+          "name": "payload_hash",
+          "definition": "CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL"
+        },
+        {
+          "name": "evidence_json",
+          "definition": "LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "PRIMARY",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "id"
+          ]
+        },
+        {
+          "name": "uq_quota_charge_scope",
+          "unique": true,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "id",
+            "currency",
+            "portfolio_month"
+          ]
+        },
+        {
+          "name": "uq_quota_provider_event",
+          "unique": true,
+          "columns": [
+            "issuer",
+            "account_id",
+            "provider_event_id"
+          ]
+        },
+        {
+          "name": "fk_quota_posting_reservation_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "currency",
+            "portfolio_month"
+          ]
+        },
+        {
+          "name": "fk_quota_original_charge_idx",
+          "unique": false,
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "original_charge_id",
+            "currency",
+            "portfolio_month"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_quota_posting_reservation",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "currency",
+            "portfolio_month"
+          ],
+          "parent": "growth_quota_reservations_v2",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "id",
+            "currency",
+            "portfolio_month"
+          ]
+        },
+        {
+          "name": "fk_quota_original_charge",
+          "columns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "original_charge_id",
+            "currency",
+            "portfolio_month"
+          ],
+          "parent": "growth_quota_postings_v2",
+          "parentColumns": [
+            "organization_id",
+            "website_id",
+            "reservation_id",
+            "id",
+            "currency",
+            "portfolio_month"
+          ]
+        }
+      ],
+      "collation": "utf8mb4_uca1400_ai_ci",
+      "rowFormat": "DYNAMIC"
+    }
+  ],
+  "triggers": [
+    {
+      "name": "approval_audit_update_guard",
+      "event": "UPDATE",
+      "table": "growth_approval_decisions",
+      "sha256": "cea18b8ecedfc93572bc0aed45a2fe30f5ca3593e7b0460ed8ba0d81245fb811"
+    },
+    {
+      "name": "approval_audit_delete_guard",
+      "event": "DELETE",
+      "table": "growth_approval_decisions",
+      "sha256": "75cb7103bd4260e18989274c9e5d53314de7c716079f8c7fb572caccc3d6fc17"
+    },
+    {
+      "name": "growth_feature_audit_no_update",
+      "event": "UPDATE",
+      "table": "growth_website_feature_audit",
+      "sha256": "8d24c1b087c1b2f063e07776146909ecf2e8ca560aafe636913e0642b020e4dd"
+    },
+    {
+      "name": "growth_feature_audit_no_delete",
+      "event": "DELETE",
+      "table": "growth_website_feature_audit",
+      "sha256": "9eba0bdf564131044a0d4703df1be34e812094d9047ba3a86f4b9394142976a3"
+    },
+    {
+      "name": "growth_content_events_no_update",
+      "event": "UPDATE",
+      "table": "growth_content_events",
+      "sha256": "93572187d52b5ec2f0a6917286882819b26354981cccb722ac8d425d689b89bc"
+    },
+    {
+      "name": "growth_content_events_no_delete",
+      "event": "DELETE",
+      "table": "growth_content_events",
+      "sha256": "6fb60849881eef37e93fe4f16f734d44141df84e23b3ce83d63a1b40033fd623"
+    },
+    {
+      "name": "growth_publication_observations_no_update",
+      "event": "UPDATE",
+      "table": "growth_publication_observations",
+      "sha256": "15fd46432e67c5ed0fc4ca78fff48bbece676f98121e0730c58ef7146c8d7cad"
+    },
+    {
+      "name": "growth_publication_observations_no_delete",
+      "event": "DELETE",
+      "table": "growth_publication_observations",
+      "sha256": "95b7e0909e0e3e68e9d6d449f7f6355bb3247f48c7bc260061ad7f67433f5151"
+    },
+    {
+      "name": "growth_publication_claim_insert_guard",
+      "event": "INSERT",
+      "table": "growth_publication_claims",
+      "sha256": "5c1b6f72501577ed7cf4b89e27fb403277eb484d4c06d7d4eef160ac30e31465"
+    },
+    {
+      "name": "growth_publication_claim_update_guard",
+      "event": "UPDATE",
+      "table": "growth_publication_claims",
+      "sha256": "a6b251b1135d106f7c976c79d7dd8b13c4f8d2d2b66ce768f9eb329184d8d1cd"
+    },
+    {
+      "name": "growth_publication_claim_no_delete",
+      "event": "DELETE",
+      "table": "growth_publication_claims",
+      "sha256": "b5003c2f26f7fcf0abf721c3145dbb557ee1cc9065e124547fa232288ef0426e"
+    },
+    {
+      "name": "growth_probe_history_update",
+      "event": "UPDATE",
+      "table": "growth_connector_evidence_history",
+      "sha256": "1d53ffadc59896ef1041e4020d5243609c54de4399b79c6f19281805eadf3083"
+    },
+    {
+      "name": "growth_probe_history_delete",
+      "event": "DELETE",
+      "table": "growth_connector_evidence_history",
+      "sha256": "5f2b0a737d8397db4d9de20832c9f7261df4b1de4058a9bed7aaadef0e5232fd"
+    },
+    {
+      "name": "growth_auth_events_update",
+      "event": "UPDATE",
+      "table": "growth_publication_authorization_events",
+      "sha256": "ed28e02557513a4d9ae62b287c2ea6f932dfbd88aad587f8a2621e1e28a46936"
+    },
+    {
+      "name": "growth_auth_events_delete",
+      "event": "DELETE",
+      "table": "growth_publication_authorization_events",
+      "sha256": "83c9576f41ed071f3e9121b1282b81d3d8c5f09991e83b2a785ee638a5d28391"
+    },
+    {
+      "name": "growth_auth_uses_update",
+      "event": "UPDATE",
+      "table": "growth_publication_authorization_uses",
+      "sha256": "369f352ccf9804c78c3e0948828aa41cff3908545f0453bf3a7853b0999d6be7"
+    },
+    {
+      "name": "growth_auth_uses_delete",
+      "event": "DELETE",
+      "table": "growth_publication_authorization_uses",
+      "sha256": "368949db6bf4f4a4df4620696907a27b4dae03d8b03479658be982e95e78c3fa"
+    },
+    {
+      "name": "growth_auth_insert_guard",
+      "event": "INSERT",
+      "table": "growth_content_authorizations",
+      "sha256": "05b795b0fe333615267aa2f0da19d2088a0f107c9d1c484cbaea851abcf19215"
+    },
+    {
+      "name": "growth_auth_update_guard",
+      "event": "UPDATE",
+      "table": "growth_content_authorizations",
+      "sha256": "bca6ce51cef73ef6a347615652ffcb5157091356f5c12dec8ba1d9e122b97046"
+    },
+    {
+      "name": "growth_auth_no_delete",
+      "event": "DELETE",
+      "table": "growth_content_authorizations",
+      "sha256": "d6fc1e4767fd80e855a38a61fed65041b10f2f1f7c61b27d07176c5a42e2d16b"
+    },
+    {
+      "name": "growth_auth_policy_update_guard",
+      "event": "UPDATE",
+      "table": "growth_publication_policy_revisions",
+      "sha256": "db389085ed1efa3d766744e17434f2431299a9c00bab11e854ef64010c506f35"
+    },
+    {
+      "name": "growth_auth_policy_no_delete",
+      "event": "DELETE",
+      "table": "growth_publication_policy_revisions",
+      "sha256": "0e131263d6212817b66736e471f62a34b0785fedbaebc103d8087c6a649b17a5"
+    },
+    {
+      "name": "growth_auth_destination_update_guard",
+      "event": "UPDATE",
+      "table": "growth_publication_destinations",
+      "sha256": "6a376bc2ae71d8a7619b1e942b1d2098d2f25fac33c829a06f7faa0fdea41fda"
+    },
+    {
+      "name": "growth_auth_destination_no_delete",
+      "event": "DELETE",
+      "table": "growth_publication_destinations",
+      "sha256": "02b86e2a680dc8dc05bd085189f8b461a2d09b7b8de7f63f42ffab9f5288895b"
+    },
+    {
+      "name": "growth_connector_trust_update_guard",
+      "event": "UPDATE",
+      "table": "growth_connector_issuer_state",
+      "sha256": "08e39216b36b99a8b1438b417c35a37359a4fc88b8d869f656e3886789299983"
+    },
+    {
+      "name": "growth_connector_trust_no_delete",
+      "event": "DELETE",
+      "table": "growth_connector_issuer_state",
+      "sha256": "022c64c17aa55de04c83dc970af5873e441d9999a6b32c2a9f5b8512d1c7a38f"
+    },
+    {
+      "name": "growth_connector_pointer_update_guard",
+      "event": "UPDATE",
+      "table": "growth_connector_attestations",
+      "sha256": "b7b412c20c70ec81e0fb82cdd90ac6e81f13b559368b5cd0caf440ad35af10b7"
+    },
+    {
+      "name": "growth_connector_pointer_no_delete",
+      "event": "DELETE",
+      "table": "growth_connector_attestations",
+      "sha256": "638d068aadf43a9ebbd955297749c1e13678830aa272cec1f8e255a3abd40ede"
+    },
+    {
+      "name": "growth_quota_events_update",
+      "event": "UPDATE",
+      "table": "growth_quota_events_v2",
+      "sha256": "d32e596529196d7618ffe0115ebfd9348f615d260bb18723de8e8a466177c347"
+    },
+    {
+      "name": "growth_quota_events_delete",
+      "event": "DELETE",
+      "table": "growth_quota_events_v2",
+      "sha256": "0e5be5ac601906572eb3c8a76df532767ed3bffb509d1a66012fb58ab4d51825"
+    },
+    {
+      "name": "growth_quota_postings_update",
+      "event": "UPDATE",
+      "table": "growth_quota_postings_v2",
+      "sha256": "270f6b06da3ddd0a4d9099155ed728bd36fa0715bbf9d5511d8db2247ced25f1"
+    },
+    {
+      "name": "growth_quota_postings_delete",
+      "event": "DELETE",
+      "table": "growth_quota_postings_v2",
+      "sha256": "0ea456b59282aa5d08451cb649a196d87049a8a828af755027c8a15c0af714a7"
+    },
+    {
+      "name": "growth_quota_insert_guard",
+      "event": "INSERT",
+      "table": "growth_quota_reservations_v2",
+      "sha256": "bdf0ffded66287fe4b40814436cfd9151cb94e1927425f3da34180d7cfe7eddc"
+    },
+    {
+      "name": "growth_quota_update_guard",
+      "event": "UPDATE",
+      "table": "growth_quota_reservations_v2",
+      "sha256": "499bd22c669ca320e1cbb4f80b3c05f7072b672b7fd53dc5c123326af4e8210b"
+    },
+    {
+      "name": "growth_quota_no_delete",
+      "event": "DELETE",
+      "table": "growth_quota_reservations_v2",
+      "sha256": "d55d8bc2b3265ddb420c2cd02aca24bff39a209d682e7d4310ccbaa770ef0c27"
+    }
+  ],
+  "fkColumns": 114,
+  "contractHash": "5b810bd2981ee4ef527e35de6704f9c0ce3969138541009023d43b25563a9b62",
+  "runtimeCertified": false,
+  "installationAuthorized": false
+}
