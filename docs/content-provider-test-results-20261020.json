@@ -1,0 +1,214 @@
+{
+  "format": "growthos-content-provider-offline-evidence-v1",
+  "runtime": "v24.19.0",
+  "production": "HOLD / NO-GO",
+  "sourceHead": "8b0e2d9eb52eb184eb9ecc5ba5b2521eb0acf71d",
+  "unitFinal": {
+    "total": 420,
+    "pass": 419,
+    "skip": 1,
+    "fail": 0
+  },
+  "newFocusedFinal": {
+    "total": 71,
+    "pass": 71,
+    "skip": 0,
+    "fail": 0
+  },
+  "liveMariaDBExecuted": false,
+  "liveProviderCalls": false,
+  "mutationRegression": {
+    "command": "node --import=tsx --test --test-name-pattern=queued reconciliation snapshots src/core/__tests__/safe-publication-workflow.test.ts",
+    "controlledMutantExitCode": 1,
+    "logSha256": "a3d9718b87e333175010d7ce0f121046bdf4b3480c8ceaf0dc2c7389c26a1861",
+    "fixedInFinalFocusedSuite": true
+  },
+  "runs": [
+    {
+      "command": "node --version",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/00.log",
+      "logSha256": "b7677d3ec37ee1897ba07dc2cfe8292fe421c9ac93396cca5bbece486d1a2a41"
+    },
+    {
+      "command": "node --import=tsx --test src/core/__tests__/content-factory-orchestration.test.ts src/core/__tests__/content-originality.test.ts src/core/__tests__/safe-publication-workflow.test.ts",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/01.log",
+      "logSha256": "ba34b2c7db8b5b7c68d4c98118fb8e68cd022a6aacf8294963af051eb77336a7"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/02.log",
+      "logSha256": "2e147234e87e2673373b0cc140ea3bc8f59c04e86212ec249799eeddbaa908e5"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/03.log",
+      "logSha256": "030f96e3d7f02595fa125240e5b8d8a3a19a8f310021de68872a54f443e35fd1"
+    },
+    {
+      "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/04.log",
+      "logSha256": "eb8328d35350f6b86142bf85c15aaac9d5c9d5ed37365766d97d82cc437c4342"
+    },
+    {
+      "command": "npm run test:security:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/05.log",
+      "logSha256": "c421835971e61130fbe630d226421e0af50af271b089b279a6f81218a525fd10"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/06.log",
+      "logSha256": "d38c212643654f5b6c5f4a951215f6b158feb34eee1e0fd2e6cdc95f4a1b6ddc"
+    },
+    {
+      "command": "npm run test:auth-cookies:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/07.log",
+      "logSha256": "3e29ccecc1ef518079ce3cca315161a127683173fcf0dc9e2e15406c40f33b8a"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/08.log",
+      "logSha256": "f21f53009a3ed7db2b58505e51bbe6209a9f54f2663ebb1770b9326e1307c722"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/09.log",
+      "logSha256": "1d9fbdb4a43f080ea81493f8564b530c3d91397427a7957d3e4f67c2d162475c"
+    },
+    {
+      "command": "node scripts/test-governance-route-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/10.log",
+      "logSha256": "38d8415102a11f464fd11eaa4a58c6b22eb523cbd98546ad5e78d64035e5d507"
+    },
+    {
+      "command": "node scripts/test-growth-engine-db-boundary-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/11.log",
+      "logSha256": "58cf37637c88cc390f5c1425ff33a1e6611b5fc64585fb49f15a5da3f501de6f"
+    },
+    {
+      "command": "node scripts/verify-production-migration-package.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/12.log",
+      "logSha256": "b0156ab76588cde4f0630365fcb2623afc409f19f085100c6c59c7b9a87c628b"
+    },
+    {
+      "command": "node scripts/verify-authorization-trust-proposal.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/13.log",
+      "logSha256": "b5815901c086b3d3df8f8f380f67bcf7b486f72d37ab51bb4b2ad8a00dc338a7"
+    },
+    {
+      "command": "npm run migration:plan",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/14.log",
+      "logSha256": "dd3497cb6177057bbd87ef5b0c3c187a11ebe21f7f69288ff0fe2d361474c1ff"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/15.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --exit-code 8b0e2d9eb52eb184eb9ecc5ba5b2521eb0acf71d -- database scripts/mariadb-migration-runner.cjs scripts/disposable-dump-guard.cjs scripts/disposable-backup-restore-rehearsal-candidate.cjs scripts/production-migration-executor-candidate.cjs src/server/connector-trust.ts src/core/quota-settlement.ts src/core/quota-periods.ts src/server/mysql-publication-claim-store.ts src/server/mysql-publication-authorization.ts src/server/publication-evidence.ts .github/workflows staging",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/16.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "node --import=tsx --test src/core/__tests__/content-factory-orchestration.test.ts src/core/__tests__/content-originality.test.ts src/core/__tests__/safe-publication-workflow.test.ts",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-00.log",
+      "logSha256": "1376172c220145996b0ee703cce2712adb80fc5fc96405dd20704b13cf3a2804"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-01.log",
+      "logSha256": "14dbfc57d709a30ca15726140170f6f376258d0aa8a3d9533990f3e4d755dad0"
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-02.log",
+      "logSha256": "030f96e3d7f02595fa125240e5b8d8a3a19a8f310021de68872a54f443e35fd1"
+    },
+    {
+      "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-03.log",
+      "logSha256": "e468a8449f7118718b7df1c60b5841815e9ff5cba5497e6c16e083b770bddb84"
+    },
+    {
+      "command": "npm run test:security:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-04.log",
+      "logSha256": "c421835971e61130fbe630d226421e0af50af271b089b279a6f81218a525fd10"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-05.log",
+      "logSha256": "d38c212643654f5b6c5f4a951215f6b158feb34eee1e0fd2e6cdc95f4a1b6ddc"
+    },
+    {
+      "command": "npm run test:auth-cookies:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-06.log",
+      "logSha256": "3e29ccecc1ef518079ce3cca315161a127683173fcf0dc9e2e15406c40f33b8a"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-07.log",
+      "logSha256": "f21f53009a3ed7db2b58505e51bbe6209a9f54f2663ebb1770b9326e1307c722"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-08.log",
+      "logSha256": "1d9fbdb4a43f080ea81493f8564b530c3d91397427a7957d3e4f67c2d162475c"
+    },
+    {
+      "command": "node scripts/test-governance-route-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-09.log",
+      "logSha256": "38d8415102a11f464fd11eaa4a58c6b22eb523cbd98546ad5e78d64035e5d507"
+    },
+    {
+      "command": "node scripts/test-growth-engine-db-boundary-mocked.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-10.log",
+      "logSha256": "58cf37637c88cc390f5c1425ff33a1e6611b5fc64585fb49f15a5da3f501de6f"
+    },
+    {
+      "command": "node scripts/verify-production-migration-package.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-11.log",
+      "logSha256": "b0156ab76588cde4f0630365fcb2623afc409f19f085100c6c59c7b9a87c628b"
+    },
+    {
+      "command": "node scripts/verify-authorization-trust-proposal.cjs",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-12.log",
+      "logSha256": "b5815901c086b3d3df8f8f380f67bcf7b486f72d37ab51bb4b2ad8a00dc338a7"
+    },
+    {
+      "command": "npm run migration:plan",
+      "exitCode": 0,
+      "log": "/tmp/growthos-content-provider-evidence/final-13.log",
+      "logSha256": "dd3497cb6177057bbd87ef5b0c3c187a11ebe21f7f69288ff0fe2d361474c1ff"
+    }
+  ]
+}
