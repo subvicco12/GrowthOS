@@ -27,6 +27,12 @@ export class ConnectorEvidenceVerifier {
     this.issuers = issuers.map(i => ({ ...i, secret: Buffer.from(i.secret) }));
   }
   verify(input: SignedConnectorAttestation, destination: PublicationDestination, current: CurrentConnectorTrust, now: number) {
+    return this.check(input,destination,current,now,true);
+  }
+  verifyProbe(input: SignedConnectorAttestation, destination: PublicationDestination, current: CurrentConnectorTrust, now: number) {
+    return this.check(input,destination,current,now,false);
+  }
+  private check(input: SignedConnectorAttestation, destination: PublicationDestination, current: CurrentConnectorTrust, now: number, publishing: boolean) {
     const parsed = evidenceSchema.safeParse(input?.evidence);
     if (!parsed.success || typeof input?.signature !== 'string' || !/^[a-f0-9]{64}$/.test(input.signature)) throw Error('CONNECTOR_EVIDENCE_INVALID');
     const e = parsed.data, issuer = this.issuers.find(i => i.id === e.issuer && i.keyId === e.keyId);
@@ -38,7 +44,7 @@ export class ConnectorEvidenceVerifier {
     if (!Number.isFinite(now) || checked > now || expires <= now || expires <= checked || expires - checked > 300000) throw Error('CONNECTOR_EVIDENCE_EXPIRED');
     const payload = connectorEvidencePayload(e), expected = createHmac('sha256',issuer.secret).update(payload).digest();
     if (!timingSafeEqual(expected,Buffer.from(input.signature,'hex'))) throw Error('CONNECTOR_SIGNATURE_INVALID');
-    if (!destination.enabled || e.status !== 'verified' || !e.capabilities.includes('publish') || new Set(e.capabilities).size !== e.capabilities.length) throw Error('CONNECTOR_NOT_PUBLISH_VERIFIED');
+    if (!destination.enabled || new Set(e.capabilities).size !== e.capabilities.length || (publishing && (e.status !== 'verified' || !e.capabilities.includes('publish')))) throw Error('CONNECTOR_NOT_PUBLISH_VERIFIED');
     return { evidence:e, payloadHash:createHash('sha256').update(payload).digest('hex') };
   }
 }

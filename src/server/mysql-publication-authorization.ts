@@ -1,3 +1,4 @@
+import type { ConnectorCheckpointVerifier } from './connector-trust';
 import type { PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import type { ContentRecord } from '../core/content-lifecycle';
 import type { PublicationClaim } from '../core/publication-handoff';
@@ -8,19 +9,28 @@ import { ConnectorEvidenceVerifier, type SignedConnectorAttestation } from './co
 type Row = RowDataPacket & Record<string, unknown>;
 const json = (value: unknown): unknown => typeof value === 'string' ? JSON.parse(value) : value;
 const iso = (value: unknown) => value instanceof Date ? value.toISOString() : String(value);
+export interface PublicationExecutionGuard {
+  check(connection:PoolConnection,authorization:PublicationAuthorization,now:number):Promise<void>;
+}
 export interface PublicationAuthorizationReceipt {
-  authorization: PublicationAuthorization; requestorId: string; connectorHash: string; checkedAt: number; expiresAt: number;
+  authorization: PublicationAuthorization; requestorId: string; connectorHash: string; checkedAt: number; expiresAt: number; recheck: (at?:number) => Promise<void>;
 }
 /** No pool, environment, provider or key defaults. Uses the caller's existing locked transaction. */
 export class MySQLPublicationAuthorization {
-  constructor(private readonly connectorVerifier = new ConnectorEvidenceVerifier()) {}
+  constructor(private readonly connectorVerifier = new ConnectorEvidenceVerifier(), private readonly checkpoint?: ConnectorCheckpointVerifier, private readonly executionGuard?:PublicationExecutionGuard) {}
   async authorize(connection: PoolConnection, claim: PublicationClaim, record: ContentRecord,
     switches: Omit<PublicationPolicySnapshot,'revision'|'featureEnabled'>, now: number): Promise<PublicationAuthorizationReceipt> {
+    return this.check(connection,claim,record,switches,now);
+  }
+  async inspectForIssuance(connection: PoolConnection, claim: PublicationClaim, record: ContentRecord, switches: Omit<PublicationPolicySnapshot,'revision'|'featureEnabled'>, now: number, candidate: PublicationAuthorization): Promise<PublicationAuthorizationReceipt> {
+    return this.check(connection,claim,record,switches,now,candidate);
+  }
+  private async check(connection: PoolConnection, claim: PublicationClaim, record: ContentRecord, switches: Omit<PublicationPolicySnapshot,'revision'|'featureEnabled'>, now: number, candidate?: PublicationAuthorization): Promise<PublicationAuthorizationReceipt> {
     const request = publicationAuthorizationRequestSchema.parse(claim.authorization);
     const [sessions] = await connection.execute<Row[]>(
       'SELECT s.user_id,s.expires_at,s.revoked_at,u.disabled FROM growth_sessions s JOIN growth_users u ON u.id=s.user_id WHERE s.token_hash=? FOR UPDATE', [request.sessionTokenHash]);
     if (sessions.length !== 1 || Number(sessions[0].disabled) !== 0 || sessions[0].revoked_at !== null || !Number.isFinite(Date.parse(iso(sessions[0].expires_at))) || Date.parse(iso(sessions[0].expires_at)) <= now) throw Error('PUBLICATION_SESSION_DENIED');
-    const [authorizations] = await connection.execute<Row[]>(
+    const [authorizations] = candidate ? [[{authorization_json:candidate,revoked_at:null,consumed_at:null}]] : await connection.execute<Row[]>(
       'SELECT authorization_json,revoked_at,consumed_at FROM growth_content_authorizations WHERE organization_id=? AND website_id=? AND id=? FOR UPDATE',
       [claim.organizationId,claim.websiteId,request.authorizationId]);
     if (authorizations.length !== 1 || authorizations[0].revoked_at !== null || authorizations[0].consumed_at !== null) throw Error('PUBLICATION_APPROVAL_MISSING_REVOKED_OR_USED');
@@ -67,10 +77,20 @@ export class MySQLPublicationAuthorization {
       'SELECT revision,revoked FROM growth_connector_issuer_state WHERE issuer=? AND key_id=? FOR UPDATE', [signed.evidence.issuer,signed.evidence.keyId]);
     if (trust.length !== 1) throw Error('CONNECTOR_TRUST_UNAVAILABLE');
     const verified = this.connectorVerifier.verify(signed,destination,{ issuer:signed.evidence.issuer,keyId:signed.evidence.keyId,revision:String(trust[0].revision),revoked:Number(trust[0].revoked) !== 0 },now);
-    return { authorization:approved,requestorId,connectorHash:verified.payloadHash,checkedAt:now,expiresAt:Math.min(Date.parse(iso(sessions[0].expires_at)),Date.parse(approved.expiresAt),Date.parse(verified.evidence.expiresAt)) };
+    if(!this.checkpoint)throw Error('CONNECTOR_CHECKPOINT_UNAVAILABLE');
+    const trustSnapshot={issuer:signed.evidence.issuer,keyId:signed.evidence.keyId,revision:String(trust[0].revision),revoked:Number(trust[0].revoked)!==0};
+    const recheck=async(at=now)=>{
+      if(!Number.isFinite(at)||at<now)throw Error('PUBLICATION_AUTHORIZATION_EXPIRED');
+      await this.checkpoint!.assertCurrent({signed,payloadHash:verified.payloadHash,trust:trustSnapshot});
+      if(!this.executionGuard)throw Error('PUBLICATION_EXECUTION_GATE_UNAVAILABLE');
+      await this.executionGuard.check(connection,approved,at);
+    };
+    await recheck();
+    return { recheck, authorization:approved,requestorId,connectorHash:verified.payloadHash,checkedAt:now,expiresAt:Math.min(Date.parse(iso(sessions[0].expires_at)),Date.parse(approved.expiresAt),Date.parse(verified.evidence.expiresAt)) };
   }
   async consume(connection: PoolConnection, receipt: PublicationAuthorizationReceipt, claimHash: string, now: number): Promise<void> {
     if (!Number.isFinite(now) || now < receipt.checkedAt || now >= receipt.expiresAt) throw Error('PUBLICATION_AUTHORIZATION_EXPIRED');
+    await receipt.recheck(now);
     const a = receipt.authorization;
     const [updated] = await connection.execute<ResultSetHeader>(
       'UPDATE growth_content_authorizations SET consumed_at=?,claim_hash=? WHERE organization_id=? AND website_id=? AND id=? AND consumed_at IS NULL AND revoked_at IS NULL',

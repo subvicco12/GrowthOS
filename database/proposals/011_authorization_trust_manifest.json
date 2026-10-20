@@ -1,0 +1,659 @@
+{
+  "format": "growthos-authorization-trust-review-v1",
+  "requires010Sha256": "bb10b32ec0186399ae10b1820541d4330aab500843cd0fcf2a82b4da515c2c5b",
+  "sha256": "7b9f5b15d2797c13bc6c30d04a08d49b5112a2545f264b543e86ffd5b303362a",
+  "inventory": {
+    "tables": [
+      "growth_publication_policy_revisions",
+      "growth_publication_destinations",
+      "growth_connector_issuer_state",
+      "growth_connector_evidence_history",
+      "growth_connector_attestations",
+      "growth_content_authorizations",
+      "growth_publication_authorization_events",
+      "growth_publication_authorization_uses"
+    ],
+    "triggers": [
+      {
+        "name": "growth_probe_history_update",
+        "event": "UPDATE",
+        "table": "growth_connector_evidence_history"
+      },
+      {
+        "name": "growth_probe_history_delete",
+        "event": "DELETE",
+        "table": "growth_connector_evidence_history"
+      },
+      {
+        "name": "growth_auth_events_update",
+        "event": "UPDATE",
+        "table": "growth_publication_authorization_events"
+      },
+      {
+        "name": "growth_auth_events_delete",
+        "event": "DELETE",
+        "table": "growth_publication_authorization_events"
+      },
+      {
+        "name": "growth_auth_uses_update",
+        "event": "UPDATE",
+        "table": "growth_publication_authorization_uses"
+      },
+      {
+        "name": "growth_auth_uses_delete",
+        "event": "DELETE",
+        "table": "growth_publication_authorization_uses"
+      },
+      {
+        "name": "growth_auth_insert_guard",
+        "event": "INSERT",
+        "table": "growth_content_authorizations"
+      },
+      {
+        "name": "growth_auth_update_guard",
+        "event": "UPDATE",
+        "table": "growth_content_authorizations"
+      },
+      {
+        "name": "growth_auth_no_delete",
+        "event": "DELETE",
+        "table": "growth_content_authorizations"
+      },
+      {
+        "name": "growth_auth_policy_update_guard",
+        "event": "UPDATE",
+        "table": "growth_publication_policy_revisions"
+      },
+      {
+        "name": "growth_auth_policy_no_delete",
+        "event": "DELETE",
+        "table": "growth_publication_policy_revisions"
+      },
+      {
+        "name": "growth_auth_destination_update_guard",
+        "event": "UPDATE",
+        "table": "growth_publication_destinations"
+      },
+      {
+        "name": "growth_auth_destination_no_delete",
+        "event": "DELETE",
+        "table": "growth_publication_destinations"
+      },
+      {
+        "name": "growth_connector_trust_update_guard",
+        "event": "UPDATE",
+        "table": "growth_connector_issuer_state"
+      },
+      {
+        "name": "growth_connector_trust_no_delete",
+        "event": "DELETE",
+        "table": "growth_connector_issuer_state"
+      },
+      {
+        "name": "growth_connector_pointer_update_guard",
+        "event": "UPDATE",
+        "table": "growth_connector_attestations"
+      },
+      {
+        "name": "growth_connector_pointer_no_delete",
+        "event": "DELETE",
+        "table": "growth_connector_attestations"
+      }
+    ],
+    "foreignKeys": [
+      {
+        "name": "fk_auth_policy_site",
+        "columns": [
+          "organization_id",
+          "website_id"
+        ],
+        "parent": "growth_websites",
+        "parentColumns": [
+          "organization_id",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_auth_policy_type",
+        "columns": [
+          "website_id",
+          "content_type"
+        ],
+        "parent": "growth_content_policies",
+        "parentColumns": [
+          "website_id",
+          "content_type"
+        ]
+      },
+      {
+        "name": "fk_auth_destination_site",
+        "columns": [
+          "organization_id",
+          "website_id"
+        ],
+        "parent": "growth_websites",
+        "parentColumns": [
+          "organization_id",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_probe_destination",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "destination_id"
+        ],
+        "parent": "growth_publication_destinations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_probe_issuer",
+        "columns": [
+          "issuer",
+          "key_id"
+        ],
+        "parent": "growth_connector_issuer_state",
+        "parentColumns": [
+          "issuer",
+          "key_id"
+        ]
+      },
+      {
+        "name": "fk_attest_destination",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "destination_id"
+        ],
+        "parent": "growth_publication_destinations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_attest_history",
+        "columns": [
+          "issuer",
+          "key_id",
+          "event_id"
+        ],
+        "parent": "growth_connector_evidence_history",
+        "parentColumns": [
+          "issuer",
+          "key_id",
+          "event_id"
+        ]
+      },
+      {
+        "name": "fk_auth_content",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "content_id"
+        ],
+        "parent": "growth_content_records",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_auth_approval_event",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "content_id",
+          "approval_event_id"
+        ],
+        "parent": "growth_content_events",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "content_id",
+          "event_id"
+        ]
+      },
+      {
+        "name": "fk_auth_reservation",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "reservation_id"
+        ],
+        "parent": "growth_ai_reservations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_auth_destination",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "destination_id"
+        ],
+        "parent": "growth_publication_destinations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_auth_approver",
+        "columns": [
+          "approver_id"
+        ],
+        "parent": "growth_users",
+        "parentColumns": [
+          "id"
+        ]
+      },
+      {
+        "name": "fk_auth_claim",
+        "columns": [
+          "organization_id",
+          "claim_hash"
+        ],
+        "parent": "growth_publication_claims",
+        "parentColumns": [
+          "organization_id",
+          "claim_hash"
+        ]
+      },
+      {
+        "name": "fk_auth_event_authorization",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id"
+        ],
+        "parent": "growth_content_authorizations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "id"
+        ]
+      },
+      {
+        "name": "fk_auth_event_actor",
+        "columns": [
+          "actor_id"
+        ],
+        "parent": "growth_users",
+        "parentColumns": [
+          "id"
+        ]
+      },
+      {
+        "name": "fk_use_auth_source",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id",
+          "content_id",
+          "approval_decision_id",
+          "destination_id"
+        ],
+        "parent": "growth_content_authorizations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "id",
+          "content_id",
+          "approval_event_id",
+          "destination_id"
+        ]
+      },
+      {
+        "name": "fk_use_auth_claim",
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id",
+          "claim_hash"
+        ],
+        "parent": "growth_content_authorizations",
+        "parentColumns": [
+          "organization_id",
+          "website_id",
+          "id",
+          "claim_hash"
+        ]
+      },
+      {
+        "name": "fk_use_claim",
+        "columns": [
+          "organization_id",
+          "claim_hash"
+        ],
+        "parent": "growth_publication_claims",
+        "parentColumns": [
+          "organization_id",
+          "claim_hash"
+        ]
+      },
+      {
+        "name": "fk_use_actor",
+        "columns": [
+          "actor_id"
+        ],
+        "parent": "growth_users",
+        "parentColumns": [
+          "id"
+        ]
+      }
+    ],
+    "indexes": [
+      {
+        "table": "growth_publication_policy_revisions",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "content_type"
+        ]
+      },
+      {
+        "table": "growth_publication_policy_revisions",
+        "name": "fk_auth_policy_type_idx",
+        "unique": false,
+        "columns": [
+          "website_id",
+          "content_type"
+        ]
+      },
+      {
+        "table": "growth_publication_destinations",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "id"
+        ]
+      },
+      {
+        "table": "growth_publication_destinations",
+        "name": "uq_auth_destination_channel",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "id"
+        ]
+      },
+      {
+        "table": "growth_connector_issuer_state",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "issuer",
+          "key_id"
+        ]
+      },
+      {
+        "table": "growth_connector_evidence_history",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "issuer",
+          "key_id",
+          "event_id"
+        ]
+      },
+      {
+        "table": "growth_connector_evidence_history",
+        "name": "uq_probe_sequence",
+        "unique": true,
+        "columns": [
+          "issuer",
+          "key_id",
+          "sequence"
+        ]
+      },
+      {
+        "table": "growth_connector_evidence_history",
+        "name": "uq_probe_hash",
+        "unique": true,
+        "columns": [
+          "issuer",
+          "key_id",
+          "event_id",
+          "payload_hash"
+        ]
+      },
+      {
+        "table": "growth_connector_evidence_history",
+        "name": "fk_probe_destination_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "destination_id"
+        ]
+      },
+      {
+        "table": "growth_connector_attestations",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "channel",
+          "destination_id"
+        ]
+      },
+      {
+        "table": "growth_connector_attestations",
+        "name": "uq_current_issuer_key",
+        "unique": true,
+        "columns": [
+          "issuer",
+          "key_id"
+        ]
+      },
+      {
+        "table": "growth_connector_attestations",
+        "name": "fk_attest_history_idx",
+        "unique": false,
+        "columns": [
+          "issuer",
+          "key_id",
+          "event_id"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "id"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "uq_single_content_approval",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "content_id",
+          "approval_event_id",
+          "channel"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "uq_auth_source_scope",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "id",
+          "content_id",
+          "approval_event_id",
+          "destination_id"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "uq_auth_claim_scope",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "id",
+          "claim_hash"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "fk_auth_reservation_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "reservation_id"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "fk_auth_destination_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "destination_id"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "fk_auth_approver_idx",
+        "unique": false,
+        "columns": [
+          "approver_id"
+        ]
+      },
+      {
+        "table": "growth_content_authorizations",
+        "name": "fk_auth_claim_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "claim_hash"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_events",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "request_key"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_events",
+        "name": "idx_auth_event_scope",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id",
+          "occurred_at"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_events",
+        "name": "fk_auth_event_actor_idx",
+        "unique": false,
+        "columns": [
+          "actor_id"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_uses",
+        "name": "PRIMARY",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_uses",
+        "name": "uq_approval_use",
+        "unique": true,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "content_id",
+          "approval_decision_id"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_uses",
+        "name": "fk_use_auth_source_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id",
+          "content_id",
+          "approval_decision_id",
+          "destination_id"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_uses",
+        "name": "fk_use_auth_claim_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "website_id",
+          "authorization_id",
+          "claim_hash"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_uses",
+        "name": "fk_use_claim_idx",
+        "unique": false,
+        "columns": [
+          "organization_id",
+          "claim_hash"
+        ]
+      },
+      {
+        "table": "growth_publication_authorization_uses",
+        "name": "fk_use_actor_idx",
+        "unique": false,
+        "columns": [
+          "actor_id"
+        ]
+      }
+    ],
+    "fkColumns": 52
+  }
+}

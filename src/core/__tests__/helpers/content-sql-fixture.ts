@@ -7,7 +7,7 @@ type ClaimRow = { organization_id:string; website_id:string; content_id:string; 
 /** Serialized SQL simulator, not a MariaDB server or SQL parser. Models rollback and uniqueness only. */
 export function contentSQLFixture(record: ContentRecord, now: number) {
   const bridge = publicationBridgeFixture(record,now);
-  let data = { consumed:false, authorizationUses:new Map<string,unknown[]>(), record:structuredClone(record), claim:null as ClaimRow|null, events:new Map<string,unknown[]>(), observations:new Map<string,{payload_hash:unknown}>() };
+  let data = { issuedAuth:null as typeof bridge.authorization|null, issuanceAudit:new Map<string,unknown[]>(), consumed:false, authorizationUses:new Map<string,unknown[]>(), record:structuredClone(record), claim:null as ClaimRow|null, events:new Map<string,unknown[]>(), observations:new Map<string,{payload_hash:unknown}>() };
   let tail: Promise<void> = Promise.resolve();
   const state = { commits:0,rollbacks:0,queries:[] as {sql:string;params:unknown[]}[], failSQL:'', health:'verified', checkedAt:new Date(now-60000).toISOString(), expiresAt:new Date(now+60000).toISOString(), budgetAvailable:true, reservationStatus:'completed', actualCost:'20' as string|null, paused:0, publishing:1, automation:1, policy:1, reservationSite:record.websiteId, approvalEventMissing:false, approvalEventActor:record.approval!.actorId, sessionRevoked:false, sessionExpires:new Date(now+60000).toISOString(), requestorRole:'owner', approverRole:'owner', membership:true, userDisabled:0, approvalRevoked:false, approval:bridge.authorization, destination:bridge.destination, policyRevision:bridge.policy.revision, feature:1, attestation:bridge.signed, connectorRevoked:false, issuerRevoked:0, trustRevision:bridge.issuer.trustRevision };
   const duplicate = () => Object.assign(Error('duplicate'),{code:'ER_DUP_ENTRY'});
@@ -33,14 +33,18 @@ export function contentSQLFixture(record: ContentRecord, now: number) {
         } else if(sql.includes('FROM growth_connector_health')) {
           assert.deepEqual(params,[record.organizationId,record.websiteId,'site']);
           result=[{organization_id:record.organizationId,website_id:record.websiteId,channel:'site',status:state.health,checked_at:state.checkedAt,expires_at:state.expiresAt}];
-        } else if(sql.includes('FROM growth_ai_reservations')) result=params[0]===record.organizationId && params[1]===state.reservationSite ? [{status:state.reservationStatus,content_type:record.contentType,actual_cost_minor:state.actualCost}] : [];
+        } else if(sql.includes('FROM growth_ai_reservations')) result=params[0]===record.organizationId && params[1]===state.reservationSite ? [{status:state.reservationStatus,content_type:record.contentType,actual_cost_minor:state.actualCost,id:params[2]}] : [];
         else if(sql.includes('FROM growth_content_events')) {
           assert.deepEqual(params.slice(0,3),[record.organizationId,record.websiteId,record.id]);
           const approved={...record,stage:'approved',version:record.version-1,eventIds:record.eventIds.slice(0,-1)};delete approved.schedule;
           result=!state.approvalEventMissing && params[3]===record.eventIds.at(-2) ? [{event_id:params[3],actor_id:state.approvalEventActor,occurred_at:record.approval!.at,version:approved.version,record_json:JSON.stringify(approved)}] : [];
         }
-        else if(sql.includes('FROM growth_sessions')) result=params[0]===bridge.request.sessionTokenHash ? [{user_id:'requestor1',disabled:state.userDisabled,revoked_at:state.sessionRevoked?'revoked':null,expires_at:state.sessionExpires}] : [];
+        else if(sql.includes('FROM growth_sessions')) result=params[0]===bridge.request.sessionTokenHash ? [{user_id:'requestor1',disabled:state.userDisabled,role:state.requestorRole,revoked_at:state.sessionRevoked?'revoked':null,expires_at:state.sessionExpires}] : [];
+        else if(sql.includes('FROM growth_publication_authorization_events')) result=data.issuanceAudit.has(String(params[1]))?[{request_key:params[1]}]:[];
+        else if(sql.startsWith('INSERT INTO growth_content_authorizations')) {if(data.issuedAuth)throw duplicate();data.issuedAuth=JSON.parse(String(params[10]));result={affectedRows:1};}
+        else if(sql.startsWith('INSERT INTO growth_publication_authorization_events')) {if(data.issuanceAudit.has(String(params[3])))throw duplicate();data.issuanceAudit.set(String(params[3]),params);result={affectedRows:1};}
         else if(sql.includes('FROM growth_content_authorizations')) result=params[0]===record.organizationId && params[1]===record.websiteId && params[2]===state.approval.id ? [{authorization_json:JSON.stringify(state.approval),revoked_at:state.approvalRevoked?'revoked':null,consumed_at:data.consumed?'consumed':null}] : [];
+        else if(sql.includes('FROM growth_memberships') && params.length===2) result=state.membership?[{user_id:record.approval!.actorId,role:state.approverRole,disabled:0}]:[];
         else if(sql.includes('FROM growth_memberships')) result=state.membership ? [{user_id:'requestor1',role:state.requestorRole,disabled:state.userDisabled},{user_id:record.approval!.actorId,role:state.approverRole,disabled:0}] : [];
         else if(sql.includes('FROM growth_publication_policy_revisions')) result=[{revision:state.policyRevision,feature_enabled:state.feature}];
         else if(sql.includes('FROM growth_publication_destinations')) result=params[2]===state.destination.id ? [{...state.destination,enabled:state.destination.enabled?1:0}] : [];
