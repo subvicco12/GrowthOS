@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {FORMAT,tables,ledger,inventory,rowsHash,sealFixture,validate}=require('./lib/publication-recovery-v4.cjs');
+const key=Buffer.alloc(32,7),source='growthos_test_source',destination='growthos_test_destination',metadataHash='a'.repeat(64);
+const fixture=()=>({format:FORMAT,sourceSchema:source,metadataHash,inventory:{...inventory},tables:tables.map(name=>{const columns=name==='growth_schema_migrations'?['migration_id','sha256']:['id'];const rows=name==='growth_schema_migrations'?ledger.map(r=>[...r]).sort((a,b)=>Buffer.compare(Buffer.from(JSON.stringify(a)),Buffer.from(JSON.stringify(b)))):[['synthetic']];return {name,columns,rows,count:rows.length,sha256:rowsHash(rows)};}),trustAnchorDigest:'b'.repeat(64)});
+const opts={key,source,destination,referenceMetadataHash:metadataHash,independentTrustVerified:true,destinationEmpty:true};
+const valid=sealFixture(fixture(),key);assert.equal(validate(valid,opts).restoreExecutable,false);let refused=0;
+const deny=(b,o=opts)=>{assert.throws(()=>validate(b,o));refused++;};
+deny(valid,{...opts,destination:'production'});deny(valid,{...opts,destination:source});deny(valid,{...opts,destinationEmpty:false});deny(valid,{...opts,independentTrustVerified:false});deny(valid,{...opts,referenceMetadataHash:'c'.repeat(64)});
+deny(Buffer.concat([valid,Buffer.from('USE production;')]));deny(Buffer.from([0xff]));deny(Buffer.from(valid.toString().replace('synthetic','forged')));
+const mutate=fn=>{const d=fixture();fn(d);deny(sealFixture(d,key));};
+mutate(d=>d.inventory.foreignKeyColumns=155);
+mutate(d=>d.tables[0].sha256='0'.repeat(64));mutate(d=>d.tables.pop());mutate(d=>d.tables[0].rows.push(['extra']));
+mutate(d=>d.sourceSchema='growthos_prod');mutate(d=>d.trustAnchorDigest='');
+mutate(d=>{const t=d.tables.find(t=>t.name==='growth_schema_migrations');t.rows[0][1]='0'.repeat(64);t.sha256=rowsHash(t.rows);});
+assert.equal(refused,15);console.log(`PASS: review-only archive, ${refused} refusal cases; no SQL execution`);
