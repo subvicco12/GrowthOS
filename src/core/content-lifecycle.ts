@@ -13,6 +13,8 @@ export interface ContentRecord {
   sources: readonly SourceEvidence[]; draft?: string; quality?: QualityEvidence;
   approval?: { actorId: string; at: string }; schedule?: { channel: string; at: string };
   publication?: { providerId: string; url: string; observedAt: string };
+  /** Factory approval binds the reviewed research/brief/draft; absent on legacy records. */
+  factoryReviewDigest?: string;
   attribution?: { source: string; observedAt: string; conversions: number };
 }
 type Base = { eventId: string; at: string };

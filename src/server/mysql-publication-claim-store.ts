@@ -46,6 +46,7 @@ export class MySQLPublicationClaimStore implements PublicationClaimStore {
         'SELECT status,verified_at,automation_enabled,auto_publish_enabled FROM growth_websites WHERE organization_id=? AND id=? FOR UPDATE', [claim.organizationId,claim.websiteId]);
       if (site.length !== 1 || site[0].status !== 'active' || !site[0].verified_at || Number(site[0].auto_publish_enabled) !== 1 || Number(site[0].automation_enabled) !== 1) throw Error('PUBLISHING_DISABLED');
       const record = await lockContent(connection,claim);
+      if(Object.hasOwn(record,'_factory')) throw Error('FACTORY_PUBLICATION_ATOMIC_ADAPTER_REQUIRED');
       const [prior] = await connection.execute<Row[]>(
         'SELECT claim_hash FROM growth_publication_claims WHERE organization_id=? AND website_id=? AND content_id=? AND channel=? FOR UPDATE',
         [claim.organizationId,claim.websiteId,claim.contentId,claim.channel]);
@@ -101,6 +102,7 @@ export class MySQLPublicationClaimStore implements PublicationClaimStore {
       await connection.beginTransaction();
       // Same content-before-claim order as claimOnce; content cancellation cannot race a claim.
       const record = await lockContent(connection,claim);
+      if(Object.hasOwn(record,'_factory')) throw Error('FACTORY_PUBLICATION_ATOMIC_ADAPTER_REQUIRED');
       const [rows] = await connection.execute<Row[]>(
         'SELECT status,provider_id,publication_url,reservation_id FROM growth_publication_claims WHERE organization_id=? AND website_id=? AND content_id=? AND channel=? AND claim_hash=? FOR UPDATE',
         [claim.organizationId,claim.websiteId,claim.contentId,claim.channel,publicationClaimHash(claim)]);

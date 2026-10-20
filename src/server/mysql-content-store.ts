@@ -49,6 +49,8 @@ export class MySQLContentStore implements ContentStore {
         'SELECT version,record_json FROM growth_content_records WHERE organization_id=? AND website_id=? AND id=? FOR UPDATE', [organizationId,websiteId,recordId]);
       if (rows.length !== 1) throw Error('CONTENT_NOT_FOUND');
       const current = decodeStoredContent(rows[0],organizationId,websiteId,recordId);
+      // Factory metadata and its append-only journal need the dedicated authenticated writer.
+      if (Object.hasOwn(current,'_factory')) throw Error('FACTORY_WRITER_REQUIRED');
       if (current.version !== version) throw Error('CONTENT_VERSION_CONFLICT');
       const next = apply(structuredClone(current));
       if (next.id !== recordId || next.organizationId !== organizationId || next.websiteId !== websiteId ||

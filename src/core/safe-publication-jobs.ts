@@ -42,6 +42,7 @@ export interface PublicationJobStore {
 }
 const publicClaimSchema=z.object({organizationId:id,websiteId:id,contentId:id,channel:id.max(80),idempotencyKey:z.string().min(1).max(512),reservationId:id}).strict();
 const storedJobSchema=z.object({schemaVersion:z.literal(1),id,organizationId:id,websiteId:id,contentId:id,version:z.number().int().nonnegative().safe(),contentVersion:z.number().int().nonnegative().safe(),contentHash:hash,channel:id.max(80),destination:destinationSchema,state:z.enum(['scheduled','awaiting_status','confirmed','absent','cancelled','operator_review']),notBefore:time,claim:publicClaimSchema.nullable(),probeAttempts:z.number().int().min(0).max(5),nextProbeAt:time.nullable(),journal:z.array(z.object({eventId:id,payloadHash:hash,operation:z.enum(['claim','cancel','probe_failed','reconcile']),at:time}).strict())}).strict();
+export const parseStoredPublicationJob=(input:unknown):PublicationJob=>storedJobSchema.parse(input);
 export class UnavailablePublicationJobStore implements PublicationJobStore {
  readonly capability='publication-workflow' as const;
  async transaction<T>():Promise<T>{throw Error('ATOMIC_FUNDED_FENCED_JOB_ADAPTER_REQUIRED');}

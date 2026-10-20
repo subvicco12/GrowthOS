@@ -26,6 +26,7 @@ export class MySQLPublicationAuthorization {
     return this.check(connection,claim,record,switches,now,candidate);
   }
   private async check(connection: PoolConnection, claim: PublicationClaim, record: ContentRecord, switches: Omit<PublicationPolicySnapshot,'revision'|'featureEnabled'>, now: number, candidate?: PublicationAuthorization): Promise<PublicationAuthorizationReceipt> {
+    if(Object.hasOwn(record,'_factory'))throw Error('FACTORY_PUBLICATION_ATOMIC_ADAPTER_REQUIRED');
     const request = publicationAuthorizationRequestSchema.parse(claim.authorization);
     const [sessions] = await connection.execute<Row[]>(
       'SELECT s.user_id,s.expires_at,s.revoked_at,u.disabled FROM growth_sessions s JOIN growth_users u ON u.id=s.user_id WHERE s.token_hash=? FOR UPDATE', [request.sessionTokenHash]);
