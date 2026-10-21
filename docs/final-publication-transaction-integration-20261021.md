@@ -12,6 +12,10 @@ For status probes and signed observation reconciliation, the store delegates to 
 
 Unknown COMMIT returns an operator HOLD after exact-identity readback, even if readback says absent or committed; there is no automatic retry. Precommit errors attempt rollback; uncertain rollback also fails closed. The schema pin, trust verifier, fencer, reservation/budget authority, session authority and candidate installation require independent implementation and certification. A mocked `CertifiedAtomicParticipants` capability is not proof of MariaDB behavior or production authority.
 
+## Blueprint alignment
+
+The attached *Growth OS Complete Master Blueprint Architecture Bible*, sections 23, 24, 30 and 49, requires source and rights review, explicit approval, destination capability, per-site and portfolio quota/budget reservations, idempotent jobs, audit, emergency pause and no blind retry after uncertain dispatch. This change enforces the SQL claim boundary and retains fail-closed authority interfaces for approval, connector trust, budget and pause. It does not establish external provider connectivity, actual billing, remote status, attribution or live scheduling. Default draft and disabled automation remain in effect. The blueprint's cancellation/reconciliation and publishing lifecycle are not certified end to end by these mocks.
+
 ## Recovery and schema compatibility
 
 Candidate 010–014 SHA-256 values remain respectively `bb10b32ec0186399ae10b1820541d4330aab500843cd0fcf2a82b4da515c2c5b`, `7b9f5b15d2797c13bc6c30d04a08d49b5112a2545f264b543e86ffd5b303362a`, `6d32ff6a950e9e90c40a4c5e5892c783914847c0f518faab980f08764bc310a6`, `049f16c9c9eb9336c60b9d3ebf42d5f66763257146d4d99714b0f74e7aea481e`, `d341bb3bc004b332f7cbc8253c2e5eb5255a4b8120860ae5d453f87762ee71b8`. The static verifier reports candidate 014 review-only/uninstalled with three statements, two new FKs and 14 FK columns. Certified 001–009 package verification passed; no SQL was installed. The certification branch recovery-v4 is a non-executable authenticated archive contract for the *proposed* 34-table, 42-trigger, 169-FK-column and 14-ledger inventory. It has not been merged, installed or used as a restore executor. Its metadata pin and cross-table semantic reconciliation, independent trust anchor, populated backup and two-session MariaDB behavior need independent live review. The job adapter requires exact 014 metadata pinning before any transaction and cannot silently accept 013-only schema.
@@ -20,8 +24,8 @@ Candidate 010–014 SHA-256 values remain respectively `bb10b32ec0186399ae10b182
 
 | Command | Exit | Actual result |
 | --- | ---: | --- |
-| `node --import tsx --test src/core/__tests__/mysql-publication-job-store.test.ts` | 0 | 6 mocked tests passed; no database |
-| `npm test` | 0 | 464 discovered, 463 passed, one skipped |
+| `node --import tsx --test src/core/__tests__/mysql-publication-job-store.test.ts` | 0 | 8 mocked tests passed after additional rollback refusals; no database |
+| `npm test` | 0 | 466 discovered, 465 passed, one skipped after the additional cases |
 | `npm run typecheck` | 0 | TypeScript passed after fixes; initial invocations exited 2 while implementation was in progress |
 | `npm run build` | 1 | Compilation and static generation succeeded; Next export failed `ENOTEMPTY` removing `.next/export` |
 | `NEXT_TELEMETRY_DISABLED=1 npm run build` | 1 | Clean generated-cache retry failed with the same `ENOTEMPTY` |
