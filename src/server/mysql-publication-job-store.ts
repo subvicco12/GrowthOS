@@ -31,7 +31,7 @@ export class MySQLPublicationJobStore implements PublicationJobStore {
  async transaction<T>(scope:FactoryScope,jobId:string,work:(tx:PublicationJobTransaction)=>Promise<T>):Promise<T>{
   if(![scope.organizationId,scope.websiteId,scope.contentId,jobId].every(id)||typeof work!=='function')fail('PUBLICATION_JOB_STORE_SCOPE_DENIED');
   const fence=await this.fencer.acquire(scope,jobId);if(!fence?.assertCurrent||!fence?.release)fail('PUBLICATION_INDEPENDENT_FENCE_REQUIRED');
-  let c:PoolConnection|undefined,begun=false,attempted=false,indeterminate=false,operationCompleted=false;
+  let c:PoolConnection|undefined,begun=false,attempted=false,indeterminate=false,operationCompleted=false,committed=false,failure:unknown;
   let context:FactoryContext|undefined,principal:PublicationJobPrincipal|undefined;
   const s:[string,string,string]=[scope.organizationId,scope.websiteId,scope.contentId];
   try{
@@ -75,12 +75,26 @@ export class MySQLPublicationJobStore implements PublicationJobStore {
    const result=await work(tx);if(!operationCompleted||!context||!principal)throw Error('PUBLICATION_JOB_TRANSACTION_INCOMPLETE');
    const current=await readJob();if(!current)throw Error('PUBLICATION_ATOMIC_JOB_NOT_PERSISTED');
    await this.authority.recheck(c,context,scope,current,new Date(this.clock()).toISOString());await fence.assertCurrent();
-   attempted=true;try{await c.commit();}catch(error){indeterminate=true;throw Object.assign(Error('PUBLICATION_COMMIT_INDETERMINATE',{cause:error}),{code:'PUBLICATION_COMMIT_INDETERMINATE'});}
+   attempted=true;try{await c.commit();committed=true;}catch(error){indeterminate=true;throw Object.assign(Error('PUBLICATION_COMMIT_INDETERMINATE',{cause:error}),{code:'PUBLICATION_COMMIT_INDETERMINATE'});}
    return result;
   }catch(error){
-   if(begun&&!attempted)await c!.rollback().catch(()=>{throw Error('PUBLICATION_ROLLBACK_UNCERTAIN',{cause:error});});
-   if(indeterminate){const state=await this.participants.readCommittedIdentity(scope,jobId).catch(()=>'indeterminate' as const);throw Error('PUBLICATION_COMMIT_INDETERMINATE_'+state.toUpperCase()+'_OPERATOR_HOLD',{cause:error});}
+   if(begun&&!attempted)try{await c!.rollback();}catch{error=Error('PUBLICATION_ROLLBACK_UNCERTAIN',{cause:error});}
+   if(indeterminate){
+    // A readback may need another pooled connection. Release the uncertain connection first.
+    let released=true;try{c?.release();}catch{released=false;}c=undefined;
+    let state:'committed'|'absent'|'indeterminate'='indeterminate';
+    if(released){let timer:ReturnType<typeof setTimeout>|undefined;try{const observed=await Promise.race([
+     this.participants.readCommittedIdentity(scope,jobId),
+     new Promise<'indeterminate'>(resolve=>{timer=setTimeout(()=>resolve('indeterminate'),5000);})
+    ]);if(['committed','absent','indeterminate'].includes(observed))state=observed;}catch{}finally{if(timer)clearTimeout(timer);}}
+    error=Error('PUBLICATION_COMMIT_INDETERMINATE_'+state.toUpperCase()+'_OPERATOR_HOLD',{cause:error});
+   }
+   failure=error;
    throw error;
-  }finally{c?.release();await fence.release();}
+  }finally{
+   let cleanup:unknown;try{c?.release();}catch(error){cleanup=error;}
+   try{await fence.release();}catch(error){cleanup??=error;}
+   if(cleanup&&!failure)throw Error(committed?'PUBLICATION_POST_COMMIT_CLEANUP_OPERATOR_HOLD':'PUBLICATION_CLEANUP_UNCERTAIN',{cause:cleanup});
+  }
  }
 }

@@ -38,6 +38,8 @@ Candidate 010–014 SHA-256 values remain respectively `bb10b32ec0186399ae10b182
 
 The `npx tsx --test ...` invocation exited 1 because this runtime denied tsx's `/tmp/tsx-0/18.pipe` IPC listen; `node --import tsx --test ...` passed without that CLI. Build's repeated `ENOTEMPTY` is an unresolved local runtime failure. A clean Node 22 build is required.
 
+**Subsequent build and recovery review:** `docs/final-publication-build-release-blockers-20261021.md` records two successful Node 24 builds with `CIRCLE_NODE_TOTAL=2`, including a clean generated-cache build, and the readback/cleanup fix after uncertain COMMIT. The original uncapped failures above remain actual FAIL results. Node 22 and live MariaDB certification remain blocked.
+
 ## Remaining release gates
 
 - Node 22 and isolated disposable MariaDB 11.8 were unavailable (`node` v24.19.0; no `node22`, `docker`, `mariadbd` or `mariadb`). Two-session contention, rollback/unknown COMMIT, least-privilege grants, candidate 010–014 installation, full metadata, populated backup/restore and recovery-v4 negative cases are **BLOCKED**, not passed.
