@@ -1,5 +1,6 @@
 /** Durable adapter protocol only. This module has NO dispatch, worker loop, timer or provider client. */
 import {z} from 'zod';
+import {createHash} from 'node:crypto';
 import {factoryHash,type FactoryContext,type FactoryScope} from './content-factory';
 import type {ContentRecord} from './content-lifecycle';
 import type {PublicationClaim} from './publication-handoff';
@@ -26,6 +27,11 @@ export interface PublicationJobTransaction {
  /** MUST atomically: fresh auth + approval consume + independent connector/fence + quota-v2 funded start,
   * unique claim + content publication_unknown + audit. Missing any dependency denies. Never dispatch. */
  claimContentAndFunding(job:PublicationJob,context:FactoryContext,at:string):Promise<PublicationClaim>;
+ /** SQL adapter completes claim, funding, authorization, content, job and audit itself on this transaction.
+  * Returns its persisted job; the workflow MUST NOT issue a second save. */
+ claimAtomically?(job:PublicationJob,context:FactoryContext,at:string,eventId:string):Promise<PublicationJob>;
+ /** Supplied-connection status participant persists its own CAS and immutable event. */
+ statusAtomically?(job:PublicationJob,kind:'probe_failed'|'reconcile',eventId:string,at:string,evidence?:BoundProviderObservation):Promise<PublicationJob>;
  /** Must verify provider signature, trusted registry/current revocation and immutable authorization destination,
   * then update claim/content/observation journal within THIS transaction. Unknown never becomes absent. */
  reconcileContentAndClaim(job:PublicationJob,input:BoundProviderObservation,at:string):Promise<'confirmed'|'absent'|'unknown'>;
@@ -63,6 +69,11 @@ export function createPublicationJob(record:ContentRecord,input:{id:string;desti
 function principal(p:PublicationJobPrincipal,scope:FactoryScope,at:string){const now=Date.parse(at),checked=Date.parse(p.checkedAt),expires=Date.parse(p.expiresAt);need(p.organizationId===scope.organizationId&&p.websiteId===scope.websiteId&&id.safeParse(p.userId).success&&['owner','admin'].includes(p.role)&&Number.isFinite(now)&&checked<=now&&now<expires&&expires-checked<=300000,'JOB_SESSION_OR_ROLE_DENIED');}
 function retry(job:PublicationJob,at:string):PublicationJob {const attempts=job.probeAttempts+1;return {...job,probeAttempts:attempts,state:attempts>=5?'operator_review':'awaiting_status',nextProbeAt:attempts>=5?null:new Date(Date.parse(at)+Math.min(300000,1000*2**(attempts-1))).toISOString()};}
 function boundClaim(job:PublicationJob,claim:PublicationClaim){need(claim.organizationId===job.organizationId&&claim.websiteId===job.websiteId&&claim.contentId===job.contentId&&claim.channel===job.channel&&claim.idempotencyKey===`publish:${job.organizationId}:${job.websiteId}:${job.contentId}:${job.channel}`&&id.safeParse(claim.reservationId).success,'JOB_CLAIM_SCOPE_DENIED');}
+async function completedStatus(result:PublicationJob,job:PublicationJob,p:PublicationJobPrincipal,scope:FactoryScope,eventId:string,tx:PublicationJobTransaction,clock:()=>number):Promise<PublicationJob>{
+ const next=parseStoredPublicationJob(result);
+ need(next.id===job.id&&next.organizationId===scope.organizationId&&next.websiteId===scope.websiteId&&next.contentId===scope.contentId&&next.version===job.version+1&&next.contentVersion===job.contentVersion&&next.contentHash===job.contentHash&&next.channel===job.channel&&factoryHash(next.destination)===factoryHash(job.destination)&&factoryHash(next.claim)===factoryHash(job.claim)&&next.probeAttempts===job.probeAttempts+1&&next.journal.length===job.journal.length+1&&next.journal.at(-1)?.eventId===eventId&&['awaiting_status','confirmed','absent','operator_review'].includes(next.state),'PUBLICATION_ATOMIC_STATUS_MISMATCH');
+ const now=new Date(clock()).toISOString();principal(p,scope,now);await tx.recheck(p,next,now);return structuredClone(next);
+}
 export class SafePublicationWorkflow {
  constructor(private readonly store:PublicationJobStore=new UnavailablePublicationJobStore(),private readonly clock:()=>number=Date.now){need(store.capability==='publication-workflow','JOB_CAPABILITY_DENIED');}
  async execute(context:FactoryContext,input:unknown):Promise<PublicationJob>{
@@ -79,13 +90,23 @@ export class SafePublicationWorkflow {
  case 'claim':{
  need(job.state==='scheduled'&&job.claim===null&&Date.parse(job.notBefore)<=Date.parse(at),'PUBLICATION_JOB_NOT_DUE_OR_CLAIMED');
  const record=await tx.loadContent(scope);need(record.organizationId===scope.organizationId&&record.websiteId===scope.websiteId&&record.id===scope.contentId&&record.stage==='scheduled'&&record.version===job.contentVersion&&contentAuthorizationHash(record)===job.contentHash&&record.schedule?.channel===job.channel,'PUBLICATION_JOB_STALE_CONTENT');
+ if(tx.claimAtomically){
+  const expected='claim_'+createHash('sha256').update(`publish:${job.organizationId}:${job.websiteId}:${job.contentId}:${job.channel}`).digest('hex');
+  need(c.eventId===expected,'PUBLICATION_ATOMIC_EVENT_ID_DENIED');
+  const persisted=parseStoredPublicationJob(await tx.claimAtomically(structuredClone(job),ctx,at,c.eventId));
+  need(persisted.version===job.version+1&&persisted.state==='awaiting_status'&&persisted.claim!==null&&persisted.organizationId===scope.organizationId&&persisted.websiteId===scope.websiteId&&persisted.contentId===scope.contentId&&persisted.id===job.id&&persisted.contentVersion===job.contentVersion&&persisted.contentHash===job.contentHash&&factoryHash(persisted.destination)===factoryHash(job.destination)&&persisted.journal.length===job.journal.length+1&&persisted.journal.at(-1)?.eventId===c.eventId,'PUBLICATION_ATOMIC_JOB_MISMATCH');
+  boundClaim(job,persisted.claim!);
+  const now=new Date(this.clock()).toISOString();principal(p,scope,now);await tx.recheck(p,persisted,now);
+  return structuredClone(persisted);
+ }
  const claim=await tx.claimContentAndFunding(structuredClone(job),ctx,at);boundClaim(job,claim);const safe=publicClaimSchema.parse({organizationId:claim.organizationId,websiteId:claim.websiteId,contentId:claim.contentId,channel:claim.channel,idempotencyKey:claim.idempotencyKey,reservationId:claim.reservationId});job={...job,claim:safe,state:'awaiting_status',nextProbeAt:at};break;}
  case 'cancel':need(job.state==='scheduled'&&job.claim===null,'CLAIMED_CANCELLATION_REQUIRES_RECONCILIATION');await tx.cancelUnclaimed(structuredClone(job),at);job={...job,state:'cancelled',nextProbeAt:null};break;
- case 'probe_failed':need(job.state==='awaiting_status'&&job.claim&&job.nextProbeAt!==null&&Date.parse(job.nextProbeAt)<=Date.parse(at),'PROBE_NOT_DUE');boundClaim(job,job.claim!);job=retry(job,at);break;
+ case 'probe_failed':need(job.state==='awaiting_status'&&job.claim&&job.nextProbeAt!==null&&Date.parse(job.nextProbeAt)<=Date.parse(at),'PROBE_NOT_DUE');boundClaim(job,job.claim!);if(tx.statusAtomically)return completedStatus(await tx.statusAtomically(job,'probe_failed',c.eventId,at),job,p,scope,c.eventId,tx,this.clock);job=retry(job,at);break;
  case 'reconcile':{
  need(job.state==='awaiting_status'&&job.claim&&job.nextProbeAt!==null&&Date.parse(job.nextProbeAt)<=Date.parse(at),'PROBE_NOT_DUE');boundClaim(job,job.claim!);
  need(evidence&&typeof evidence==='object'&&(evidence as BoundProviderObservation).format==='growthos-synthetic-provider-observation-v1'&&(evidence as BoundProviderObservation).synthetic===true,'SYNTHETIC_EVIDENCE_REQUIRED');
  const bound=evidence as BoundProviderObservation;need(factoryHash(destinationSchema.parse(bound.destination))===factoryHash(job.destination),'PROVIDER_DESTINATION_DENIED');
+ if(tx.statusAtomically)return completedStatus(await tx.statusAtomically(job,'reconcile',c.eventId,at,bound),job,p,scope,c.eventId,tx,this.clock);
  const state=await tx.reconcileContentAndClaim(structuredClone(job),bound,at);need(['confirmed','absent','unknown'].includes(state),'PROVIDER_STATUS_INVALID');job=state==='unknown'?retry(job,at):{...job,state,nextProbeAt:null};break;}
  }
  const now=new Date(this.clock()).toISOString();principal(p,scope,now);await tx.recheck(p,job,now);
