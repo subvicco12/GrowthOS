@@ -18,6 +18,7 @@ export function OrganizationApprovalInbox(){
     const current=await scope.json() as {organization:{id:string;role:string}};
     const data=await response.json() as {items:Approval[];nextCursor:string|null};
     if(cursor&&organization&&organization.id!==current.organization.id)throw Error('Workspace changed. Refresh the page.');
+    if(cursor&&organization&&organization.role!==current.organization.role)throw Error('Workspace permissions changed. Refresh the page.');
     setOrganization(current.organization);
     setItems(previous=>{
       if(!cursor)return data.items;
