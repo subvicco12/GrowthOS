@@ -18,10 +18,10 @@ export function rejectUntrustedOrigin(request: Request): Response | null {
 export async function readBoundedJson(request: Request, limit = 4096): Promise<{ value: unknown; error?: never } | { value?: never; error: Response }> {
   const declared = request.headers.get('content-length');
   if (declared !== null && (!/^\d+$/.test(declared) || !Number.isSafeInteger(Number(declared)) || Number(declared) > limit))
-    return { error: Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 }) };
+    return { error: Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413, headers: { 'Cache-Control': 'no-store' } }) };
   try {
     const reader = request.body?.getReader();
-    if (!reader) return { error: Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 }) };
+    if (!reader) return { error: Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400, headers: { 'Cache-Control': 'no-store' } }) };
     const chunks: Uint8Array[] = [];
     let bytes = 0;
     while (true) {
@@ -30,13 +30,13 @@ export async function readBoundedJson(request: Request, limit = 4096): Promise<{
       bytes += value.byteLength;
       if (bytes > limit) {
         try { await reader.cancel(); } catch { /* The oversize result is authoritative. */ }
-        return { error: Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413 }) };
+        return { error: Response.json({ ok: false, code: 'REQUEST_TOO_LARGE' }, { status: 413, headers: { 'Cache-Control': 'no-store' } }) };
       }
       chunks.push(value);
     }
     // Buffer.toString silently replaces malformed UTF-8, which can change JSON keys or values.
     return { value: JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))) };
   } catch {
-    return { error: Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400 }) };
+    return { error: Response.json({ ok: false, code: 'INVALID_JSON' }, { status: 400, headers: { 'Cache-Control': 'no-store' } }) };
   }
 }
