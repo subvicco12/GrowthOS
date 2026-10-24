@@ -80,6 +80,35 @@ async function run() {
   assert.equal(loginCount, 1);
   console.log('PASS oversized login body is non-cacheable and refused before authentication');
 
+  // Exercise the real route's error mapping independently of the happy-path login mock.
+  for (const [failure, expectedStatus, expectedCode] of [
+    ['INVALID_CREDENTIALS', 401, 'INVALID_CREDENTIALS'],
+    ['LOGIN_THROTTLED', 429, 'LOGIN_THROTTLED'],
+    ['SYNTHETIC_DATABASE_FAILURE', 503, 'SERVICE_UNAVAILABLE']
+  ]) {
+    const failingLogin = transpile('src/app/api/auth/login/route.ts', {
+      zod: {
+        z: {
+          object: () => ({ strict: () => ({ safeParse: value => ({ success: true, data: value }) }) }),
+          string: () => ({ email() { return this; }, max() { return this; }, min() { return this; } })
+        }
+      },
+      '../../../../server/mysql-login': { loginWithPassword: async () => { throw new Error(failure); } },
+      '../../../../server/authenticated-website-access': { SESSION_COOKIE_NAME: cookieName },
+      '../../../../server/organization-context': { ORGANIZATION_COOKIE_NAME: organizationCookie },
+      '../../../../server/request-security': requestSecurity
+    });
+    const failed = await failingLogin.POST(new Request('https://growthos.example/api/auth/login', {
+      method: 'POST', headers: originHeaders,
+      body: JSON.stringify({ email: 'test@example.invalid', password: 'synthetic' })
+    }));
+    assert.equal(failed.status, expectedStatus);
+    assert.equal(failed.headers.get('cache-control'), 'no-store');
+    assert.equal((await failed.json()).code, expectedCode);
+    assert.equal(failed.headers.has('set-cookie'), false);
+  }
+  console.log('PASS invalid credentials, throttling and service failures never issue session cookies');
+
   let membershipChecks = 0;
   const organizationContext = transpile('src/server/organization-context.ts', {
     './mysql-session': { verifyMySQLSession: async token => token === 'synthetic-token' ? 'user-a' : null },
