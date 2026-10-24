@@ -62,6 +62,24 @@ async function run() {
   assert.equal(loginCount, 1);
   console.log('PASS cross-origin login refused before authentication');
 
+  result = await login.POST(new Request('https://growthos.example/api/auth/login', { method: 'POST', headers: originHeaders, body: '{}' }));
+  assert.equal(result.status, 401);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal(loginCount, 1);
+  console.log('PASS malformed login credentials are not cached or authenticated');
+
+  result = await login.POST(new Request('https://growthos.example/api/auth/login', { method: 'POST', headers: originHeaders, body: '{invalid' }));
+  assert.equal(result.status, 400);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal(loginCount, 1);
+  console.log('PASS malformed JSON is non-cacheable and refused before authentication');
+
+  result = await login.POST(new Request('https://growthos.example/api/auth/login', { method: 'POST', headers: originHeaders, body: 'x'.repeat(4097) }));
+  assert.equal(result.status, 413);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal(loginCount, 1);
+  console.log('PASS oversized login body is non-cacheable and refused before authentication');
+
   const deleted = [];
   const revoked = [];
   const logout = transpile('src/app/api/auth/logout/route.ts', {
