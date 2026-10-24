@@ -27,7 +27,7 @@ export function OrganizationApprovalInbox(){
     setNextCursor(data.nextCursor);setMessage('');
   }
   async function more(){if(!nextCursor||loadingMore)return;setLoadingMore(true);try{await load(nextCursor);}catch(error){setMessage(error instanceof Error?error.message:'Approval inbox unavailable.');}finally{setLoadingMore(false);}}
-  useEffect(()=>{void load().catch(error=>setMessage(error instanceof Error?error.message:'Approval inbox unavailable.'));},[]);
+  useEffect(()=>{void load().catch(error=>{setItems([]);setOrganization(null);setNextCursor(null);setSelected(null);setMessage(error instanceof Error?error.message:'Approval inbox unavailable.');});},[]);
   function choose(item:Approval,decision:Decision){setSelected({item,decision,key:crypto.randomUUID()});setNote('');setMessage('');}
   async function submit(){if(!selected||!organization)return;
     setBusy(true);setMessage('');
