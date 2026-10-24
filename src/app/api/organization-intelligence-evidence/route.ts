@@ -18,7 +18,7 @@ const headers = { 'Cache-Control': 'no-store' };
 function failure(error: unknown): Response {
   const code = error instanceof Error ? error.message : '';
   if (code === 'WEBSITE_NOT_FOUND' || code === 'EVIDENCE_NOT_FOUND') return Response.json({ ok: false, code }, { status: 404, headers });
-  if (code === 'EVIDENCE_IDEMPOTENCY_CONFLICT') return Response.json({ ok: false, code }, { status: 409, headers });
+  if (code === 'EVIDENCE_IDEMPOTENCY_CONFLICT' || code === 'EVIDENCE_REVOKED') return Response.json({ ok: false, code }, { status: 409, headers });
   if (code === 'EVIDENCE_TIME_INVALID' || code === 'EVIDENCE_SCOPE_MISMATCH') return Response.json({ ok: false, code }, { status: 400, headers });
   return pageError(error);
 }

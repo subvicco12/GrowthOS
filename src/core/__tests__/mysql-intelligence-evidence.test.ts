@@ -11,7 +11,7 @@ const input = { organizationId: org, websiteId: site, actorId: actor,
   pages: [{ url: 'https://site.test/pricing', status: 200, indexable: true,
     h1Count: 1, wordCount: 100, internalLinks: 0 }] };
 const now = Date.parse('2026-10-24T11:00:00.000Z');
-function mock(existing: { id: string; payload_hash: string }[] = [], failAudit = false, siteVisible = true) {
+function mock(existing: { id: string; payload_hash: string }[] = [], failAudit = false, siteVisible = true, revoked = false) {
   const calls: { sql: string; params: unknown[] }[] = [];
   let commits = 0, rollbacks = 0;
   const connection = {
@@ -22,7 +22,7 @@ function mock(existing: { id: string; payload_hash: string }[] = [], failAudit =
       if (sql.includes('FROM growth_websites')) return [siteVisible ? [{ domain: 'site.test' }] : []];
       if (sql.includes('FROM growth_intelligence_evidence WHERE') && sql.includes('idempotency_key')) return [existing];
       if (sql.includes('FROM growth_intelligence_evidence WHERE') && sql.includes('AND id=?')) return [[{ id: 'evidence' }]];
-      if (sql.includes('FROM growth_intelligence_evidence_events')) return [[]];
+      if (sql.includes('FROM growth_intelligence_evidence_events')) return [revoked ? [{ id: 'revocation' }] : []];
       if (failAudit && sql.includes('INSERT INTO growth_intelligence_evidence_events')) throw Error('AUDIT_FAILURE');
       return [{ affectedRows: 1 }];
     }
@@ -53,6 +53,12 @@ test('identical replay returns the original identity without a second event', as
   const m = mock([{ id: 'original', payload_hash: hash }]);
   assert.deepEqual(await m.store.record(input, now), { id: 'original', duplicate: true });
   assert.equal(m.calls.some(c => c.sql.includes('INSERT INTO')), false);
+});
+test('revoked evidence cannot be revived by an identical ingestion replay', async () => {
+  const hash = createHash('sha256').update(JSON.stringify([input.sourceLabel,input.observedAt,input.expiresAt,input.pages])).digest('hex');
+  const m = mock([{ id: 'original', payload_hash: hash }], false, true, true);
+  await assert.rejects(m.store.record(input, now), /EVIDENCE_REVOKED/);
+  assert.equal(m.commits, 0); assert.equal(m.rollbacks, 1);
 });
 test('cross-domain and stale observations are refused', async () => {
   const m = mock();

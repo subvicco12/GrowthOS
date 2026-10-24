@@ -42,6 +42,10 @@ export class MySQLManualEvidenceStore {
         [input.organizationId, input.websiteId, input.idempotencyKey]);
       if (existing.length) {
         if (existing.length !== 1 || existing[0].payload_hash !== hash) throw Error('EVIDENCE_IDEMPOTENCY_CONFLICT');
+        const [revoked] = await connection.execute<RowDataPacket[]>(
+          "SELECT id FROM growth_intelligence_evidence_events WHERE organization_id=? AND website_id=? AND evidence_id=? AND event_type='revoked'",
+          [input.organizationId,input.websiteId,existing[0].id]);
+        if (revoked.length) throw Error('EVIDENCE_REVOKED');
         await connection.commit();
         return { id: existing[0].id, duplicate: true };
       }
