@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { ConnectorEvidenceVerifier, connectorEvidencePayload, type SignedConnectorAttestation, type TrustedConnectorIssuer, type CurrentConnectorTrust } from './connector-evidence';
 import type { PublicationDestination } from '../core/publication-authorization';
+import type { ConnectorHealthView } from '../core/connector-health';
 export interface ConnectorCheckpointVerifier {
   assertCurrent(input: { signed: SignedConnectorAttestation; payloadHash: string; trust: CurrentConnectorTrust }): Promise<void>;
 }
@@ -74,6 +75,43 @@ export class ConnectorTrustService {
       if (pending.revoked || pending.pending?.hash!==hash || pending.generation!==issuer.generation || pending.revision!==issuer.trustRevision) throw Error('TRUST_CHANGED');
       await lease.compareAndSet(pending,{...pending,hash,sequence:probe.sequence,pending:null});
       return 'recorded' as const;
+    });
+  }
+  /** Read-only health proof. No configuration or unsigned SQL projection can produce verified. */
+  async inspectHealth(destinationInput: PublicationDestination, now: number): Promise<ConnectorHealthView & { lastSuccessfulAt: string | null }> {
+    const destination=structuredClone(destinationInput);
+    const unknown=(reason:string):ConnectorHealthView & {lastSuccessfulAt:string|null}=>({state:'unknown',checkedAt:null,lastSuccessfulAt:null,reason});
+    if(!Number.isFinite(now)||!destination?.organizationId||!destination.websiteId||!destination.channel||!destination.id)
+      throw Error('CONNECTOR_HEALTH_SCOPE_INVALID');
+    const candidates=this.registry.filter(i=>i.organizationId===destination.organizationId&&i.websiteId===destination.websiteId&&
+      i.channel===destination.channel&&i.destinationId===destination.id&&i.capabilities.includes('read')&&!i.revoked);
+    if(candidates.length===0)return unknown('TRUSTED_ISSUER_UNAVAILABLE');
+    if(candidates.length!==1)throw Error('CONNECTOR_ISSUER_AMBIGUOUS');
+    const issuer=candidates[0];
+    return this.anchor.exclusive(connectorTrustKey(issuer),async lease=>{
+      const state=await lease.read();validateCheckpoint(state);
+      if(state.revoked||state.pending||state.hash===null||state.revision!==issuer.trustRevision||state.generation!==issuer.generation)
+        return unknown('INDEPENDENT_ANCHOR_UNAVAILABLE');
+      const saved=await this.repository.readCurrent(connectorTrustKey(issuer));
+      if(!saved)return unknown('NO_PERSISTED_HEALTH_CHECK');
+      const probe=saved.probe;
+      if(saved.hash!==state.hash||saved.sequence!==state.sequence||digest(probe)!==state.hash||
+        probe.sequence!==state.sequence||probe.generation!==state.generation||
+        probe.attestation.evidence.issuer!==issuer.id||probe.attestation.evidence.keyId!==issuer.keyId)
+        throw Error('CONNECTOR_HEALTH_ROLLBACK_OR_REPLAY');
+      if(!/^[a-f0-9]{64}$/.test(probe.controlSignature)||!timingSafeEqual(
+        createHmac('sha256',issuer.secret).update(probeControlPayload(probe)).digest(),Buffer.from(probe.controlSignature,'hex')))
+        throw Error('PROBE_CONTROL_SIGNATURE_INVALID');
+      const verified=new ConnectorEvidenceVerifier([issuer]).verifyProbe(probe.attestation,destination,
+        {issuer:issuer.id,keyId:issuer.keyId,revision:state.revision,revoked:false},now);
+      if(!verified.evidence.capabilities.includes('read') || verified.evidence.capabilities.some(c=>!issuer.capabilities.includes(c)))
+        throw Error('CONNECTOR_READ_CAPABILITY_DENIED');
+      const after=await lease.read();validateCheckpoint(after);
+      if(after.revoked||after.pending||after.hash!==state.hash||after.sequence!==state.sequence||
+        after.generation!==state.generation||after.revision!==state.revision)throw Error('CONNECTOR_HEALTH_CHANGED');
+      return {state:verified.evidence.status,checkedAt:verified.evidence.checkedAt,
+        lastSuccessfulAt:verified.evidence.status==='verified'?verified.evidence.checkedAt:null,
+        reason:'INDEPENDENTLY_VERIFIED_PROBE'};
     });
   }
   /** Wrap the ENTIRE claim transaction, not just evidence verification. No SQL locks may

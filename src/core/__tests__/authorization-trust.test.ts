@@ -87,6 +87,45 @@ test('signed sequenced evidence ingestion survives service restart; no local cac
  const restarted=new ConnectorTrustService([f.issuer],f.anchor,f.repository);
  await restarted.withClaimLease(f.issuer.id,f.issuer.keyId,async checkpoint=>{const p=f.saved()!.probe;await checkpoint.assertCurrent({signed:p.attestation,payloadHash:createHash('sha256').update(connectorEvidencePayload(p.attestation.evidence)).digest('hex'),trust:{issuer:f.issuer.id,keyId:f.issuer.keyId,revision:f.issuer.trustRevision,revoked:false}});});
 });
+test('read-only connector health requires current signed destination-bound independent evidence',async()=>{
+ const f=trustFixture();
+ assert.equal((await f.service.inspectHealth(f.bridge.destination,now)).state,'unknown');
+ const p=f.probe();p.attestation.evidence.capabilities=['read','publish'];
+ p.attestation.signature=createHmac('sha256',f.issuer.secret).update(connectorEvidencePayload(p.attestation.evidence)).digest('hex');
+ p.controlSignature=createHmac('sha256',f.issuer.secret).update(probeControlPayload(p)).digest('hex');
+ await f.service.ingest(p,f.bridge.destination,now);
+ const view=await f.service.inspectHealth(f.bridge.destination,now);
+ assert.equal(view.state,'verified');assert.equal(view.reason,'INDEPENDENTLY_VERIFIED_PROBE');
+ assert.equal(view.lastSuccessfulAt,view.checkedAt);
+ const downgraded=new ConnectorTrustService([{...f.issuer,capabilities:['read']}],f.anchor,f.repository);
+ await assert.rejects(()=>downgraded.inspectHealth(f.bridge.destination,now),/READ_CAPABILITY_DENIED/);
+ assert.equal((await f.service.inspectHealth({...f.bridge.destination,id:'foreign'},now)).state,'unknown');
+ await assert.rejects(()=>f.service.inspectHealth({...f.bridge.destination,target:'https://other.test'},now),/SCOPE/);
+ await assert.rejects(()=>f.service.inspectHealth({...f.bridge.destination,revision:'stale'},now),/SCOPE/);
+ await assert.rejects(()=>f.service.inspectHealth({...f.bridge.destination,enabled:false},now),/NOT_PUBLISH_VERIFIED/);
+ await assert.rejects(()=>f.service.inspectHealth(f.bridge.destination,now+300001),/EXPIRED/);
+});
+test('health refuses forged signatures, revocation, replayed database state and missing anchor',async()=>{
+ const f=trustFixture();await f.service.ingest(f.probe(),f.bridge.destination,now);
+ const saved=f.saved()!;
+ const forged=structuredClone(saved);forged.probe.attestation.signature='0'.repeat(64);f.restore(forged);
+ await assert.rejects(()=>f.service.inspectHealth(f.bridge.destination,now),/ROLLBACK|SIGNATURE/);
+ f.restore(saved);
+ await revokeConnectorTrust(f.anchor,{capability:'trust-administrator',authorizeRevocation:async()=>{},auditRevocation:async()=>{}},connectorTrustKey(f.issuer),1);
+ assert.equal((await f.service.inspectHealth(f.bridge.destination,now)).state,'unknown');
+ const absent=new ConnectorTrustService([f.issuer],{exclusive:async()=>{throw Error('ANCHOR_UNAVAILABLE');}},f.repository);
+ await assert.rejects(()=>absent.inspectHealth(f.bridge.destination,now),/ANCHOR_UNAVAILABLE/);
+ const revokedIssuer=new ConnectorTrustService([{...f.issuer,revoked:true}],f.anchor,f.repository);
+ assert.equal((await revokedIssuer.inspectHealth(f.bridge.destination,now)).state,'unknown');
+});
+test('negative signed observations are reported as disconnected, never as verified health',async()=>{
+ const f=trustFixture(),p=f.probe();p.attestation.evidence.status='disconnected';p.attestation.evidence.capabilities=['read'];
+ p.attestation.signature=createHmac('sha256',f.issuer.secret).update(connectorEvidencePayload(p.attestation.evidence)).digest('hex');
+ p.controlSignature=createHmac('sha256',f.issuer.secret).update(probeControlPayload(p)).digest('hex');
+ await f.service.ingest(p,f.bridge.destination,now);
+ const view=await f.service.inspectHealth(f.bridge.destination,now);
+ assert.equal(view.state,'disconnected');assert.equal(view.lastSuccessfulAt,null);
+});
 test('forged control/base signatures, stale evidence, foreign destinations and capabilities refuse before anchor advance',async()=>{
  for(const mutate of [(p:SequencedConnectorProbe)=>{p.controlSignature='0'.repeat(64);},(p:SequencedConnectorProbe)=>{p.attestation.signature='0'.repeat(64);},(p:SequencedConnectorProbe)=>{p.attestation.evidence.expiresAt=new Date(now).toISOString();},(p:SequencedConnectorProbe)=>{p.attestation.evidence.websiteId='foreign';}]){
   const f=trustFixture(),p=f.probe();mutate(p);await assert.rejects(()=>f.service.ingest(p,f.bridge.destination,now));assert.equal(f.anchorState().sequence,0);assert.equal(f.saved(),null);

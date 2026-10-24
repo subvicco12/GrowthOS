@@ -6,7 +6,8 @@ import { nextPageCursor, PAGE_SIZE, pageError, readPageCursor } from '../../../s
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-type Row = RowDataPacket & { id: string; domain: string; platform: string };
+type Row = RowDataPacket & { id: string; domain: string; platform: string;
+  automation_enabled: number; auto_publish_enabled: number };
 export type { ConnectorState } from '../../../core/connector-health';
 
 /** No persisted connector probe exists. A configured platform is never evidence of health. */
@@ -15,14 +16,15 @@ export async function GET(request: Request): Promise<Response> {
     const { organization } = await getAuthenticatedOrganizationContext(request);
     const cursor = readPageCursor(request, organization.id, 'websites');
     const [rows] = await getMySQLPool().execute<Row[]>(
-      'SELECT id,domain,platform FROM growth_websites WHERE organization_id=?' +
+      'SELECT id,domain,platform,automation_enabled,auto_publish_enabled FROM growth_websites WHERE organization_id=?' +
         (cursor ? ' AND (domain>? OR (domain=? AND id>?))' : '') + ' ORDER BY domain,id LIMIT ?',
       cursor ? [organization.id, cursor.key, cursor.key, cursor.id, PAGE_SIZE + 1] : [organization.id, PAGE_SIZE + 1]
     );
     const page = rows.slice(0, PAGE_SIZE);
     const last = page.at(-1);
-    return Response.json({ ok: true, connectors: page.map(row => ({
+    return Response.json({ ok: true, organization: { id: organization.id, role: organization.role }, connectors: page.map(row => ({
       websiteId: row.id, domain: row.domain, platform: row.platform,
+      automationEnabled: Boolean(row.automation_enabled), publishingEnabled: Boolean(row.auto_publish_enabled),
       ...projectConnectorHealth({ organizationId: organization.id, websiteId: row.id, channel: row.platform }, null, Date.now())
     })), nextCursor: rows.length > PAGE_SIZE && last ? nextPageCursor(organization.id, 'websites', last.domain, last.id) : null,
     disconnectedRequiresExplicitPersistedEvidence: true }, { headers: { 'Cache-Control': 'no-store' } });
