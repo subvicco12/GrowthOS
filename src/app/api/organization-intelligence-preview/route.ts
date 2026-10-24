@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
       [organization.id, parsed.data.websiteId]);
     if (!rows.length) return Response.json({ ok: false, code: 'WEBSITE_NOT_FOUND' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
     try {
-      return Response.json({ ok: true, websiteId: parsed.data.websiteId,
+      return Response.json({ ok: true, organizationId: organization.id, websiteId: parsed.data.websiteId,
         ...manualIntelligencePreview(parsed.data, rows[0].domain) }, { headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return Response.json({ ok: false, code: 'EVIDENCE_SCOPE_MISMATCH' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });

@@ -38,6 +38,7 @@ async function run(body, { error, rows = [{ domain: 'site.test' }] } = {}) {
   let checks = 0;
   let result = await run(payload());
   assert.equal(result.response.status, 200); assert.equal(result.body.evidence, 'UNVERIFIED_MANUAL_INPUT');
+  assert.equal(result.body.organizationId, org); assert.equal(result.body.websiteId, id); checks += 2;
   assert.deepEqual(Array.from(result.queries[0].params), [org, id]);
   assert.match(result.queries[0].sql, /organization_id=\? AND id=\?/); checks += 4;
   for (const error of ['AUTHENTICATION_REQUIRED', 'ORGANIZATION_FORBIDDEN']) {
@@ -46,6 +47,17 @@ async function run(body, { error, rows = [{ domain: 'site.test' }] } = {}) {
   }
   result = await run(payload(), { rows: [] }); assert.equal(result.response.status, 404); checks++;
   result = await run(payload('https://other.test/')); assert.equal(result.response.status, 400); checks++;
+  const comparison = JSON.stringify({ ...JSON.parse(payload()), competitors: [{ evidenceUrl: 'https://competitor.test/pricing',
+    featureName: 'CSV export', plan: 'business', ourAvailability: 'unknown' }] });
+  result = await run(comparison); assert.equal(result.response.status, 200);
+  assert.equal(result.body.evidence, 'UNVERIFIED_MANUAL_INPUT');
+  assert.ok(result.body.recommendations.some(item => item.title === 'Compare CSV export for business')); checks += 3;
+  result = await run(comparison, { rows: [] }); assert.equal(result.response.status, 404); checks++;
+  for (const evidenceUrl of ['http://competitor.test/', 'https://site.test/', 'javascript:alert(1)']) {
+    result = await run(JSON.stringify({ ...JSON.parse(payload()), competitors: [{ evidenceUrl,
+      featureName: 'Export', plan: 'pro', ourAvailability: 'unknown' }] }));
+    assert.equal(result.response.status, 400); checks++;
+  }
   result = await run('{'); assert.equal(result.response.status, 400); assert.equal(result.queries.length, 0); checks += 2;
   result = await run('x'.repeat(5000)); assert.equal(result.response.status, 413); assert.equal(result.queries.length, 0); checks += 2;
   result = await run(payload());

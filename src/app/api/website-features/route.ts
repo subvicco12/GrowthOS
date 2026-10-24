@@ -27,12 +27,12 @@ export async function PATCH(request: Request): Promise<Response> {
         'SELECT ' + column + ' AS enabled FROM growth_websites WHERE id=? AND organization_id=? FOR UPDATE',
         [parsed.data.websiteId, organization.id]
       );
-      const websiteRows = rows as Array<{ enabled: number | boolean }>;
+      const websiteRows = rows as Array<{ enabled: number | boolean | string }>;
       if (websiteRows.length === 0) {
         await connection.rollback();
         return Response.json({ ok: false, code: 'WEBSITE_NOT_FOUND' }, { status: 404 });
       }
-      if (Boolean(websiteRows[0].enabled)) {
+      if (websiteRows[0].enabled === true || websiteRows[0].enabled === 1 || websiteRows[0].enabled === '1') {
         await connection.execute(
           'UPDATE growth_websites SET ' + column + '=FALSE WHERE id=? AND organization_id=?',
           [parsed.data.websiteId, organization.id]

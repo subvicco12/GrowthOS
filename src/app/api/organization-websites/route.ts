@@ -15,6 +15,7 @@ type WebsiteRow = RowDataPacket & {
   id: string; domain: string; platform: string; status: string;
   verified_at: Date | null; automation_enabled: number; auto_publish_enabled: number; monthly_budget_minor: string;
 };
+const mysqlFlag = (value: unknown): boolean => value === true || value === 1 || value === '1';
 
 /** Read-only tenant-scoped website registry. No mutations, publishing or AI spending. */
 export async function GET(request: Request): Promise<Response> {
@@ -33,8 +34,8 @@ export async function GET(request: Request): Promise<Response> {
       websites: page.map(row => ({
         id: row.id, domain: row.domain, platform: row.platform, status: row.status,
         verifiedAt: row.verified_at,
-        automationEnabled: Boolean(row.automation_enabled),
-        autoPublishEnabled: Boolean(row.auto_publish_enabled),
+        automationEnabled: mysqlFlag(row.automation_enabled),
+        autoPublishEnabled: mysqlFlag(row.auto_publish_enabled),
         monthlyBudgetMinor: String(row.monthly_budget_minor)
       })),
       nextCursor: rows.length > PAGE_SIZE && last ? nextPageCursor(organization.id, 'websites', last.domain, last.id) : null
@@ -45,6 +46,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 const registerSchema = z.object({
+  organizationId: z.string().uuid(),
   domain: websiteDomainSchema,
   platform: z.enum(['wordpress','nextjs','react','static','custom'])
 }).strict();
@@ -60,6 +62,8 @@ export async function POST(request: Request): Promise<Response> {
     if (body.error) return body.error;
     const parsed = registerSchema.safeParse(body.value);
     if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_WEBSITE' }, { status: 400 });
+    if (parsed.data.organizationId !== organization.id)
+      return Response.json({ ok: false, code: 'ORGANIZATION_SCOPE_CHANGED' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
     const id = randomUUID();
     await getMySQLPool().execute(
       'INSERT INTO growth_websites (id,organization_id,domain,platform,status,monthly_budget_minor,automation_enabled,auto_publish_enabled) VALUES (?,?,?,? ,\'draft\',0,FALSE,FALSE)',

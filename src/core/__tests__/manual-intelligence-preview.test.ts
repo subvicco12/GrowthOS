@@ -27,3 +27,30 @@ test('bounds and validates the preview input, rejecting extra caller-supplied cl
   assert.equal(previewInput.safeParse({ websiteId, pages: [{ ...page, verified: true }] }).success, false);
   assert.equal(previewInput.safeParse({ websiteId, pages: [{ ...page, wordCount: -1 }] }).success, false);
 });
+
+test('manual comparison produces review ideas without granting verification or publication', () => {
+  const input = previewInput.parse({ websiteId, pages: [page], competitors: [{ evidenceUrl: 'https://competitor.test/pricing',
+    featureName: 'CSV export', plan: 'pro', ourAvailability: 'unknown' }] });
+  const result = manualIntelligencePreview(input, 'example.test');
+  assert.equal(result.evidence, 'UNVERIFIED_MANUAL_INPUT');
+  assert.ok(result.recommendations.some(r => r.title === 'Compare CSV export for pro' && /unknown/.test(r.rationale)));
+  assert.ok(result.recommendations.some(r => r.category === 'content' && r.evidenceUrl === page.url));
+  assert.equal(JSON.stringify(result).includes('approved'), false);
+});
+
+test('competitor comparison refuses internal scope, insecure sources and caller-created authority', () => {
+  for (const evidenceUrl of ['https://example.test/pricing',
+    'https://user@competitor.test/', 'https://competitor.test:8080/']) {
+    const input = previewInput.parse({ websiteId, pages: [page], competitors: [{ evidenceUrl,
+      featureName: 'Export', plan: 'business', ourAvailability: 'absent' }] });
+    assert.throws(() => manualIntelligencePreview(input, 'example.test'), /EVIDENCE_SCOPE_MISMATCH/);
+  }
+  assert.equal(previewInput.safeParse({ websiteId, pages: [page], competitors: [{ evidenceUrl: 'http://competitor.test/',
+    featureName: 'Export', plan: 'business', ourAvailability: 'absent' }] }).success, false);
+  for (const competitor of [{ evidenceUrl: 'javascript:alert(1)', featureName: 'Export', plan: 'pro', ourAvailability: 'unknown' },
+    { evidenceUrl: 'https://competitor.test/', featureName: 'Export', plan: 'pro', ourAvailability: 'unknown', verified: true }]) {
+    assert.equal(previewInput.safeParse({ websiteId, pages: [page], competitors: [competitor] }).success, false);
+  }
+  assert.equal(previewInput.safeParse({ websiteId, pages: [page], competitors: Array(6).fill({
+    evidenceUrl: 'https://competitor.test/', featureName: 'Export', plan: 'pro', ourAvailability: 'unknown' }) }).success, false);
+});

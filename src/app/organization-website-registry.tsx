@@ -44,6 +44,8 @@ export function OrganizationWebsiteRegistry() {
     return () => { active = false; };
   }, []);
   async function disableFeature(websiteId: string, feature: 'automation' | 'auto_publish') {
+    if (!data || !['owner','admin'].includes(data.organization.role) || !data.websites.some(site=>site.id===websiteId)) return;
+    const expectedOrganization = data.organization.id;
     setMessage('');
     try {
       const response = await fetch('/api/website-features', {
@@ -53,22 +55,26 @@ export function OrganizationWebsiteRegistry() {
       });
       if (!response.ok) throw workspaceError(response, 'Feature change');
       const refreshed = await getPage();
+      if (refreshed.organization.id !== expectedOrganization) { setData(null); throw Error('Workspace changed. Reload before continuing.'); }
       setData(refreshed); setNextCursor(refreshed.nextCursor);
       setMessage('Feature disabled. No operation was started.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Feature change failed.'); }
   }
   async function register(event: import('react').FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!data || !['owner','admin'].includes(data.organization.role)) return;
+    const expectedOrganization = data.organization.id;
     setSubmitting(true);
     setMessage('');
     try {
       const response = await fetch('/api/organization-websites', {
         method: 'POST', credentials: 'include', cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain, platform })
+        body: JSON.stringify({ organizationId: expectedOrganization, domain, platform })
       });
       if (!response.ok) throw response.status === 409 ? Error('This website is already registered.') : workspaceError(response, 'Registration');
       const refreshed = await getPage();
+      if (refreshed.organization.id !== expectedOrganization) { setData(null); throw Error('Workspace changed. Reload before continuing.'); }
       setData(refreshed); setNextCursor(refreshed.nextCursor);
       setDomain('');
       setMessage('Website registered as draft. Verification and automation remain disabled.');
