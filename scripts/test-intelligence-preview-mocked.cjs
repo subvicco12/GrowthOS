@@ -62,5 +62,35 @@ async function run(body, { error, rows = [{ domain: 'site.test' }] } = {}) {
     if (!error) { const body = await response.json(); assert.equal(body.connection, 'unknown'); assert.equal(body.host, undefined); checks += 2; }
     checks++;
   }
+  const evidenceCalls = [];
+  const evidenceRoute = (role = 'owner', error = null) => load('src/app/api/organization-intelligence-evidence/route.ts', {
+    zod: require('zod'),
+    '../../../core/manual-intelligence-preview': { previewInput: core.previewInput },
+    '../../../server/request-security': security,
+    '../../../server/organization-pagination': pagination,
+    '../../../server/mysql': { getMySQLPool: () => ({}) },
+    '../../../server/mysql-intelligence-evidence': { MySQLManualEvidenceStore: class {
+      async record(input) { evidenceCalls.push(['record',input]); return { id: id, duplicate: false }; }
+      async revoke(input) { evidenceCalls.push(['revoke',input]); return true; }
+      async list(organizationId, websiteId) { evidenceCalls.push(['list',organizationId,websiteId]); return []; }
+    } },
+    '../../../server/organization-context': { getAuthenticatedOrganizationContext: async () => {
+      if (error) throw Error(error);
+      return { userId: id, organization: { id: org, role } };
+    } }
+  });
+  const recordBody = JSON.stringify({ ...JSON.parse(payload()), idempotencyKey: 'synthetic-request',
+    sourceLabel: 'manual', observedAt: '2026-10-24T10:00:00Z', expiresAt: '2026-10-25T10:00:00Z' });
+  const before = evidenceCalls.length;
+  assert.equal((await evidenceRoute('viewer').POST(request(recordBody))).status, 403); checks++;
+  assert.equal((await evidenceRoute('owner','AUTHENTICATION_REQUIRED').POST(request(recordBody))).status, 401); checks++;
+  assert.equal((await evidenceRoute().POST(request(recordBody,'https://evil.test'))).status, 403); checks++;
+  assert.equal((await evidenceRoute().POST(request('x'.repeat(5000)))).status, 413); checks++;
+  assert.equal(evidenceCalls.length, before); checks++;
+  assert.equal((await evidenceRoute().POST(request(recordBody))).status, 201); checks++;
+  assert.equal(evidenceCalls.at(-1)[1].organizationId, org); checks++;
+  assert.equal((await evidenceRoute('viewer').PATCH(request(JSON.stringify({ websiteId: id, evidenceId: id })))).status, 403); checks++;
+  assert.equal((await evidenceRoute().PATCH(request(JSON.stringify({ websiteId: id, evidenceId: id })))).status, 200); checks++;
+  assert.equal((await evidenceRoute().GET(new Request('https://growthos.example/api/organization-intelligence-evidence?websiteId=' + id))).status, 200); checks++;
   console.log(`PASS ${checks} mocked route assertions: scoped preview, denial, malformed and oversized input, forged origin`);
 })().catch(error => { console.error(error); process.exitCode = 1; });
