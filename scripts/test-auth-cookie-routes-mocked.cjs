@@ -80,6 +80,30 @@ async function run() {
   assert.equal(loginCount, 1);
   console.log('PASS oversized login body is non-cacheable and refused before authentication');
 
+  let membershipChecks = 0;
+  const organizationContext = transpile('src/server/organization-context.ts', {
+    './mysql-session': { verifyMySQLSession: async token => token === 'synthetic-token' ? 'user-a' : null },
+    './mysql-organizations': {
+      listAccessibleOrganizations: async () => [{ id: 'org-a', name: 'Synthetic A', role: 'owner' }],
+      requireOrganizationChoice: async (userId, organizationId) => {
+        membershipChecks++;
+        if (userId !== 'user-a' || organizationId !== 'org-a') throw Error('ORGANIZATION_FORBIDDEN');
+        return { id: 'org-a', name: 'Synthetic A', role: 'owner' };
+      }
+    },
+    './authenticated-website-access': { SESSION_COOKIE_NAME: cookieName }
+  });
+  const requestWithCookies = cookies => new Request('https://growthos.example/api/organizations', {
+    headers: { cookie: cookies }
+  });
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('')), /AUTHENTICATION_REQUIRED/);
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token')), /ORGANIZATION_REQUIRED/);
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-b')), /ORGANIZATION_FORBIDDEN/);
+  const scoped = await organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-a'));
+  assert.equal(scoped.organization.id, 'org-a');
+  assert.equal(membershipChecks, 2);
+  console.log('PASS organization context requires session, explicit choice, and verified membership');
+
   const deleted = [];
   const revoked = [];
   const logout = transpile('src/app/api/auth/logout/route.ts', {
