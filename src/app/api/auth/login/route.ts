@@ -18,7 +18,8 @@ export async function POST(request: Request): Promise<Response> {
   const body = await readBoundedJson(request);
   if (body.error) return body.error;
   const parsed = inputSchema.safeParse(body.value);
-  if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_CREDENTIALS' }, { status: 401 });
+  if (!parsed.success) return Response.json({ ok: false, code: 'INVALID_CREDENTIALS' },
+    { status: 401, headers: { 'Cache-Control': 'no-store' } });
   try {
     const { token, expiresAt } = await loginWithPassword(parsed.data.email, parsed.data.password);
     const response = Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
