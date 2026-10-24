@@ -101,6 +101,9 @@ async function run() {
   await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-b')), /ORGANIZATION_FORBIDDEN/);
   await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_session=synthetic-token; growthos_organization=org-a')), /AUTHENTICATION_REQUIRED/);
   await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-a; growthos_organization=org-a')), /ORGANIZATION_REQUIRED/);
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_session=other-token; growthos_organization=org-a')), /AUTHENTICATION_REQUIRED/);
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-a; growthos_organization=org-b')), /ORGANIZATION_REQUIRED/);
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-a; growthos_organization=%ZZ')), /ORGANIZATION_REQUIRED/);
   console.log('PASS duplicate session and organization cookies fail closed');
   const scoped = await organizationContext.getAuthenticatedOrganizationContext(requestWithCookies('growthos_session=synthetic-token; growthos_organization=org-a'));
   assert.equal(scoped.organization.id, 'org-a');
