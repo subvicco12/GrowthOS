@@ -31,6 +31,7 @@ export function IntelligencePanel() {
   const [ourAvailability, setOurAvailability] = useState<'present'|'absent'|'unknown'>('unknown');
   const [status, setStatus] = useState('Loading websites…');
   const [result, setResult] = useState<Result | null>(null);
+  const [ideaCategory, setIdeaCategory] = useState('all');
   const [busy, setBusy] = useState(false);
   const [role, setRole] = useState('viewer');
   const [observation, setObservation] = useState<Observation | null>(null);
@@ -126,6 +127,7 @@ export function IntelligencePanel() {
   return <section className="panel" aria-label="Growth intelligence preview">
     <h2>Growth intelligence</h2>
     <p>Enter a page observation to preview the SEO and feature rules. Manual input is unverified and is never fetched, saved, or used to authorize work.</p>
+    <p role="status">Discovery job: unavailable until website ownership, crawl destination safety and a durable job authority are certified.</p>
     {status && <p role="status">{status}</p>}
     {site && <form className="registryForm" onSubmit={event => void preview(event)}>
       <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setObservation(null); setRecorded(null); setRecordedStatus(''); }}>
@@ -152,7 +154,14 @@ export function IntelligencePanel() {
       <p>SEO findings: {result.seoFindings.length}. Feature candidates: {result.featureCandidates.length}.</p>
       <ul>{result.seoFindings.map((f, i) => <li key={f.key + i}>{f.severity}: {f.evidence}</li>)}</ul>
       <ul>{result.featureCandidates.map(f => <li key={f.featureKey}>{f.name} ({f.confidence} confidence from supplied text)</li>)}</ul>
-      <h4>Ideas for administrative review only</h4><ul>{result.recommendations.map((r,i)=><li key={r.category+i}>{r.title}: {r.rationale} (manual source: {r.evidenceUrl})</li>)}</ul>
+      <h4>Ideas for administrative review only</h4>
+      <label htmlFor="idea-category">Filter ideas by category</label><select id="idea-category" className="reviewFilter" value={ideaCategory} onChange={event=>setIdeaCategory(event.target.value)}>
+        <option value="all">All</option><option value="seo">SEO</option><option value="content">Content</option>
+        <option value="conversion">Conversion</option><option value="feature_review">Feature and package</option></select>
+      <ul className="reviewIdeas">{result.recommendations.filter(r=>ideaCategory==='all'||r.category===ideaCategory).map((r,i)=><li key={r.category+r.evidenceUrl+i}>
+        <strong>{r.title}</strong><span>{r.rationale}</span><small>Unverified manual source: {r.evidenceUrl}</small>
+      </li>)}</ul>
+      <p>Review decisions and history: unavailable until durable tenant-scoped recommendation and audit persistence is certified. No idea can be accepted, rejected or scheduled here.</p>
       {['owner','admin','editor'].includes(role) && <button type="button" disabled={busy||mutationHold||!observation}
         onClick={save}>Save unverified observation with audit</button>}
     </div>}

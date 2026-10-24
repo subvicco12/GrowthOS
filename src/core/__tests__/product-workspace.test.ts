@@ -36,5 +36,6 @@ test('intelligence workspace starts as manual preview without showing saved or v
   const html = renderToStaticMarkup(createElement(IntelligencePanel));
   assert.match(html, /Manual input is unverified/);
   assert.match(html, /Loading websites/);
+  assert.match(html, /Discovery job: unavailable/);
   assert.doesNotMatch(html, /Save unverified observation|Revoke recorded observation|Verified evidence available/);
 });
