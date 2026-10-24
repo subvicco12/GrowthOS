@@ -1,6 +1,7 @@
 'use client';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
+import { workspaceError } from './workspace-response';
 
 type Overview = {
   organization: { name: string };
@@ -14,13 +15,20 @@ export function OrganizationDashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [message, setMessage] = useState('Loading workspace overview…');
   useEffect(() => {
-    fetch('/api/organization-dashboard', { credentials: 'include', cache: 'no-store' })
+    const controller = new AbortController();
+    fetch('/api/organization-dashboard', { credentials: 'include', cache: 'no-store', signal: controller.signal })
       .then(async response => {
-        if (!response.ok) throw new Error('Workspace overview unavailable.');
+        if (!response.ok) throw workspaceError(response, 'Workspace overview');
         return response.json() as Promise<Overview>;
       })
-      .then(data => { setOverview(data); setMessage(''); })
-      .catch(() => setMessage('Workspace overview unavailable.'));
+      .then(data => { if (!controller.signal.aborted) { setOverview(data); setMessage(''); } })
+      .catch(error => {
+        if (!controller.signal.aborted) {
+          setOverview(null);
+          setMessage(error instanceof Error ? error.message : 'Workspace overview unavailable.');
+        }
+      });
+    return () => controller.abort();
   }, []);
   return <section className="panel">
     <h2>Workspace overview</h2>
