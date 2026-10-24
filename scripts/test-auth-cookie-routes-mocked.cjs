@@ -121,6 +121,18 @@ async function run() {
   assert.deepEqual(revoked, ['synthetic-token']);
   assert.deepEqual(deleted, [cookieName, organizationCookie]);
   console.log('PASS logout revokes session and clears both cookies');
+  const failingLogout = transpile('src/app/api/auth/logout/route.ts', {
+    'next/headers': { cookies: async () => { throw Error('SYNTHETIC_COOKIE_STORE_FAILURE'); } },
+    '../../../../server/mysql-session': { revokeMySQLSession: async () => { throw Error('SHOULD_NOT_RUN'); } },
+    '../../../../server/authenticated-website-access': { SESSION_COOKIE_NAME: cookieName },
+    '../../../../server/organization-context': { ORGANIZATION_COOKIE_NAME: organizationCookie },
+    '../../../../server/request-security': requestSecurity
+  });
+  result = await failingLogout.POST({ headers: originHeaders });
+  assert.equal(result.status, 503);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal((await result.json()).code, 'SERVICE_UNAVAILABLE');
+  console.log('PASS logout service failure is generic and non-cacheable');
   result = await logout.POST({ headers: new Headers({ origin: 'https://evil.example', host: 'growthos.example' }) });
   assert.equal(result.status, 403);
   assert.equal(revoked.length, 1);
