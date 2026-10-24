@@ -56,13 +56,15 @@ CREATE TABLE growth_plan_assignments (
 CREATE TABLE growth_plan_assignment_events (
  id CHAR(36) NOT NULL PRIMARY KEY,
  organization_id CHAR(36) NOT NULL, revision BIGINT UNSIGNED NOT NULL,
+ actor_id CHAR(36) NOT NULL,
  plan ENUM('free','pro','business') NOT NULL,
  action ENUM('issued','revoked','expired') NOT NULL,
  issuer VARCHAR(128) NOT NULL,
  evidence_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
  recorded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
  UNIQUE KEY uq_plan_revision_action (organization_id,revision,action),
- FOREIGN KEY (organization_id) REFERENCES growth_organizations(id)
+ FOREIGN KEY (organization_id) REFERENCES growth_organizations(id),
+ FOREIGN KEY (actor_id) REFERENCES growth_users(id)
 ) ENGINE=InnoDB;
 CREATE TRIGGER plan_assignment_events_no_update BEFORE UPDATE ON growth_plan_assignment_events
  FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='IMMUTABLE_PLAN_EVENT';
@@ -77,27 +79,63 @@ CREATE TABLE growth_plan_usage (
 ) ENGINE=InnoDB;
 CREATE TABLE growth_plan_usage_events (
  id CHAR(36) NOT NULL PRIMARY KEY,
- organization_id CHAR(36) NOT NULL, feature_key VARCHAR(80) NOT NULL,
+ organization_id CHAR(36) NOT NULL, website_id CHAR(36) NOT NULL, feature_key VARCHAR(80) NOT NULL,
  period_start DATE NOT NULL, idempotency_key VARCHAR(128) NOT NULL,
  units BIGINT UNSIGNED NOT NULL,
- status ENUM('reserved','settled','released') NOT NULL,
+ status ENUM('reserved','settled','released','refunded') NOT NULL,
  plan_revision BIGINT UNSIGNED NOT NULL,
  recorded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
  UNIQUE KEY uq_plan_usage_request (organization_id,feature_key,idempotency_key),
  UNIQUE KEY uq_plan_usage_event_scope (organization_id,id),
  KEY idx_plan_usage_period (organization_id,feature_key,period_start,status),
  FOREIGN KEY (organization_id,feature_key,period_start) REFERENCES growth_plan_usage(organization_id,feature_key,period_start),
+ FOREIGN KEY (organization_id,website_id) REFERENCES growth_websites(organization_id,id),
  CHECK (units > 0)
 ) ENGINE=InnoDB;
 CREATE TABLE growth_plan_usage_transitions (
  id CHAR(36) NOT NULL PRIMARY KEY,
  organization_id CHAR(36) NOT NULL, usage_event_id CHAR(36) NOT NULL,
- action ENUM('reserved','settled','released') NOT NULL,
+ actor_id CHAR(36) NOT NULL,
+ action ENUM('reserved','settled','released','refunded') NOT NULL,
+ units BIGINT UNSIGNED NOT NULL,
  recorded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
  UNIQUE KEY uq_usage_transition (usage_event_id,action),
- FOREIGN KEY (organization_id,usage_event_id) REFERENCES growth_plan_usage_events(organization_id,id)
+ FOREIGN KEY (organization_id,usage_event_id) REFERENCES growth_plan_usage_events(organization_id,id),
+ FOREIGN KEY (actor_id) REFERENCES growth_users(id),
+ CHECK (units > 0)
 ) ENGINE=InnoDB;
 CREATE TRIGGER plan_usage_transitions_no_update BEFORE UPDATE ON growth_plan_usage_transitions
  FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='IMMUTABLE_USAGE_TRANSITION';
 CREATE TRIGGER plan_usage_transitions_no_delete BEFORE DELETE ON growth_plan_usage_transitions
  FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='IMMUTABLE_USAGE_TRANSITION';
+
+-- State rows may change only through a monotonic, separately audited transition.
+-- The runtime principal cannot issue arbitrary SQL; this is an additional database guard.
+DELIMITER //
+-- @statement
+CREATE TRIGGER plan_assignment_update_guard BEFORE UPDATE ON growth_plan_assignments
+ FOR EACH ROW BEGIN
+  IF OLD.revoked_at IS NOT NULL OR NOT (OLD.organization_id <=> NEW.organization_id) OR
+     NOT ((NEW.revision=OLD.revision+1 AND NEW.revoked_at IS NULL) OR
+       (NEW.revision=OLD.revision AND OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL AND
+        OLD.plan <=> NEW.plan AND OLD.issuer <=> NEW.issuer AND OLD.evidence_hash <=> NEW.evidence_hash AND OLD.expires_at <=> NEW.expires_at)) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='PLAN_ASSIGNMENT_TRANSITION_DENIED';
+  END IF;
+ END//
+-- @statement
+CREATE TRIGGER plan_usage_event_update_guard BEFORE UPDATE ON growth_plan_usage_events
+ FOR EACH ROW BEGIN
+  IF NOT (OLD.id <=> NEW.id AND OLD.organization_id <=> NEW.organization_id AND
+    OLD.website_id <=> NEW.website_id AND OLD.feature_key <=> NEW.feature_key AND
+    OLD.period_start <=> NEW.period_start AND OLD.idempotency_key <=> NEW.idempotency_key AND
+    OLD.units <=> NEW.units AND OLD.plan_revision <=> NEW.plan_revision AND OLD.recorded_at <=> NEW.recorded_at) OR
+    NOT ((OLD.status='reserved' AND NEW.status IN ('settled','released')) OR
+      (OLD.status='settled' AND NEW.status='refunded')) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='PLAN_USAGE_TRANSITION_DENIED';
+  END IF;
+ END//
+DELIMITER ;
+CREATE TRIGGER plan_assignment_no_delete BEFORE DELETE ON growth_plan_assignments
+ FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='IMMUTABLE_PLAN_ASSIGNMENT';
+CREATE TRIGGER plan_usage_event_no_delete BEFORE DELETE ON growth_plan_usage_events
+ FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='IMMUTABLE_PLAN_USAGE_EVENT';
