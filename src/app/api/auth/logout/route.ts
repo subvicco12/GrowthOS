@@ -18,6 +18,7 @@ export async function POST(request: Request): Promise<Response> {
     store.delete(ORGANIZATION_COOKIE_NAME);
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
-    return Response.json({ ok: false, code: 'SERVICE_UNAVAILABLE' },\n      { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    return Response.json({ ok: false, code: 'SERVICE_UNAVAILABLE' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }
