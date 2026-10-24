@@ -22,3 +22,35 @@ test('internal approval permission is role-checked separately from publication',
   assert.throws(() => assertWebsiteAdminAccess({ ...member, role: 'owner', active: false }, 'org-1', 'approve'), /UNAUTHORIZED_ORGANIZATION/);
   assert.throws(() => assertWebsiteAdminAccess({ ...member, role: 'owner' }, 'org-2', 'approve'), /UNAUTHORIZED_ORGANIZATION/);
 });
+
+
+test('every admin action enforces the complete role matrix', () => {
+  const permissions = {
+    read: ['owner', 'admin', 'editor', 'viewer'],
+    register: ['owner', 'admin'],
+    change_budget: ['owner', 'admin'],
+    enable_automation: ['owner'],
+    approve: ['owner', 'admin', 'editor'],
+    publish: ['owner', 'admin', 'editor']
+  } as const;
+  for (const [action, allowedRoles] of Object.entries(permissions)) {
+    for (const role of ['owner', 'admin', 'editor', 'viewer'] as const) {
+      const attempt = () => assertWebsiteAdminAccess({ ...member, role }, 'org-1', action as keyof typeof permissions);
+      if ((allowedRoles as readonly string[]).includes(role)) {
+        assert.doesNotThrow(attempt, `${role} should be allowed to ${action}`);
+      } else {
+        assert.throws(attempt, /INSUFFICIENT_ROLE/, `${role} must not ${action}`);
+      }
+    }
+  }
+});
+
+test('all actions fail closed for inactive, missing and cross-tenant membership', () => {
+  const actions = ['read', 'register', 'change_budget', 'enable_automation', 'approve', 'publish'] as const;
+  for (const action of actions) {
+    assert.throws(() => assertWebsiteAdminAccess(null, 'org-1', action), /UNAUTHORIZED_ORGANIZATION/);
+    assert.throws(() => assertWebsiteAdminAccess({ ...member, role: 'owner', active: false }, 'org-1', action), /UNAUTHORIZED_ORGANIZATION/);
+    assert.throws(() => assertWebsiteAdminAccess({ ...member, role: 'owner' }, 'org-2', action), /UNAUTHORIZED_ORGANIZATION/);
+    assert.throws(() => assertWebsiteAdminAccess({ ...member, role: 'owner' }, '', action), /UNAUTHORIZED_ORGANIZATION/);
+  }
+});
