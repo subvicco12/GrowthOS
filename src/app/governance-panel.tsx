@@ -24,7 +24,7 @@ function HistoryStream({ stream, title }: { stream: Stream; title: string }) {
   }, [stream]);
   async function more() { if (!nextCursor || busy) return;
     setBusy(true); setMessage('');
-    try { const page = await fetchPage(nextCursor); setEntries(old => [...old, ...page.items]); setNextCursor(page.nextCursor); }
+    try { const page = await fetchPage(nextCursor); setEntries(old => { const known = new Set(old.map(entry => entry.id)); return [...old, ...page.items.filter(entry => !known.has(entry.id))]; }); setNextCursor(page.nextCursor); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'History unavailable.'); }
     finally { setBusy(false); }
   }
