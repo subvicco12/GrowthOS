@@ -13,7 +13,7 @@ const transpile = (relative, mocks) => {
   }).outputText;
   const module = { exports: {} };
   vm.runInNewContext(compiled, {
-    module, exports: module.exports, Response, URL, Buffer, TextDecoder, process,
+    module, exports: module.exports, Response, URL, Buffer, TextDecoder, Error, process,
     require: id => {
       if (!(id in mocks)) throw Error('Unmocked dependency: ' + id);
       return mocks[id];
