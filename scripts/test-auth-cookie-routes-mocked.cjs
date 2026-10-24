@@ -104,6 +104,23 @@ async function run() {
   assert.equal(membershipChecks, 2);
   console.log('PASS organization context requires session, explicit choice, and verified membership');
 
+  const organizationRoute = transpile('src/app/api/organizations/route.ts', {
+    '../../../server/organization-context': {
+      getAuthenticatedOrganizationChoices: async request => {
+        if (!request.headers.get('cookie')) throw Error('AUTHENTICATION_REQUIRED');
+        return { organizations: [{ id: 'org-a', name: 'Synthetic A', role: 'owner' }] };
+      }
+    }
+  });
+  result = await organizationRoute.GET(requestWithCookies(''));
+  assert.equal(result.status, 401);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  result = await organizationRoute.GET(requestWithCookies('growthos_session=synthetic-token'));
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('cache-control'), 'no-store');
+  assert.equal((await result.json()).organizations[0].id, 'org-a');
+  console.log('PASS organization listing rejects anonymous access and returns non-cacheable scoped choices');
+
   const deleted = [];
   const revoked = [];
   const logout = transpile('src/app/api/auth/logout/route.ts', {
