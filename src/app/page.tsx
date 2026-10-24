@@ -21,11 +21,13 @@ export default function Dashboard(){
   const [auth,setAuth]=useState<'loading'|'ready'|'signed-out'|'unavailable'>('loading');
   useEffect(()=>{
     const expired=()=>setAuth('signed-out');
+    const hashChanged=()=>{const next=window.location.hash.slice(1);if(navigation.some(item=>item.id===next))setSection(next as Section);};
     window.addEventListener('growthos-session-expired',expired);
+    window.addEventListener('hashchange',hashChanged);
     const initial=window.location.hash.slice(1);
     if(navigation.some(item=>item.id===initial))setSection(initial as Section);
     void checkAuth();
-    return()=>window.removeEventListener('growthos-session-expired',expired);
+    return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
   async function checkAuth(){
     try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});
@@ -37,7 +39,7 @@ export default function Dashboard(){
       if(!response.ok)throw Error('Logout failed.');setAuth('signed-out');
     }catch{setAuth('unavailable');}
   }
-  function navigate(next:Section){setSection(next);window.history.replaceState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
+  function navigate(next:Section){setSection(next);window.history.pushState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
   if(auth==='loading')return <main className="authShell" role="status">Checking session…</main>;
   if(auth==='signed-out')return <AuthPanel onAuthenticated={()=>{setAuth('ready');window.location.reload();}}/>;
   if(auth==='unavailable')return <main className="authShell"><div className="panel"><h1>Workspace unavailable</h1><p>Authentication status could not be verified. No workspace data is shown.</p><button onClick={()=>void checkAuth()}>Retry</button></div></main>;
