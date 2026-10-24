@@ -11,11 +11,11 @@ const input = { organizationId: org, websiteId: site, actorId: actor,
   pages: [{ url: 'https://site.test/pricing', status: 200, indexable: true,
     h1Count: 1, wordCount: 100, internalLinks: 0 }] };
 const now = Date.parse('2026-10-24T11:00:00.000Z');
-function mock(existing: { id: string; payload_hash: string }[] = [], failAudit = false, siteVisible = true, revoked = false) {
+function mock(existing: { id: string; payload_hash: string }[] = [], failAudit = false, siteVisible = true, revoked = false, failCommit = false) {
   const calls: { sql: string; params: unknown[] }[] = [];
   let commits = 0, rollbacks = 0;
   const connection = {
-    beginTransaction: async () => {}, commit: async () => { commits++; },
+    beginTransaction: async () => {}, commit: async () => { commits++; if (failCommit) throw Error('CONNECTION_LOST'); },
     rollback: async () => { rollbacks++; }, release: () => {},
     execute: async (sql: string, params: unknown[]) => {
       calls.push({ sql, params });
@@ -77,4 +77,12 @@ test('revocation appends an event under evidence lock', async () => {
   assert.equal(await m.store.revoke({ organizationId: org, websiteId: site, evidenceId: 'evidence', actorId: actor }), true);
   assert.equal(m.commits, 1);
   assert.ok(m.calls.some(c => c.sql.includes("'revoked'") && c.sql.includes('INSERT INTO')));
+});
+test('lost COMMIT reply on ingestion or revocation is an operator-held unknown outcome', async () => {
+  const m = mock([], false, true, false, true);
+  await assert.rejects(m.store.record(input, now), /EVIDENCE_COMMIT_UNKNOWN/);
+  assert.equal(m.commits, 1);
+  const r = mock([], false, true, false, true);
+  await assert.rejects(r.store.revoke({ organizationId: org, websiteId: site, evidenceId: 'evidence', actorId: actor }), /EVIDENCE_COMMIT_UNKNOWN/);
+  assert.equal(r.commits, 1);
 });

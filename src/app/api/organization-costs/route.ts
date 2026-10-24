@@ -2,10 +2,11 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { getAuthenticatedOrganizationContext } from '../../../server/organization-context';
 import { getMySQLPool } from '../../../server/mysql';
 import { pageError } from '../../../server/organization-pagination';
+import { projectRecordedCosts } from '../../../server/mysql-cost-projection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-type Row = RowDataPacket & { website_id: string; recorded_minor: string; completed_count: number };
+type Row = RowDataPacket & { website_id: string; recorded_minor: string; completed_count: string | number };
 
 /** Ledger entries are recorded completed costs, not provider invoices or a currency claim. */
 export async function GET(request: Request): Promise<Response> {
@@ -19,7 +20,7 @@ export async function GET(request: Request): Promise<Response> {
     );
     return Response.json({ ok: true, organizationId: organization.id, monthStart, currency: null, providerBilledSpendAvailable: false,
       accountingBasis: 'recorded_completed_reservations', reservationEstimatesIncluded: false, cancelledReservationCostsIncluded: false, settlementStatus: 'unverified',
-      recordedCompletedCosts: rows.map(row => ({ websiteId: row.website_id, recordedMinor: row.recorded_minor, completedCount: Number(row.completed_count) })) },
+      recordedCompletedCosts: projectRecordedCosts(rows) },
     { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return pageError(error); }
 }

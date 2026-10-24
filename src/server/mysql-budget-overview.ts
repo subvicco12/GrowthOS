@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2/promise';
 import { getMySQLPool } from './mysql';
 import type { WebsiteBudgetRow } from '../app/website-budget-panel';
+import { exactUnsigned } from './mysql-integer';
 
 type BudgetRow = RowDataPacket & {
   websiteId: string; domain: string; status: string; verified: number;
@@ -24,11 +25,21 @@ export async function listMySQLWebsiteBudgets(organizationId: string): Promise<W
     GROUP BY w.id,w.domain,w.status,w.verified_at
     ORDER BY w.domain ASC
   `, [organizationId]);
+  return projectBudgetRows(rows);
+}
+
+/** Preserve exact database aggregates; a rounded quota or budget is not a usable read model. */
+export function projectBudgetRows(rows: readonly BudgetRow[]): WebsiteBudgetRow[] {
+  const safeCount = (value: unknown) => {
+    const amount = exactUnsigned(value);
+    if (amount > BigInt(Number.MAX_SAFE_INTEGER)) throw Error('UNSAFE_BUDGET_COUNT');
+    return Number(amount);
+  };
   return rows.map(row => ({
     websiteId: row.websiteId, domain: row.domain, status: row.status,
-    verified: Boolean(row.verified),
-    enabledContentTypes: Number(row.enabledContentTypes),
-    weeklyUnits: Number(row.weeklyUnits),
-    configuredMonthlyMinor: String(row.configuredMonthlyMinor)
+    verified: row.verified === 1,
+    enabledContentTypes: safeCount(row.enabledContentTypes),
+    weeklyUnits: safeCount(row.weeklyUnits),
+    configuredMonthlyMinor: exactUnsigned(row.configuredMonthlyMinor).toString()
   }));
 }

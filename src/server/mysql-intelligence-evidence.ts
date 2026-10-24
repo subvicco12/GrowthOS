@@ -30,6 +30,7 @@ export class MySQLManualEvidenceStore {
     validTime(input, now);
     const hash = digest(input), id = randomUUID(), eventId = randomUUID();
     const connection = await this.pool.getConnection();
+    let commitAttempted = false;
     try {
       await connection.beginTransaction();
       const [sites] = await connection.execute<SiteRow[]>(
@@ -46,7 +47,7 @@ export class MySQLManualEvidenceStore {
           "SELECT id FROM growth_intelligence_evidence_events WHERE organization_id=? AND website_id=? AND evidence_id=? AND event_type='revoked'",
           [input.organizationId,input.websiteId,existing[0].id]);
         if (revoked.length) throw Error('EVIDENCE_REVOKED');
-        await connection.commit();
+        commitAttempted = true; await connection.commit();
         return { id: existing[0].id, duplicate: true };
       }
       const [saved] = await connection.execute<ResultSetHeader>(
@@ -60,14 +61,19 @@ export class MySQLManualEvidenceStore {
         "INSERT INTO growth_intelligence_evidence_events (id,organization_id,website_id,evidence_id,actor_id,event_type) VALUES (?,?,?,?,?,'ingested')",
         [eventId,input.organizationId,input.websiteId,id,input.actorId]);
       if (event.affectedRows !== 1) throw Error('EVIDENCE_AUDIT_FAILED');
-      await connection.commit();
+      commitAttempted = true; await connection.commit();
       return { id, duplicate: false };
-    } catch (error) { await connection.rollback(); throw error; }
+    } catch (error) {
+      try { await connection.rollback(); } catch { /* A rollback cannot establish the outcome of COMMIT. */ }
+      if (commitAttempted) throw Error('EVIDENCE_COMMIT_UNKNOWN');
+      throw error;
+    }
     finally { connection.release(); }
   }
 
   async revoke(scope: { organizationId: string; websiteId: string; evidenceId: string; actorId: string }): Promise<boolean> {
     const connection = await this.pool.getConnection();
+    let commitAttempted = false;
     try {
       await connection.beginTransaction();
       const [rows] = await connection.execute<EvidenceRow[]>(
@@ -77,13 +83,17 @@ export class MySQLManualEvidenceStore {
       const [revocations] = await connection.execute<EvidenceRow[]>(
         "SELECT id FROM growth_intelligence_evidence_events WHERE organization_id=? AND website_id=? AND evidence_id=? AND event_type='revoked'",
         [scope.organizationId,scope.websiteId,scope.evidenceId]);
-      if (revocations.length) { await connection.commit(); return false; }
+      if (revocations.length) { commitAttempted = true; await connection.commit(); return false; }
       const [event] = await connection.execute<ResultSetHeader>(
         "INSERT INTO growth_intelligence_evidence_events (id,organization_id,website_id,evidence_id,actor_id,event_type) VALUES (?,?,?,?,?,'revoked')",
         [randomUUID(),scope.organizationId,scope.websiteId,scope.evidenceId,scope.actorId]);
       if (event.affectedRows !== 1) throw Error('EVIDENCE_AUDIT_FAILED');
-      await connection.commit(); return true;
-    } catch (error) { await connection.rollback(); throw error; }
+      commitAttempted = true; await connection.commit(); return true;
+    } catch (error) {
+      try { await connection.rollback(); } catch { /* A rollback cannot establish the outcome of COMMIT. */ }
+      if (commitAttempted) throw Error('EVIDENCE_COMMIT_UNKNOWN');
+      throw error;
+    }
     finally { connection.release(); }
   }
 

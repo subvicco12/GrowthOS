@@ -12,7 +12,7 @@ function load(file, mocks) {
 process.env.GROWTHOS_APP_ORIGIN = 'https://growthos.example';
 const security = load('src/server/request-security.ts', {});
 const pagination = load('src/server/organization-pagination.ts', { zod: require('zod') });
-const core = require('../src/core/manual-intelligence-preview.ts');
+let core;
 const id = '00000000-0000-4000-8000-000000000001';
 const org = '00000000-0000-4000-8000-000000000002';
 const payload = (url = 'https://site.test/pricing') => JSON.stringify({ websiteId: id, pages: [{ url, status: 200, indexable: true, h1Count: 1, wordCount: 100, internalLinks: 1 }] });
@@ -34,6 +34,7 @@ async function run(body, { error, rows = [{ domain: 'site.test' }] } = {}) {
   return { response, body: await response.json(), queries, route };
 }
 (async () => {
+  core = await import('../src/core/manual-intelligence-preview.ts');
   let checks = 0;
   let result = await run(payload());
   assert.equal(result.response.status, 200); assert.equal(result.body.evidence, 'UNVERIFIED_MANUAL_INPUT');
@@ -63,15 +64,15 @@ async function run(body, { error, rows = [{ domain: 'site.test' }] } = {}) {
     checks++;
   }
   const evidenceCalls = [];
-  const evidenceRoute = (role = 'owner', error = null) => load('src/app/api/organization-intelligence-evidence/route.ts', {
+  const evidenceRoute = (role = 'owner', error = null, mutationFailure = null) => load('src/app/api/organization-intelligence-evidence/route.ts', {
     zod: require('zod'),
     '../../../core/manual-intelligence-preview': { previewInput: core.previewInput },
     '../../../server/request-security': security,
     '../../../server/organization-pagination': pagination,
     '../../../server/mysql': { getMySQLPool: () => ({}) },
     '../../../server/mysql-intelligence-evidence': { MySQLManualEvidenceStore: class {
-      async record(input) { evidenceCalls.push(['record',input]); return { id: id, duplicate: false }; }
-      async revoke(input) { evidenceCalls.push(['revoke',input]); return true; }
+      async record(input) { evidenceCalls.push(['record',input]); if (mutationFailure) throw Error(mutationFailure); return { id: id, duplicate: false }; }
+      async revoke(input) { evidenceCalls.push(['revoke',input]); if (mutationFailure) throw Error(mutationFailure); return true; }
       async list(organizationId, websiteId) { evidenceCalls.push(['list',organizationId,websiteId]); return []; }
     } },
     '../../../server/organization-context': { getAuthenticatedOrganizationContext: async () => {
@@ -91,6 +92,14 @@ async function run(body, { error, rows = [{ domain: 'site.test' }] } = {}) {
   assert.equal(evidenceCalls.at(-1)[1].organizationId, org); checks++;
   assert.equal((await evidenceRoute('viewer').PATCH(request(JSON.stringify({ websiteId: id, evidenceId: id })))).status, 403); checks++;
   assert.equal((await evidenceRoute().PATCH(request(JSON.stringify({ websiteId: id, evidenceId: id })))).status, 200); checks++;
-  assert.equal((await evidenceRoute().GET(new Request('https://growthos.example/api/organization-intelligence-evidence?websiteId=' + id))).status, 200); checks++;
+  for (const operation of ['POST','PATCH']) {
+    const response = await evidenceRoute('owner', null, 'EVIDENCE_COMMIT_UNKNOWN')[operation](request(operation === 'POST' ? recordBody : JSON.stringify({ websiteId: id, evidenceId: id })));
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'EVIDENCE_OUTCOME_UNKNOWN_OPERATOR_HOLD'); checks += 2;
+  }
+  const listing = await evidenceRoute().GET(new Request('https://growthos.example/api/organization-intelligence-evidence?websiteId=' + id));
+  assert.equal(listing.status, 200);
+  const scoped = await listing.json(); assert.equal(scoped.organizationId, org); assert.equal(scoped.websiteId, id);
+  assert.equal(scoped.verifiedEvidenceAvailable, false); checks += 4;
   console.log(`PASS ${checks} mocked route assertions: scoped preview, denial, malformed and oversized input, forged origin`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

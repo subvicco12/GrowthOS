@@ -27,6 +27,8 @@ async function run(file, url, { error, sqlError = false, rows = [], organization
       queries.push({ sql, params }); if (sqlError) throw Error('DATABASE_UNAVAILABLE'); return [rows];
     } }) },
     '../../../server/organization-pagination': pagination,
+    '../../../server/mysql-cost-projection': load('src/server/mysql-cost-projection.ts', {
+      './mysql-integer': load('src/server/mysql-integer.ts') }),
     '../../../core/connector-health': load('src/core/connector-health.ts'),
     '../../../server/request-security': {}, '../../../core/website-domain-schema': { websiteDomainSchema: require('zod').z.string() },
     'node:crypto': require('node:crypto'), zod: require('zod'),
