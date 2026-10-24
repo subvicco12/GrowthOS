@@ -27,7 +27,12 @@ export function OrganizationWebsiteRegistry() {
     setLoadingMore(true); setMessage('');
     try { const result = await getPage(nextCursor);
       if (data && result.organization.id !== data.organization.id) throw Error('Workspace changed. Refresh the page.');
-      setData(previous => previous ? { ...previous, websites: [...previous.websites, ...result.websites] } : result);
+      setData(previous => {
+        if (!previous) return result;
+        if (previous.organization.id !== result.organization.id) return previous;
+        const known = new Set(previous.websites.map(site => site.id));
+        return { ...previous, websites: [...previous.websites, ...result.websites.filter(site => !known.has(site.id))] };
+      });
       setNextCursor(result.nextCursor);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Website registry unavailable.'); }
     finally { setLoadingMore(false); }
