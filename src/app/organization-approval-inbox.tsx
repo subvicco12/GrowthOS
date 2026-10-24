@@ -18,7 +18,13 @@ export function OrganizationApprovalInbox(){
     const current=await scope.json() as {organization:{id:string;role:string}};
     const data=await response.json() as {items:Approval[];nextCursor:string|null};
     if(cursor&&organization&&organization.id!==current.organization.id)throw Error('Workspace changed. Refresh the page.');
-    setOrganization(current.organization);setItems(previous=>cursor?[...previous,...data.items]:data.items);setNextCursor(data.nextCursor);setMessage('');
+    setOrganization(current.organization);
+    setItems(previous=>{
+      if(!cursor)return data.items;
+      const known=new Set(previous.map(item=>item.id));
+      return [...previous,...data.items.filter(item=>!known.has(item.id))];
+    });
+    setNextCursor(data.nextCursor);setMessage('');
   }
   async function more(){if(!nextCursor||loadingMore)return;setLoadingMore(true);try{await load(nextCursor);}catch(error){setMessage(error instanceof Error?error.message:'Approval inbox unavailable.');}finally{setLoadingMore(false);}}
   useEffect(()=>{void load().catch(error=>setMessage(error instanceof Error?error.message:'Approval inbox unavailable.'));},[]);
