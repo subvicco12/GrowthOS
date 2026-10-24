@@ -20,7 +20,7 @@ export function ConnectorsPanel() {
     .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Connector evidence unavailable.'); });
     return () => { active = false; }; }, []);
   async function more() { if (!cursor || busy) return; setBusy(true); setMessage('');
-    try { const page = await fetchPage(cursor); setEntries(old => [...old, ...page.connectors]); setCursor(page.nextCursor); }
+    try { const page = await fetchPage(cursor); setEntries(old => { const known = new Set(old.map(entry => entry.websiteId)); return [...old, ...page.connectors.filter(entry => !known.has(entry.websiteId))]; }); setCursor(page.nextCursor); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Connector evidence unavailable.'); }
     finally { setBusy(false); }
   }
