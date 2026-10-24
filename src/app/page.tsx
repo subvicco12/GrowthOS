@@ -9,10 +9,11 @@ import { AuthPanel } from './auth-panel';
 import { CostCenter } from './cost-center';
 import { GovernancePanel } from './governance-panel';
 import { ConnectorsPanel } from './connectors-panel';
+import { IntelligencePanel } from './intelligence-panel';
 
-type Section='home'|'websites'|'approvals'|'costs'|'automation'|'connectors'|'governance';
+type Section='home'|'websites'|'intelligence'|'approvals'|'costs'|'automation'|'connectors'|'governance';
 const navigation:{id:Section;label:string}[]=[
-  {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'approvals',label:'Approvals'},
+  {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'intelligence',label:'Intelligence'},{id:'approvals',label:'Approvals'},
   {id:'costs',label:'Cost center'},{id:'automation',label:'Controls'},
   {id:'connectors',label:'Connectors'},{id:'governance',label:'Governance'}
 ];
@@ -52,6 +53,7 @@ export default function Dashboard(){
     <section className="appContent"><header className="appHeader"><div><p className="eyebrow">FIRST-PARTY ADMIN</p><h1>{title}</h1><p className="lede">Selected organization scope. Unknown metrics are shown as unavailable.</p></div>
       <div className="headerActions"><OrganizationSelector/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
       {section==='home'&&<OrganizationDashboard/>}{section==='websites'&&<OrganizationWebsiteRegistry/>}
+      {section==='intelligence'&&<IntelligencePanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
       {section==='governance'&&<GovernancePanel/>}
