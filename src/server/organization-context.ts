@@ -7,12 +7,16 @@ export const ORGANIZATION_COOKIE_NAME = 'growthos_organization';
 /** Read cookies from the actual request, not caller-supplied identity headers. */
 function readCookie(request: Request, name: string): string | undefined {
   const cookie = request.headers.get('cookie') || '';
+  let found: string | undefined;
   for (const item of cookie.split(';')) {
     const idx = item.indexOf('=');
     if (idx < 0 || item.slice(0, idx).trim() !== name) continue;
-    try { return decodeURIComponent(item.slice(idx + 1).trim()); } catch { return undefined; }
+    // Duplicate authentication/scope cookies are ambiguous; reject rather than
+    // allowing intermediaries to disagree about which cookie is authoritative.
+    if (found !== undefined) return undefined;
+    try { found = decodeURIComponent(item.slice(idx + 1).trim()); } catch { return undefined; }
   }
-  return undefined;
+  return found;
 }
 
 export async function getAuthenticatedOrganizationContext(request: Request) {
