@@ -139,6 +139,13 @@ async function run() {
   assert.equal(membershipChecks, 2);
   console.log('PASS organization context requires session, explicit choice, and verified membership');
 
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationChoices(requestWithCookies('growthos_session=synthetic-token; growthos_session=other-token')), /AUTHENTICATION_REQUIRED/);
+  await assert.rejects(() => organizationContext.getAuthenticatedOrganizationChoices(requestWithCookies('growthos_session=%ZZ')), /AUTHENTICATION_REQUIRED/);
+  const validChoices = await organizationContext.getAuthenticatedOrganizationChoices(requestWithCookies('growthos_session=synthetic-token'));
+  assert.equal(validChoices.userId, 'user-a');
+  assert.equal(validChoices.organizations[0].id, 'org-a');
+  console.log('PASS organization discovery rejects ambiguous session cookies');
+
   const organizationRoute = transpile('src/app/api/organizations/route.ts', {
     '../../../server/organization-context': {
       getAuthenticatedOrganizationChoices: async request => {
