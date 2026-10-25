@@ -12,11 +12,12 @@ import { ConnectorsPanel } from './connectors-panel';
 import { IntelligencePanel } from './intelligence-panel';
 import { RecommendationReviewPanel } from './recommendation-review-panel';
 import { AnalyticsPanel } from './analytics-panel';
+import { CompetitorWorkspace } from './competitor-workspace';
 
-type Section='home'|'websites'|'intelligence'|'analytics'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
+type Section='home'|'websites'|'intelligence'|'analytics'|'competitors'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
 const navigation:{id:Section;label:string}[]=[
   {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'intelligence',label:'Intelligence'},
-  {id:'analytics',label:'Analytics'},
+  {id:'analytics',label:'Analytics'},{id:'competitors',label:'Competitors'},
   {id:'recommendations',label:'Recommendations'},{id:'approvals',label:'Approvals'},
   {id:'costs',label:'Cost center'},{id:'automation',label:'Controls'},
   {id:'connectors',label:'Connectors'},{id:'governance',label:'Governance'}
@@ -64,6 +65,7 @@ export default function Dashboard(){
       {section==='home'&&<OrganizationDashboard/>}{section==='websites'&&<OrganizationWebsiteRegistry/>}
       {intelligenceVisited&&<div hidden={section!=='intelligence'}><IntelligencePanel onDirtyChange={setLocalWorkDirty}/></div>}
       {section==='analytics'&&<AnalyticsPanel/>}
+      {section==='competitors'&&<CompetitorWorkspace/>}
       {section==='recommendations'&&<RecommendationReviewPanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
