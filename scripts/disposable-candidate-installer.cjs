@@ -45,6 +45,11 @@ function plan(){
 async function install(env){
  if(env.GROWTHOS_CANDIDATE_INSTALL!=='EXPLICIT_DISPOSABLE_INSTALL_ONLY')throw Error('INSTALL_AUTHORIZATION_REQUIRED');
  const options=assertDisposable(env),files=plan(),inventory=expected();
+ // Loopback, a test schema name and caller-set environment variables do not
+ // independently identify the server process. Keep installation unreachable
+ // until a separately reviewed process/network isolation attestation exists.
+ void options;void files;void inventory;
+ throw Error('INDEPENDENT_SERVER_ISOLATION_GATE_UNAVAILABLE');
  const mysql=require('mysql2/promise');
  const config={...options,multipleStatements:false,connectTimeout:3000,timezone:'Z'};
  const a=await mysql.createConnection(config);let b,started=false;

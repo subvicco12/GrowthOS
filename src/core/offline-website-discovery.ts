@@ -57,8 +57,12 @@ function sitemapPaths(xml: string, host: string): string[] {
   }
   return paths;
 }
-function within(ms: number, signal: AbortSignal): AbortSignal {
-  return AbortSignal.any([signal,AbortSignal.timeout(ms)]);
+function within(ms: number, signal: AbortSignal): { signal: AbortSignal; close: () => void } {
+  // AbortSignal.timeout uses an unref'ed timer on Node 22. A stalled provider
+  // promise could otherwise leave no active handle and cancel the test/job.
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(), ms);
+  return { signal: AbortSignal.any([signal,timeout.signal]), close: () => clearTimeout(timer) };
 }
 
 /** Every authority check precedes transport use. No live transport implementation is provided. */
@@ -74,7 +78,8 @@ export async function discoverSyntheticWebsite(input: DiscoveryInput, authority:
   await authority.assertCurrent(input); // Owner verification, tenant membership and feature policy are external mandatory authorities.
   await authority.rateLimit(input);
   if (await authority.claim(input) !== 'new') throw Error('DISCOVERY_DUPLICATE_JOB');
-  const scoped = within(input.timeoutMs,signal);
+  const deadline = within(input.timeoutMs,signal);
+  const scoped = deadline.signal;
   const result: DiscoveryResult = { organizationId:input.organizationId,websiteId:input.websiteId,jobKey:input.jobKey,
     state:'unknown',pages:[],warnings:[] };
   const read = async(path:string) => {
@@ -111,5 +116,5 @@ export async function discoverSyntheticWebsite(input: DiscoveryInput, authority:
   } catch(error) {
     result.state = scoped.aborted ? 'cancelled' : 'unknown';
     result.pages=[];result.warnings.push(error instanceof Error ? error.message : 'DISCOVERY_FAILURE');return result;
-  }
+  } finally { deadline.close(); }
 }
