@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 type Organization = { id: string; name: string; role: 'owner' | 'admin' | 'editor' | 'viewer' };
 
-export function OrganizationSelector() {
+export function OrganizationSelector({onBeforeSelection}:{onBeforeSelection?:()=>boolean}={}) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selected, setSelected] = useState('');
   const [status, setStatus] = useState('Loading organizations…');
@@ -38,6 +38,7 @@ export function OrganizationSelector() {
 
   async function choose(id: string) {
     if (!id) return;
+    if(onBeforeSelection&&!onBeforeSelection())return;
     setBusy(true);
     setStatus('');
     try {

@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { workspaceError } from './workspace-response';
 import { prepareContentBrief, prepareLocalPlan, type DraftChannel } from '../core/local-growth-plan';
 import { ContentCampaignStudio } from './content-campaign-studio';
@@ -15,7 +15,7 @@ type Recorded = { id: string; sourceLabel: string; state: 'unverified' | 'expire
 type Observation = { websiteId: string; pages: { url: string; status: number; indexable: boolean; title: string; description?: string; canonical?: string;
   h1Count: number; wordCount: number; internalLinks: number }[] };
 
-export function IntelligencePanel() {
+export function IntelligencePanel({onDirtyChange}:{onDirtyChange?:(dirty:boolean)=>void}={}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState('');
   const [url, setUrl] = useState('');
@@ -45,10 +45,13 @@ export function IntelligencePanel() {
   const [recordedStatus, setRecordedStatus] = useState('');
   const [reviewStatus, setReviewStatus] = useState('');
   const [mutationHold, setMutationHold] = useState(false);
+  const [studioDirty,setStudioDirty] = useState(false);
+  const updateStudioDirty=useCallback((value:boolean)=>{setStudioDirty(value);onDirtyChange?.(value);},[onDirtyChange]);
   const [selectedIdeas, setSelectedIdeas] = useState<string[]>([]);
   const [planTitle, setPlanTitle] = useState('Website growth plan');
   const [draftChannel, setDraftChannel] = useState<DraftChannel>('blog');
   const [draftIdea, setDraftIdea] = useState('');
+  function mayReplaceLocalWork(){return !studioDirty || window.confirm('Local editorial drafts and campaigns will be discarded. Export the package first if you want to preserve them. Continue?');}
   useEffect(() => {
     let active = true;
     async function load() {
@@ -70,7 +73,8 @@ export function IntelligencePanel() {
   }, []);
   const site = sites.find(s => s.id === siteId);
   async function preview(event: import('react').FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!site) return;
+    event.preventDefault(); if (!site || !mayReplaceLocalWork()) return;
+    updateStudioDirty(false);
     setBusy(true); setResult(null); setObservation(null); setSelectedIdeas([]); setDraftIdea(''); setStatus('');
     try {
       const candidate: Observation = { websiteId: site.id, pages: [{ url, status: Number(httpStatus), indexable: indexable === 'yes', title,
@@ -154,7 +158,7 @@ export function IntelligencePanel() {
     <p>Enter a page observation to preview the SEO and feature rules. Manual input is unverified and is never fetched, saved, or used to authorize work.</p>
     <p role="status">Discovery job: unavailable until website ownership, crawl destination safety and a durable job authority are certified.</p>
     {status && <p role="status">{status}</p>}
-    {site && <form className="registryForm" onSubmit={event => void preview(event)}>
+    {site && <form className="registryForm" onSubmit={event => void preview(event)} onChangeCapture={event=>{if(studioDirty){if(!mayReplaceLocalWork()){event.stopPropagation();return;}updateStudioDirty(false);}}}>
       <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setSelectedIdeas([]); setDraftIdea(''); setObservation(null); setRecorded(null); setRecordedStatus(''); setReviewStatus(''); }}>
         {sites.map(s => <option key={s.id} value={s.id}>{s.domain}</option>)}</select></div>
       <div><label htmlFor="intelligence-url">Observed HTTPS page URL on {site.domain}</label><input id="intelligence-url" type="url" required maxLength={2048} value={url} onChange={event => {setUrl(event.target.value);setResult(null);setObservation(null);}} placeholder={'https://' + site.domain + '/'} /></div>
@@ -192,7 +196,7 @@ export function IntelligencePanel() {
         <label htmlFor="local-plan-title">Working title</label><input id="local-plan-title" maxLength={120} value={planTitle} onChange={e=>setPlanTitle(e.target.value)} />
         <ul>{result.recommendations.map((r,i)=>{const id=`${selectedOrganization.current}:${siteId}:${i}`;return <li key={id}>
           <label><input type="checkbox" checked={selectedIdeas.includes(id)} disabled={!selectedIdeas.includes(id)&&selectedIdeas.length>=20}
-            onChange={e=>{setSelectedIdeas(old=>e.target.checked?[...old,id]:old.filter(item=>item!==id));setDraftIdea('');}} />
+            onChange={e=>{if(!mayReplaceLocalWork())return;updateStudioDirty(false);setSelectedIdeas(old=>e.target.checked?[...old,id]:old.filter(item=>item!==id));setDraftIdea('');}} />
             {r.title} · {r.category} · unverified manual evidence</label></li>;})}</ul>
         {proposed && <div role="status"><strong>{proposed.ideas.length} planned ideas</strong><p>Estimated cost: unknown. Effort and impact: unestimated. Approval: not requested.</p>
           <ol>{proposed.ideas.map(i=><li key={i.id}>{i.title} · priority {i.priority} (category rule only) · source: {i.evidenceUrl}</li>)}</ol>
@@ -206,7 +210,7 @@ export function IntelligencePanel() {
             <ol>{brief.checklist.map(step=><li key={step}>{step}</li>)}</ol><p>Unsaved local outline. Publishing disabled.</p></div>}
         </div> : null}
       </div>
-      {proposed?.ideas.length ? <ContentCampaignStudio key={proposed.organizationId+':'+proposed.websiteId+':'+proposed.ideas.map(i=>i.id).join(',')} plan={proposed} role={role}/> : null}
+      {proposed?.ideas.length ? <ContentCampaignStudio key={proposed.organizationId+':'+proposed.websiteId+':'+proposed.ideas.map(i=>i.id).join(',')} plan={proposed} role={role} onDirtyChange={updateStudioDirty}/> : null}
       <p>Review decisions and history: unavailable until durable tenant-scoped recommendation and audit persistence is certified. No idea can be accepted, rejected or scheduled here.</p>
       {['owner','admin','editor'].includes(role) && <button type="button" disabled={busy||mutationHold||!observation}
         onClick={save}>Save unverified observation with audit</button>}

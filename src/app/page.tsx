@@ -21,14 +21,17 @@ const navigation:{id:Section;label:string}[]=[
 ];
 export default function Dashboard(){
   const [section,setSection]=useState<Section>('home');
+  const [intelligenceVisited,setIntelligenceVisited]=useState(false);
   const [auth,setAuth]=useState<'loading'|'ready'|'signed-out'|'unavailable'>('loading');
+  const [localWorkDirty,setLocalWorkDirty]=useState(false);
   useEffect(()=>{
     const expired=()=>setAuth('signed-out');
-    const hashChanged=()=>{const next=window.location.hash.slice(1);if(navigation.some(item=>item.id===next))setSection(next as Section);};
+    const hashChanged=()=>{const next=window.location.hash.slice(1);if(navigation.some(item=>item.id===next)){
+      setSection(next as Section);if(next==='intelligence')setIntelligenceVisited(true);}};
     window.addEventListener('growthos-session-expired',expired);
     window.addEventListener('hashchange',hashChanged);
     const initial=window.location.hash.slice(1);
-    if(navigation.some(item=>item.id===initial))setSection(initial as Section);
+    if(navigation.some(item=>item.id===initial)){setSection(initial as Section);if(initial==='intelligence')setIntelligenceVisited(true);}
     void checkAuth();
     return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
@@ -42,7 +45,9 @@ export default function Dashboard(){
       if(!response.ok)throw Error('Logout failed.');setAuth('signed-out');
     }catch{setAuth('unavailable');}
   }
-  function navigate(next:Section){setSection(next);window.history.pushState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
+  function allowLeavingStudio(){return !localWorkDirty||window.confirm('Local drafts and campaigns will be discarded. Export a JSON package first if you want to preserve them. Continue?');}
+  function navigate(next:Section){setSection(next);if(next==='intelligence')setIntelligenceVisited(true);
+    window.history.pushState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
   if(auth==='loading')return <main className="authShell" role="status">Checking session…</main>;
   if(auth==='signed-out')return <AuthPanel onAuthenticated={()=>{setAuth('ready');window.location.reload();}}/>;
   if(auth==='unavailable')return <main className="authShell"><div className="panel"><h1>Workspace unavailable</h1><p>Authentication status could not be verified. No workspace data is shown.</p><button onClick={()=>void checkAuth()}>Retry</button></div></main>;
@@ -53,9 +58,9 @@ export default function Dashboard(){
       <div className="sidebarFooter">Publishing and automation are not started here.</div>
     </aside>
     <section className="appContent"><header className="appHeader"><div><p className="eyebrow">FIRST-PARTY ADMIN</p><h1>{title}</h1><p className="lede">Selected organization scope. Unknown metrics are shown as unavailable.</p></div>
-      <div className="headerActions"><OrganizationSelector/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
+      <div className="headerActions"><OrganizationSelector onBeforeSelection={()=>{if(!allowLeavingStudio())return false;setSection('home');setIntelligenceVisited(false);setLocalWorkDirty(false);return true;}}/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
       {section==='home'&&<OrganizationDashboard/>}{section==='websites'&&<OrganizationWebsiteRegistry/>}
-      {section==='intelligence'&&<IntelligencePanel/>}
+      {intelligenceVisited&&<div hidden={section!=='intelligence'}><IntelligencePanel onDirtyChange={setLocalWorkDirty}/></div>}
       {section==='recommendations'&&<RecommendationReviewPanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
