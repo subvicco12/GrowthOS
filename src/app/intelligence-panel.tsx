@@ -3,6 +3,7 @@ import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { workspaceError } from './workspace-response';
 import { prepareContentBrief, prepareLocalPlan, type DraftChannel } from '../core/local-growth-plan';
+import { ContentCampaignStudio } from './content-campaign-studio';
 
 type Site = { id: string; domain: string };
 type Page = { websites: Site[]; nextCursor: string | null; organization: { id: string; role: string } };
@@ -205,6 +206,7 @@ export function IntelligencePanel() {
             <ol>{brief.checklist.map(step=><li key={step}>{step}</li>)}</ol><p>Unsaved local outline. Publishing disabled.</p></div>}
         </div> : null}
       </div>
+      {proposed?.ideas.length ? <ContentCampaignStudio key={proposed.organizationId+':'+proposed.websiteId+':'+proposed.ideas.map(i=>i.id).join(',')} plan={proposed} role={role}/> : null}
       <p>Review decisions and history: unavailable until durable tenant-scoped recommendation and audit persistence is certified. No idea can be accepted, rejected or scheduled here.</p>
       {['owner','admin','editor'].includes(role) && <button type="button" disabled={busy||mutationHold||!observation}
         onClick={save}>Save unverified observation with audit</button>}
