@@ -3,6 +3,7 @@ import { useEffect,useState } from 'react';
 import { compareReportingPeriods,performanceOpportunities,periodBuckets,summarizeAnalytics,type AnalyticsObservation } from '../core/offline-analytics';
 import { exportAnalytics,exportAnalyticsCsv,importAnalytics,type AnalyticsPackage } from '../core/offline-analytics-transfer';
 import { workspaceError } from './workspace-response';
+import { providerCapabilities } from '../core/analytics-provider-catalog';
 type Site={id:string;domain:string};
 type Page={websites:Site[];nextCursor:string|null;organization:{id:string;role:string}};
 const display=(n:number|null,unit='')=>n===null?'Unavailable':new Intl.NumberFormat().format(n)+unit;
@@ -54,7 +55,14 @@ export function AnalyticsPanel(){
    .slice(0,30).map(value=>({value,count:selected.filter(r=>r[key]===value).length}));
  return <section className="panel analyticsPanel" aria-label="Offline analytics and performance">
   <h2>Analytics & Performance</h2><p>Validated manual imports only. No analytics provider is connected. Imported figures are unverified reports, never settled payment or verified website performance.</p>
-  <p role="status">{status}</p>{error&&<p role="alert">{error}</p>}
+  <p role="status">{status}</p>
+  <details><summary>Connector and evidence trust status</summary>
+   <p>No analytics connector is active. Configuration, imported reports and successful API responses do not prove account ownership, current permissions, integrity or independent verification. This workspace accepts only local unverified or synthetic observations.</p>
+   <div className="analyticsTable"><table><caption>Provider contracts prepared; collection disabled</caption><thead><tr><th scope="col">Provider category</th><th scope="col">Required scope</th><th scope="col">Status</th></tr></thead><tbody>
+    {Object.entries(providerCapabilities).map(([kind,scopes])=><tr key={kind}><th scope="row">{kind}</th><td>{scopes.join(', ')}</td><td>Unavailable · no trusted connection</td></tr>)}
+   </tbody></table></div>
+   <p>Trust progression: synthetic or manual → imported unverified → provider reported → provider authenticated → independently verified. Each step needs current scoped evidence; revocation or missing authority blocks promotion. No local package carries approval, payment settlement or publishing authority.</p>
+  </details>{error&&<p role="alert">{error}</p>}
   <div className="analyticsControls"><label>Website<select value={siteId} onChange={e=>{setSiteId(e.target.value);setPending(null);setFrom('');setThrough('');}}>
     <option value="">Portfolio · compatible measurements only</option>{sites.map(s=><option key={s.id} value={s.id}>{s.domain}</option>)}</select></label>
     <label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label>
