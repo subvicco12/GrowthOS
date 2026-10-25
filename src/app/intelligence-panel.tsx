@@ -41,6 +41,7 @@ export function IntelligencePanel() {
   const selectedOrganization = useRef('');
   const [recorded, setRecorded] = useState<Recorded[] | null>(null);
   const [recordedStatus, setRecordedStatus] = useState('');
+  const [reviewStatus, setReviewStatus] = useState('');
   const [mutationHold, setMutationHold] = useState(false);
   useEffect(() => {
     let active = true;
@@ -99,6 +100,18 @@ export function IntelligencePanel() {
       setRecordedStatus(data.items.length ? 'Recorded observations are unverified manual claims.' : 'No recorded observations.');
     } catch(error) { setRecorded(null); setRecordedStatus(error instanceof Error ? error.message : 'Recorded observations unavailable.'); }
   }
+  async function checkReviewQueue() {
+    if (!siteId || !selectedOrganization.current) return;
+    const requestedSite=siteId, requestedOrg=selectedOrganization.current;
+    setReviewStatus('Checking recommendation review availability…');
+    try {
+      const query=new URLSearchParams({organizationId:requestedOrg,websiteId:requestedSite});
+      const response=await fetch('/api/organization-recommendations?'+query,{credentials:'include',cache:'no-store'});
+      if(requestedSite!==selectedSite.current||requestedOrg!==selectedOrganization.current)throw Error('Workspace changed. Reload before reviewing.');
+      if(!response.ok)throw workspaceError(response,'Recommendation review');
+      throw Error('Recommendation review response is unavailable until durable certification.');
+    } catch(error){setReviewStatus(error instanceof Error?error.message:'Recommendation review unavailable.');}
+  }
   async function mutate(method:'POST'|'PATCH',body:object) {
     if (mutationHold || busy) return;
     setBusy(true);setRecordedStatus('');
@@ -130,7 +143,7 @@ export function IntelligencePanel() {
     <p role="status">Discovery job: unavailable until website ownership, crawl destination safety and a durable job authority are certified.</p>
     {status && <p role="status">{status}</p>}
     {site && <form className="registryForm" onSubmit={event => void preview(event)}>
-      <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setObservation(null); setRecorded(null); setRecordedStatus(''); }}>
+      <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setObservation(null); setRecorded(null); setRecordedStatus(''); setReviewStatus(''); }}>
         {sites.map(s => <option key={s.id} value={s.id}>{s.domain}</option>)}</select></div>
       <div><label htmlFor="intelligence-url">Observed HTTPS page URL on {site.domain}</label><input id="intelligence-url" type="url" required maxLength={2048} value={url} onChange={event => {setUrl(event.target.value);setResult(null);setObservation(null);}} placeholder={'https://' + site.domain + '/'} /></div>
       <div><label htmlFor="intelligence-title">Observed page title (blank if absent)</label><input id="intelligence-title" maxLength={300} value={title} onChange={event => {setTitle(event.target.value);setResult(null);setObservation(null);}} /></div>
@@ -165,6 +178,8 @@ export function IntelligencePanel() {
       {['owner','admin','editor'].includes(role) && <button type="button" disabled={busy||mutationHold||!observation}
         onClick={save}>Save unverified observation with audit</button>}
     </div>}
+    {site&&<div><button type="button" className="secondary" onClick={()=>void checkReviewQueue()}>Check review queue availability</button>
+      {reviewStatus&&<p role="status">{reviewStatus}</p>}</div>}
     {site && <div><button type="button" className="secondary" onClick={()=>void loadRecorded()}>View recorded observations</button>
       {recordedStatus&&<p role="status">{recordedStatus}</p>}
       {recorded&&<ul>{recorded.map(item=><li key={item.id}>{item.sourceLabel} · {item.state} · claimed {String(item.observedAt)} · expires {String(item.expiresAt)}
