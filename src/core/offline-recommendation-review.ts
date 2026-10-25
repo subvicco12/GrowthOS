@@ -34,7 +34,8 @@ export async function reviewRecommendation(input:ReviewInput,authority:ReviewAut
       throw Error('REVIEW_SCOPE_DENIED');
     const now=await authority.currentTime();
     if(!Number.isFinite(Date.parse(now)))throw Error('REVIEW_CLOCK_UNAVAILABLE');
-    if(current.evidenceHash!==input.evidenceHash||Date.parse(current.expiresAt)<=Date.parse(now))throw Error('REVIEW_EVIDENCE_STALE');
+    const expiry=Date.parse(current.expiresAt);
+    if(current.evidenceHash!==input.evidenceHash||!Number.isFinite(expiry)||expiry<=Date.parse(now))throw Error('REVIEW_EVIDENCE_STALE');
     await authority.assertCurrent({...input,role:input.role as 'owner'|'admin'});
     await authority.assertCurrentBudgetAndSwitches(input.organizationId,input.websiteId);
     const prior=await tx.findIdempotency(input.organizationId,input.idempotencyKey);
@@ -45,7 +46,8 @@ export async function reviewRecommendation(input:ReviewInput,authority:ReviewAut
         throw Error('REVIEW_REPLAY_CONFLICT');
       return prior;
     }
-    if(current.revision!==input.expectedRevision||current.status!=='proposed')throw Error('REVIEW_STALE_OR_DECIDED');
+    if(current.revision!==input.expectedRevision||current.status!=='proposed'||current.revision>=0xffffffff)
+      throw Error('REVIEW_STALE_OR_DECIDED');
     const next:ReviewRecord={...current,revision:current.revision+1,
       status:input.decision==='accept_for_planning'?'accepted_for_planning':input.decision==='reject'?'rejected':'deferred'};
     const event:ReviewEvent={organizationId:input.organizationId,websiteId:input.websiteId,recommendationId:input.recommendationId,

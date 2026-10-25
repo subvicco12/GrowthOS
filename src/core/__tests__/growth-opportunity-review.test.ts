@@ -58,6 +58,18 @@ test('role, scope, revoked authority, budget and expired evidence refuse before 
  await assert.rejects(reviewRecommendation(input,authority,x.store),/REVIEW_EVIDENCE_STALE/);
  assert.equal(x.events.length,0);assert.equal(x.record.revision,0);
 });
+test('invalid evidence expiry and exhausted SQL revision refuse without writing',async()=>{
+ const authority:ReviewAuthority={assertCurrent:async()=>{},assertCurrentBudgetAndSwitches:async()=>{},currentTime:async()=>at};
+ let appended=0;
+ const storeFor=(expiresAt:string,revision:number):ReviewStore=>({transaction:async fn=>fn({
+  lock:async()=>({id,organizationId:org,websiteId:site,evidenceHash:hash,expiresAt,revision,status:'proposed'}),
+  findIdempotency:async()=>null,append:async()=>{appended++;},compareAndSwap:async()=>true
+ })});
+ await assert.rejects(reviewRecommendation(input,authority,storeFor('not-a-date',0)),/REVIEW_EVIDENCE_STALE/);
+ await assert.rejects(reviewRecommendation({...input,expectedRevision:0xffffffff},authority,
+   storeFor('2026-10-27T00:00:00Z',0xffffffff)),/REVIEW_STALE_OR_DECIDED/);
+ assert.equal(appended,0);
+});
 test('failed append rolls back when supplied transaction is atomic; unknown commit propagates to operator',async()=>{
  const x=syntheticStore();const authority:ReviewAuthority={assertCurrent:async()=>{},assertCurrentBudgetAndSwitches:async()=>{},currentTime:async()=>at};
  const failure:ReviewStore={transaction:async fn=>x.store.transaction(async tx=>fn({...tx,append:async()=>{throw Error('APPEND_FAILED');}}))};

@@ -10,10 +10,12 @@ import { CostCenter } from './cost-center';
 import { GovernancePanel } from './governance-panel';
 import { ConnectorsPanel } from './connectors-panel';
 import { IntelligencePanel } from './intelligence-panel';
+import { RecommendationReviewPanel } from './recommendation-review-panel';
 
-type Section='home'|'websites'|'intelligence'|'approvals'|'costs'|'automation'|'connectors'|'governance';
+type Section='home'|'websites'|'intelligence'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
 const navigation:{id:Section;label:string}[]=[
-  {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'intelligence',label:'Intelligence'},{id:'approvals',label:'Approvals'},
+  {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'intelligence',label:'Intelligence'},
+  {id:'recommendations',label:'Recommendations'},{id:'approvals',label:'Approvals'},
   {id:'costs',label:'Cost center'},{id:'automation',label:'Controls'},
   {id:'connectors',label:'Connectors'},{id:'governance',label:'Governance'}
 ];
@@ -54,6 +56,7 @@ export default function Dashboard(){
       <div className="headerActions"><OrganizationSelector/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
       {section==='home'&&<OrganizationDashboard/>}{section==='websites'&&<OrganizationWebsiteRegistry/>}
       {section==='intelligence'&&<IntelligencePanel/>}
+      {section==='recommendations'&&<RecommendationReviewPanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
       {section==='governance'&&<GovernancePanel/>}
