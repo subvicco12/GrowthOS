@@ -2,7 +2,8 @@
 import {useEffect,useState} from 'react';
 import {compareCompetitorFeatures,exportCompetitorPackage,exportOpportunityCsv,importCompetitorPackage,productImprovementPreview,validateCompetitorPackage,type CompetitorPackage} from '../core/local-competitor-workspace';
 import {workspaceError} from './workspace-response';
-type Site={id:string;domain:string};type Page={websites:Site[];nextCursor:string|null;organization:{id:string;role:string}};
+import {ProductBacklogPanel} from './product-backlog-panel';
+type Site={id:string;domain:string;automationEnabled?:boolean;autoPublishEnabled?:boolean};type Page={websites:Site[];nextCursor:string|null;organization:{id:string;role:string}};
 export function CompetitorWorkspace(){
  const [org,setOrg]=useState(''),[role,setRole]=useState('viewer'),[sites,setSites]=useState<Site[]>([]),[site,setSite]=useState('');
  const [status,setStatus]=useState('Loading website scope…'),[error,setError]=useState(''),[data,setData]=useState<CompetitorPackage|null>(null),[pending,setPending]=useState<CompetitorPackage|null>(null);
@@ -55,6 +56,7 @@ export function CompetitorWorkspace(){
     {canEdit&&<label><input type="checkbox" checked={selected.includes(o.id)} onChange={e=>setSelected(old=>e.target.checked?[...old,o.id]:old.filter(x=>x!==o.id))}/>Add to local plan preview</label>}</article>)}</div>
    {plan&&<div className="competitorPlan"><h3>Product improvement plan · unsaved local preview</h3><p>{plan.opportunities.length} selected; cost and impact unknown; approval not requested.</p><ul>{plan.checklist.map(c=><li key={c}>{c}</li>)}</ul></div>}
   </>}
+  {site&&org&&<ProductBacklogPanel key={org+site} organizationId={org} websiteId={site} role={role} opportunities={opportunities} controls={sites.find(s=>s.id===site)?.automationEnabled===undefined?null:{automationEnabled:!!sites.find(s=>s.id===site)?.automationEnabled,autoPublishEnabled:!!sites.find(s=>s.id===site)?.autoPublishEnabled}}/>}
   {canEdit&&<div className="competitorTransfer"><h3>Versioned import and export</h3><label>Inspect JSON package (400 KB maximum)<input type="file" accept=".json,application/json" onChange={e=>void inspect(e.target.files?.[0])}/></label>
     {pending&&<div role="group" aria-label="Confirm competitor import"><p>Replace local preview with {pending.competitors.length} competitor profiles and {pending.claims.length} unverified claims?</p>
      <button type="button" onClick={()=>{setData(pending);setPending(null);setSelected([]);setStatus('Imported into browser memory only.');}}>Replace local preview</button><button type="button" onClick={()=>setPending(null)}>Cancel</button></div>}
