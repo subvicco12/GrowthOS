@@ -7,6 +7,8 @@ export type ReviewEvent = { organizationId:string;websiteId:string;recommendatio
   decision:ReviewDecision;reason:string;evidenceHash:string;previousRevision:number;revision:number;idempotencyKey:string;at:string };
 export interface ReviewTransaction {
   lock(organizationId:string,websiteId:string,id:string):Promise<ReviewRecord|null>;
+  /** Must inspect authoritative 015 source and revocation events on this same transaction. */
+  assertCurrentEvidence(organizationId:string,websiteId:string,id:string,now:string):Promise<void>;
   append(event:ReviewEvent):Promise<void>;
   compareAndSwap(previous:ReviewRecord,next:ReviewRecord):Promise<boolean>;
   findIdempotency(organizationId:string,key:string):Promise<ReviewEvent|null>;
@@ -36,6 +38,7 @@ export async function reviewRecommendation(input:ReviewInput,authority:ReviewAut
     if(!Number.isFinite(Date.parse(now)))throw Error('REVIEW_CLOCK_UNAVAILABLE');
     const expiry=Date.parse(current.expiresAt);
     if(current.evidenceHash!==input.evidenceHash||!Number.isFinite(expiry)||expiry<=Date.parse(now))throw Error('REVIEW_EVIDENCE_STALE');
+    await tx.assertCurrentEvidence(input.organizationId,input.websiteId,input.recommendationId,now);
     await authority.assertCurrent({...input,role:input.role as 'owner'|'admin'});
     await authority.assertCurrentBudgetAndSwitches(input.organizationId,input.websiteId);
     const prior=await tx.findIdempotency(input.organizationId,input.idempotencyKey);

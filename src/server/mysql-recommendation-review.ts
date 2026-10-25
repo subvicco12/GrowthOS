@@ -36,6 +36,34 @@ export class MySQLRecommendationReviewStore implements ReviewStore {
         return {id:row.id,organizationId:row.organization_id,websiteId:row.website_id,
           evidenceHash:row.evidence_hash,expiresAt:row.expires_at,revision:Number(row.revision),status:row.state};
       },
+      assertCurrentEvidence:async(organizationId,websiteId,id,now)=>{
+        const [sources]=await connection.execute<(RowDataPacket & {original_evidence_id:string|null;source_hash:string;
+          observed_at:string;expires_at:string;source_kind:string})[]>(
+          'SELECT original_evidence_id,source_hash,source_kind,DATE_FORMAT(observed_at,\'%Y-%m-%dT%H:%i:%s.%fZ\') AS observed_at,DATE_FORMAT(expires_at,\'%Y-%m-%dT%H:%i:%s.%fZ\') AS expires_at FROM growth_recommendation_evidence WHERE organization_id=? AND website_id=? AND recommendation_id=? ORDER BY original_evidence_id,id',
+          [organizationId,websiteId,id]);
+        if(!sources.length)throw Error('REVIEW_EVIDENCE_AUTHORITY_UNAVAILABLE');
+        const seen=new Set<string>();
+        for(const source of sources){
+          if(source.source_kind!=='manual_page'||!source.original_evidence_id||
+            !/^[0-9a-f]{64}$/.test(source.source_hash)||!Number.isFinite(Date.parse(source.expires_at))||
+            Date.parse(source.expires_at)<=Date.parse(now))throw Error('REVIEW_EVIDENCE_AUTHORITY_UNAVAILABLE');
+          if(seen.has(source.original_evidence_id))throw Error('REVIEW_EVIDENCE_AUTHORITY_UNAVAILABLE');
+          seen.add(source.original_evidence_id);
+          // The FK on 015 events references this parent. Its lock must serialize a
+          // concurrent revocation INSERT; certify this behavior with two live sessions.
+          const [evidence]=await connection.execute<(RowDataPacket & {payload_hash:string;observed_at:string;expires_at:string})[]>(
+            'SELECT payload_hash,DATE_FORMAT(observed_at,\'%Y-%m-%dT%H:%i:%s.%fZ\') AS observed_at,DATE_FORMAT(expires_at,\'%Y-%m-%dT%H:%i:%s.%fZ\') AS expires_at FROM growth_intelligence_evidence WHERE organization_id=? AND website_id=? AND id=? FOR UPDATE',
+            [organizationId,websiteId,source.original_evidence_id]);
+          if(evidence.length!==1||evidence[0].payload_hash!==source.source_hash||
+            evidence[0].observed_at!==source.observed_at||evidence[0].expires_at!==source.expires_at||
+            !Number.isFinite(Date.parse(evidence[0].expires_at))||Date.parse(evidence[0].expires_at)<=Date.parse(now))
+            throw Error('REVIEW_EVIDENCE_STALE');
+          const [events]=await connection.execute<(RowDataPacket & {event_type:string})[]>(
+            'SELECT event_type FROM growth_intelligence_evidence_events WHERE organization_id=? AND website_id=? AND evidence_id=? ORDER BY event_type',
+            [organizationId,websiteId,source.original_evidence_id]);
+          if(events.length!==1||events[0].event_type!=='ingested')throw Error('REVIEW_EVIDENCE_STALE');
+        }
+      },
       findIdempotency:async(organizationId,key)=>{
         const [rows]=await connection.execute<EventRow[]>(
           'SELECT organization_id,website_id,recommendation_id,actor_id,decision,reason,evidence_hash,previous_revision,revision,idempotency_key,DATE_FORMAT(decided_at,\'%Y-%m-%dT%H:%i:%s.%fZ\') AS decided_at FROM growth_recommendation_review_events WHERE organization_id=? AND idempotency_key=? LIMIT 1',

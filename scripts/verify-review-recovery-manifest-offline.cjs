@@ -45,4 +45,43 @@ function validate(manifest){
    !/^[0-9a-f]{64}$/.test(value.sha256))throw Error('RECOVERY_CONTENT_HASH_INVALID');
  return {status:'STATIC_MANIFEST_MATCH_ONLY',liveRestoreCertified:false};
 }
-module.exports={expected,validate};
+function validateEventHistory(snapshot){
+ if(!snapshot||!Array.isArray(snapshot.evidence)||!Array.isArray(snapshot.events)||
+   !Array.isArray(snapshot.recommendations)||!Array.isArray(snapshot.decisions))throw Error('RECOVERY_HISTORY_UNAVAILABLE');
+ const records=new Map(),ids=new Set(),states=new Map();
+ for(const row of snapshot.evidence){
+  const key=[row.organizationId,row.websiteId,row.id].join(':');
+  if(!row.organizationId||!row.websiteId||!row.id||records.has(key)||!/^[0-9a-f]{64}$/.test(row.hash))
+   throw Error('RECOVERY_EVIDENCE_IDENTITY_CONFLICT');records.set(key,row);
+ }
+ for(const event of snapshot.events){
+  const key=[event.organizationId,event.websiteId,event.evidenceId].join(':');
+  if(!event.id||ids.has(event.id)||!records.has(key)||!['ingested','revoked'].includes(event.type))
+   throw Error('RECOVERY_EVIDENCE_EVENT_CONFLICT');ids.add(event.id);
+  const state=states.get(key)||new Set();if(state.has(event.type)||event.type==='revoked'&&!state.has('ingested'))
+   throw Error('RECOVERY_EVIDENCE_EVENT_ORDER');state.add(event.type);states.set(key,state);
+ }
+ for(const [key] of records)if(!states.get(key)?.has('ingested'))throw Error('RECOVERY_INGESTION_EVENT_MISSING');
+ const recommendations=new Map();
+ for(const row of snapshot.recommendations){
+  const key=[row.organizationId,row.websiteId,row.id].join(':');
+  const evidenceKey=[row.organizationId,row.websiteId,row.evidenceId].join(':');
+  if(!row.id||recommendations.has(key)||!records.has(evidenceKey)||records.get(evidenceKey).hash!==row.sourceHash)
+   throw Error('RECOVERY_RECOMMENDATION_SOURCE_CONFLICT');
+  recommendations.set(key,row);
+ }
+ const revisions=new Set();
+ for(const event of snapshot.decisions){
+  const key=[event.organizationId,event.websiteId,event.recommendationId].join(':');
+  const revisionKey=key+':'+event.revision;
+  if(!event.id||ids.has(event.id)||!recommendations.has(key)||revisions.has(revisionKey)||
+    !Number.isSafeInteger(event.revision)||event.revision!==event.previousRevision+1)
+    throw Error('RECOVERY_DECISION_HISTORY_CONFLICT');
+  ids.add(event.id);revisions.add(revisionKey);
+  const row=recommendations.get(key),source=[row.organizationId,row.websiteId,row.evidenceId].join(':');
+  if(states.get(source)?.has('revoked')&&event.decision==='accept_for_planning')
+   throw Error('RECOVERY_REVOKED_SOURCE_ACCEPTED');
+ }
+ return {status:'SYNTHETIC_HISTORY_SHAPE_ONLY',evidence:records.size,decisions:snapshot.decisions.length};
+}
+module.exports={expected,validate,validateEventHistory};

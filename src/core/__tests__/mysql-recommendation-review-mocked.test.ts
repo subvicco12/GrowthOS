@@ -9,13 +9,20 @@ const input={organizationId:org,websiteId:site,recommendationId:id,actorId:actor
  evidenceHash:hash,expectedRevision:0,decision:'accept_for_planning' as const,reason:'Plan this improvement',
  idempotencyKey:'synthetic_decision_1'};
 const authority:ReviewAuthority={assertCurrent:async()=>{},assertCurrentBudgetAndSwitches:async()=>{},currentTime:async()=> '2026-10-25T00:00:00Z'};
-function fixture(commitUnknown=false,failInsert=false,revoked=false){
+function fixture(commitUnknown=false,failInsert=false,revoked=false,sourceState:'valid'|'revoked'|'missing'|'foreign'|'wrong_hash'|'unknown'='valid'){
  const statements:string[]=[];let rollback=0,commits=0,connections=0;
  const connection={beginTransaction:async()=>{},commit:async()=>{commits++;if(commitUnknown)throw Error('SOCKET_CLOSED');},
   rollback:async()=>{rollback++;},release:()=>{},execute:async(sql:string,params:unknown[])=>{
     statements.push(sql);
     if(sql.startsWith('SELECT id,organization_id'))return [[{id,organization_id:org,website_id:site,evidence_hash:hash,
       expires_at:'2026-10-26T00:00:00.000000Z',evidence_revoked_at:revoked?'2026-10-25 00:00:00':null,revision:0,state:'proposed'}]];
+    if(sql.startsWith('SELECT original_evidence_id'))return [sourceState==='missing'?[]:[{original_evidence_id:id,source_hash:hash,
+      source_kind:'manual_page',observed_at:'2026-10-24T00:00:00.000000Z',expires_at:'2026-10-26T00:00:00.000000Z'}]];
+    if(sql.startsWith('SELECT payload_hash')){assert.equal(params[0],org);assert.equal(params[1],site);
+      if(sourceState==='unknown')throw Error('DATABASE_UNAVAILABLE');
+      return [sourceState==='foreign'?[]:[{payload_hash:sourceState==='wrong_hash'?'b'.repeat(64):hash,
+        observed_at:'2026-10-24T00:00:00.000000Z',expires_at:'2026-10-26T00:00:00.000000Z'}]];}
+    if(sql.startsWith('SELECT event_type'))return [sourceState==='revoked'?[{event_type:'ingested'},{event_type:'revoked'}]:[{event_type:'ingested'}]];
     if(sql.startsWith('SELECT organization_id'))return [[]];
     if(sql.startsWith('INSERT')){if(failInsert)throw Error('INSERT_FAILED');return [{affectedRows:1}];}
     if(sql.startsWith('UPDATE')){assert.equal(params[2],org);assert.equal(params[3],site);return [{affectedRows:1}];}
@@ -28,8 +35,9 @@ function fixture(commitUnknown=false,failInsert=false,revoked=false){
 test('candidate adapter uses one connection and event-before-CAS transaction ordering',async()=>{
  const x=fixture();const result=await reviewRecommendation(input,authority,x.store);
  assert.equal(result.revision,1);assert.equal(x.connections,1);assert.equal(x.commits,1);assert.equal(x.rollback,0);
- assert.deepEqual(x.statements.map(s=>s.split(' ')[0]),['SELECT','SELECT','INSERT','UPDATE']);
- assert.match(x.statements[0],/FOR UPDATE/);assert.match(x.statements[3],/organization_id=\? AND website_id=\?/);
+ assert.deepEqual(x.statements.map(s=>s.split(' ')[0]),['SELECT','SELECT','SELECT','SELECT','SELECT','INSERT','UPDATE']);
+ assert.match(x.statements[0],/FOR UPDATE/);assert.match(x.statements[2],/FOR UPDATE/);
+ assert.match(x.statements[6],/organization_id=\? AND website_id=\?/);
 });
 test('definite insert failure rolls back, but uncertain COMMIT never retries or calls rollback',async()=>{
  const failed=fixture(false,true);
@@ -46,4 +54,12 @@ test('revoked evidence and unavailable clock refuse without event write',async()
  const clock=fixture();
  await assert.rejects(reviewRecommendation(input,{...authority,currentTime:async()=> 'unknown'},clock.store),/REVIEW_CLOCK_UNAVAILABLE/);
  assert.equal(clock.statements.length,1);assert.equal(clock.rollback,1);
+});
+test('authoritative 015 revocation, missing source, wrong hash, foreign scope and unknown state refuse',async()=>{
+ for(const state of ['revoked','missing','foreign','wrong_hash','unknown'] as const){
+  const x=fixture(false,false,false,state);
+  await assert.rejects(reviewRecommendation(input,authority,x.store));
+  assert.equal(x.commits,0);assert.equal(x.rollback,1);
+  assert.ok(x.statements.every(s=>!s.startsWith('INSERT')));
+ }
 });

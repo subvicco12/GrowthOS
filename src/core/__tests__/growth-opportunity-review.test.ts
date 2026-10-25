@@ -29,6 +29,7 @@ function syntheticStore(){
    const previous=release;let unlock!:()=>void;release=new Promise<void>(resolve=>{unlock=resolve;});await previous;
    let draft={...record};const pending:ReviewEvent[]=[];
    try {const value=await fn({lock:async()=>draft,findIdempotency:async(o,key)=>events.find(e=>e.organizationId===o&&e.idempotencyKey===key)??null,
+    assertCurrentEvidence:async()=>{},
     compareAndSwap:async(old,next)=>{if(draft.revision!==old.revision)return false;draft=next;return true;},
     append:async event=>{pending.push(event);}});
     record=draft;events=[...events,...pending];return value;
@@ -63,6 +64,7 @@ test('invalid evidence expiry and exhausted SQL revision refuse without writing'
  let appended=0;
  const storeFor=(expiresAt:string,revision:number):ReviewStore=>({transaction:async fn=>fn({
   lock:async()=>({id,organizationId:org,websiteId:site,evidenceHash:hash,expiresAt,revision,status:'proposed'}),
+  assertCurrentEvidence:async()=>{},
   findIdempotency:async()=>null,append:async()=>{appended++;},compareAndSwap:async()=>true
  })});
  await assert.rejects(reviewRecommendation(input,authority,storeFor('not-a-date',0)),/REVIEW_EVIDENCE_STALE/);
