@@ -2,12 +2,13 @@
 import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { workspaceError } from './workspace-response';
+import { prepareContentBrief, prepareLocalPlan, type DraftChannel } from '../core/local-growth-plan';
 
 type Site = { id: string; domain: string };
 type Page = { websites: Site[]; nextCursor: string | null; organization: { id: string; role: string } };
 type Result = { evidence: 'UNVERIFIED_MANUAL_INPUT'; seoFindings: { key: string; severity: string; evidence: string }[];
   featureCandidates: { featureKey: string; name: string; confidence: string }[];
-  recommendations: { category: string; title: string; rationale: string; evidenceUrl: string }[] };
+  recommendations: { category: 'seo'|'content'|'conversion'|'feature_review'; title: string; rationale: string; evidenceUrl: string }[] };
 type Recorded = { id: string; sourceLabel: string; state: 'unverified' | 'expired' | 'revoked';
   observedAt: string; expiresAt: string; payloadHash: string };
 type Observation = { websiteId: string; pages: { url: string; status: number; indexable: boolean; title: string; description?: string; canonical?: string;
@@ -43,6 +44,10 @@ export function IntelligencePanel() {
   const [recordedStatus, setRecordedStatus] = useState('');
   const [reviewStatus, setReviewStatus] = useState('');
   const [mutationHold, setMutationHold] = useState(false);
+  const [selectedIdeas, setSelectedIdeas] = useState<string[]>([]);
+  const [planTitle, setPlanTitle] = useState('Website growth plan');
+  const [draftChannel, setDraftChannel] = useState<DraftChannel>('blog');
+  const [draftIdea, setDraftIdea] = useState('');
   useEffect(() => {
     let active = true;
     async function load() {
@@ -65,7 +70,7 @@ export function IntelligencePanel() {
   const site = sites.find(s => s.id === siteId);
   async function preview(event: import('react').FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!site) return;
-    setBusy(true); setResult(null); setObservation(null); setStatus('');
+    setBusy(true); setResult(null); setObservation(null); setSelectedIdeas([]); setDraftIdea(''); setStatus('');
     try {
       const candidate: Observation = { websiteId: site.id, pages: [{ url, status: Number(httpStatus), indexable: indexable === 'yes', title,
         h1Count: Number(h1Count), wordCount: Number(wordCount), internalLinks: Number(internalLinks),
@@ -137,13 +142,19 @@ export function IntelligencePanel() {
     void mutate('POST',{...observation,idempotencyKey:requestKey,sourceLabel:'Manual first-party preview',observedAt,
       expiresAt:new Date(Date.parse(observedAt)+7*86400000).toISOString()});
   }
+  const proposed = result && site && selectedOrganization.current ? prepareLocalPlan(
+    { organizationId: selectedOrganization.current, websiteId: site.id }, result.recommendations,
+    result.recommendations.map((_,i)=>`${selectedOrganization.current}:${site.id}:${i}`).filter(id=>selectedIdeas.includes(id)),
+    planTitle.length >= 3 ? planTitle : 'Local growth plan') : null;
+  const brief = proposed && draftIdea && proposed.ideas.some(i=>i.id===draftIdea) ?
+    prepareContentBrief(proposed,draftIdea,draftChannel) : null;
   return <section className="panel" aria-label="Growth intelligence preview">
     <h2>Growth intelligence</h2>
     <p>Enter a page observation to preview the SEO and feature rules. Manual input is unverified and is never fetched, saved, or used to authorize work.</p>
     <p role="status">Discovery job: unavailable until website ownership, crawl destination safety and a durable job authority are certified.</p>
     {status && <p role="status">{status}</p>}
     {site && <form className="registryForm" onSubmit={event => void preview(event)}>
-      <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setObservation(null); setRecorded(null); setRecordedStatus(''); setReviewStatus(''); }}>
+      <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setSelectedIdeas([]); setDraftIdea(''); setObservation(null); setRecorded(null); setRecordedStatus(''); setReviewStatus(''); }}>
         {sites.map(s => <option key={s.id} value={s.id}>{s.domain}</option>)}</select></div>
       <div><label htmlFor="intelligence-url">Observed HTTPS page URL on {site.domain}</label><input id="intelligence-url" type="url" required maxLength={2048} value={url} onChange={event => {setUrl(event.target.value);setResult(null);setObservation(null);}} placeholder={'https://' + site.domain + '/'} /></div>
       <div><label htmlFor="intelligence-title">Observed page title (blank if absent)</label><input id="intelligence-title" maxLength={300} value={title} onChange={event => {setTitle(event.target.value);setResult(null);setObservation(null);}} /></div>
@@ -174,6 +185,26 @@ export function IntelligencePanel() {
       <ul className="reviewIdeas">{result.recommendations.filter(r=>ideaCategory==='all'||r.category===ideaCategory).map((r,i)=><li key={r.category+r.evidenceUrl+i}>
         <strong>{r.title}</strong><span>{r.rationale}</span><small>Unverified manual source: {r.evidenceUrl}</small>
       </li>)}</ul>
+      <div className="localPlan" aria-label="Local growth planning preview">
+        <h4>Growth plan · local preview only</h4>
+        <p>Select ideas to prepare an outline. Nothing here is stored, approved, scheduled or published.</p>
+        <label htmlFor="local-plan-title">Working title</label><input id="local-plan-title" maxLength={120} value={planTitle} onChange={e=>setPlanTitle(e.target.value)} />
+        <ul>{result.recommendations.map((r,i)=>{const id=`${selectedOrganization.current}:${siteId}:${i}`;return <li key={id}>
+          <label><input type="checkbox" checked={selectedIdeas.includes(id)} disabled={!selectedIdeas.includes(id)&&selectedIdeas.length>=20}
+            onChange={e=>{setSelectedIdeas(old=>e.target.checked?[...old,id]:old.filter(item=>item!==id));setDraftIdea('');}} />
+            {r.title} · {r.category} · unverified manual evidence</label></li>;})}</ul>
+        {proposed && <div role="status"><strong>{proposed.ideas.length} planned ideas</strong><p>Estimated cost: unknown. Effort and impact: unestimated. Approval: not requested.</p>
+          <ol>{proposed.ideas.map(i=><li key={i.id}>{i.title} · priority {i.priority} (category rule only) · source: {i.evidenceUrl}</li>)}</ol>
+          <p>Dependencies: {proposed.dependencies.join('; ')}.</p></div>}
+        {proposed?.ideas.length ? <div className="briefPreview"><h4>Content and distribution outline</h4>
+          <label htmlFor="draft-idea">Planning idea</label><select id="draft-idea" value={draftIdea} onChange={e=>setDraftIdea(e.target.value)}>
+            <option value="">Choose an idea</option>{proposed.ideas.map(i=><option key={i.id} value={i.id}>{i.title}</option>)}</select>
+          <label htmlFor="draft-channel">Draft format</label><select id="draft-channel" value={draftChannel} onChange={e=>setDraftChannel(e.target.value as DraftChannel)}>
+            {(['blog','landing_page','seo_metadata','social','video_script','youtube_plan','instagram_plan','email'] as const).map(c=><option key={c} value={c}>{c.replaceAll('_',' ')}</option>)}</select>
+          {brief && <div><strong>{brief.workingTitle}</strong><p>Source to verify: {brief.source}</p><p>Problem: {brief.problem}</p>
+            <ol>{brief.checklist.map(step=><li key={step}>{step}</li>)}</ol><p>Unsaved local outline. Publishing disabled.</p></div>}
+        </div> : null}
+      </div>
       <p>Review decisions and history: unavailable until durable tenant-scoped recommendation and audit persistence is certified. No idea can be accepted, rejected or scheduled here.</p>
       {['owner','admin','editor'].includes(role) && <button type="button" disabled={busy||mutationHold||!observation}
         onClick={save}>Save unverified observation with audit</button>}
