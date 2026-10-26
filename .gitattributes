@@ -1,0 +1,3 @@
+# Keep integrity-pinned SQL proposal bytes identical across operating systems.
+/database/proposals/011_authorization_trust_candidate.sql text eol=lf
+/database/proposals/product-authority-v1/015_product_authority_candidate.sql text eol=lf
