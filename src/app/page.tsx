@@ -13,16 +13,19 @@ import { IntelligencePanel } from './intelligence-panel';
 import { RecommendationReviewPanel } from './recommendation-review-panel';
 import { AnalyticsPanel } from './analytics-panel';
 import { CompetitorWorkspace } from './competitor-workspace';
+import { RevenueWorkspace } from './revenue-workspace';
+import type {RevenueHandoff} from '../core/local-revenue-workspace';
+import type {CompetitorPackage} from '../core/local-competitor-workspace';
 import { journeySteps,onboardingReadiness,requireSelectedWebsite,type WebsiteScope } from '../core/workspace-journey';
 import type {AnalyticsHandoff} from '../core/local-analytics-handoff';
 import {includeScopedRegistryWebsite} from '../core/scoped-website-pages';
 import {useScopedWebsitePager} from './use-scoped-website-pager';
 import type {WebsiteSummary} from '../core/workspace-journey';
 
-type Section='home'|'websites'|'intelligence'|'analytics'|'competitors'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
+type Section='home'|'websites'|'intelligence'|'analytics'|'competitors'|'revenue'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
 const navigation:{id:Section;label:string}[]=[
   {id:'home',label:'Portfolio'},{id:'websites',label:'Websites'},{id:'intelligence',label:'Intelligence'},
-  {id:'analytics',label:'Analytics'},{id:'competitors',label:'Competitors'},
+  {id:'analytics',label:'Analytics'},{id:'competitors',label:'Competitors'},{id:'revenue',label:'Revenue'},
   {id:'recommendations',label:'Recommendations'},{id:'approvals',label:'Approvals'},
   {id:'costs',label:'Cost center'},{id:'automation',label:'Controls'},
   {id:'connectors',label:'Connectors'},{id:'governance',label:'Governance'}
@@ -33,6 +36,7 @@ export default function Dashboard(){
   const [intelligenceVisited,setIntelligenceVisited]=useState(false);
   const [analyticsVisited,setAnalyticsVisited]=useState(false);
   const [competitorsVisited,setCompetitorsVisited]=useState(false);
+  const [revenueVisited,setRevenueVisited]=useState(false);
   const [auth,setAuth]=useState<'loading'|'ready'|'signed-out'|'unavailable'>('loading');
   const [localWorkDirty,setLocalWorkDirty]=useState(false);
   const {state:websitePages,pager:websitePager}=useScopedWebsitePager(auth==='ready','Website portfolio');
@@ -44,18 +48,20 @@ export default function Dashboard(){
   const visibleWebsites=websiteScope?.websites.filter(site=>site.domain.toLocaleLowerCase().includes(websiteSearch.trim().toLocaleLowerCase()))??[];
   const [workspaceEpoch,setWorkspaceEpoch]=useState(0);
   const [analyticsHandoff,setAnalyticsHandoff]=useState<AnalyticsHandoff|null>(null);
+  const [revenueHandoff,setRevenueHandoff]=useState<RevenueHandoff|null>(null);
+  const [competitorPackage,setCompetitorPackage]=useState<CompetitorPackage|null>(null);
   useEffect(()=>{
     const expired=()=>setAuth('signed-out');
     const hashChanged=()=>{const next=window.location.hash.slice(1);if(navigation.some(item=>item.id===next)){
-      setSection(next as Section);if(next==='websites')setWebsitesVisited(true);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);}};
+      setSection(next as Section);if(next==='websites')setWebsitesVisited(true);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);if(next==='revenue')setRevenueVisited(true);}};
     window.addEventListener('growthos-session-expired',expired);
     window.addEventListener('hashchange',hashChanged);
     const initial=window.location.hash.slice(1);
-    if(navigation.some(item=>item.id===initial)){setSection(initial as Section);if(initial==='websites')setWebsitesVisited(true);if(initial==='intelligence')setIntelligenceVisited(true);if(initial==='analytics')setAnalyticsVisited(true);if(initial==='competitors')setCompetitorsVisited(true);}
+    if(navigation.some(item=>item.id===initial)){setSection(initial as Section);if(initial==='websites')setWebsitesVisited(true);if(initial==='intelligence')setIntelligenceVisited(true);if(initial==='analytics')setAnalyticsVisited(true);if(initial==='competitors')setCompetitorsVisited(true);if(initial==='revenue')setRevenueVisited(true);}
     void checkAuth();
     return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
-  useEffect(()=>{if(!websitePages.fatal)return;setSelectedWebsite('');setSupplementalSite(null);setAnalyticsHandoff(null);setWebsitesVisited(false);setIntelligenceVisited(false);setAnalyticsVisited(false);setCompetitorsVisited(false);setWorkspaceEpoch(n=>n+1);},[websitePages.fatal]);
+  useEffect(()=>{if(!websitePages.fatal)return;setSelectedWebsite('');setSupplementalSite(null);setAnalyticsHandoff(null);setRevenueHandoff(null);setCompetitorPackage(null);setWebsitesVisited(false);setIntelligenceVisited(false);setAnalyticsVisited(false);setCompetitorsVisited(false);setRevenueVisited(false);setWorkspaceEpoch(n=>n+1);},[websitePages.fatal]);
   async function checkAuth(){
     try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});
       setAuth(response.ok?'ready':response.status===401?'signed-out':'unavailable');
@@ -70,7 +76,7 @@ export default function Dashboard(){
     if(id)try{requireSelectedWebsite(websiteScope,id);}catch{return;}
     if(id===selectedWebsite)return;
     if((selectedWebsite||localWorkDirty)&&!window.confirm('Switch website? Unsaved local previews and editorial drafts in open workspaces may be discarded. Export them first if needed.'))return;
-    setSelectedWebsite(id);setAnalyticsHandoff(null);setWorkspaceEpoch(n=>n+1);setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
+    setSelectedWebsite(id);setAnalyticsHandoff(null);setRevenueHandoff(null);setCompetitorPackage(null);setWorkspaceEpoch(n=>n+1);setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setRevenueVisited(section==='revenue');setLocalWorkDirty(false);
   }
   function syncModuleWebsite(id:string,registrySite?:WebsiteSummary,registryOrganizationId?:string){if(!websiteScope)return false;
     let nextScope=websiteScope;
@@ -80,15 +86,19 @@ export default function Dashboard(){
     }catch{return false;}
     if(id===selectedWebsite)return true;
     if((selectedWebsite||localWorkDirty)&&!window.confirm('Switch website? Other local workspaces will be cleared to prevent stale website data. Export previews first if needed.'))return false;
-    setSupplementalSite(registrySite??null);setSelectedWebsite(id);setAnalyticsHandoff(null);
-    setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
+    setSupplementalSite(registrySite??null);setSelectedWebsite(id);setAnalyticsHandoff(null);setRevenueHandoff(null);setCompetitorPackage(null);setWorkspaceEpoch(n=>n+1);
+    setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setRevenueVisited(section==='revenue');setLocalWorkDirty(false);
     return true;
   }
   function prepareAnalyticsReview(h:AnalyticsHandoff){if(!websiteScope||h.organizationId!==websiteScope.organizationId||h.websiteId!==selectedWebsite)return false;
     try{requireSelectedWebsite(websiteScope,h.websiteId);}catch{return false;}
     setAnalyticsHandoff(h);navigate('competitors');return true;
   }
-  function navigate(next:Section){setSection(next);if(next==='websites')setWebsitesVisited(true);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);
+  function prepareRevenueReview(h:RevenueHandoff){if(!websiteScope||h.organizationId!==websiteScope.organizationId||h.websiteId!==selectedWebsite)return false;
+    try{requireSelectedWebsite(websiteScope,h.websiteId);}catch{return false;}
+    setRevenueHandoff(h);navigate('competitors');return true;
+  }
+  function navigate(next:Section){setSection(next);if(next==='websites')setWebsitesVisited(true);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);if(next==='revenue')setRevenueVisited(true);
     window.history.pushState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
   if(auth==='loading')return <main className="authShell" role="status">Checking session…</main>;
   if(auth==='signed-out')return <AuthPanel onAuthenticated={()=>{setAuth('ready');window.location.reload();}}/>;
@@ -126,7 +136,8 @@ export default function Dashboard(){
        </section></>}{websitesVisited&&<div hidden={section!=='websites'}><OrganizationWebsiteRegistry key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite}/></div>}
       {intelligenceVisited&&<div hidden={section!=='intelligence'}><IntelligencePanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} onDirtyChange={setLocalWorkDirty}/></div>}
       {analyticsVisited&&<div hidden={section!=='analytics'}><AnalyticsPanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} onPrepareHandoff={prepareAnalyticsReview}/></div>}
-      {competitorsVisited&&<div hidden={section!=='competitors'}><CompetitorWorkspace key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} analyticsHandoff={analyticsHandoff} onHandoffConsumed={()=>setAnalyticsHandoff(null)}/></div>}
+      {competitorsVisited&&<div hidden={section!=='competitors'}><CompetitorWorkspace key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} analyticsHandoff={analyticsHandoff} onHandoffConsumed={()=>setAnalyticsHandoff(null)} revenueHandoff={revenueHandoff} onRevenueConsumed={()=>setRevenueHandoff(null)} onPackageChange={setCompetitorPackage}/></div>}
+      {revenueVisited&&<div hidden={section!=='revenue'}><RevenueWorkspace key={workspaceEpoch} scope={websiteScope} websiteId={selectedWebsite} role={websitePages.organization?.role??'viewer'} competitors={competitorPackage} onPrepareHandoff={prepareRevenueReview}/></div>}
       {section==='recommendations'&&<RecommendationReviewPanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}

@@ -1,11 +1,12 @@
 import {z} from 'zod';
 import type {ProductOpportunity} from './local-competitor-workspace';
 import type {AnalyticsHandoff} from './local-analytics-handoff';
+import {validateRevenueHandoff,type RevenueHandoff} from './local-revenue-workspace';
 const id=z.string().trim().min(1).max(120).regex(/^[a-zA-Z0-9:_-]+$/);
 const safe=z.string().trim().max(2000).refine(v=>!/[<>\u0000-\u001f]/.test(v));
 const brief=z.string().trim().min(3).max(240).refine(v=>!/[<>\u0000-\u001f]/.test(v));
 const tier=z.enum(['free','pro','business']);
-const proposal=z.object({id,organizationId:id,websiteId:id,origin:z.enum(['manual','competitor-preview','analytics-import']),originRef:id.optional(),title:brief,problem:brief,solution:brief,
+const proposal=z.object({id,organizationId:id,websiteId:id,origin:z.enum(['manual','competitor-preview','analytics-import','revenue-preview']),originRef:id.optional(),title:brief,problem:brief,solution:brief,
  benefit:brief,evidenceRefs:z.array(id).max(30),targetTiers:z.array(tier).max(3),usageLimit:z.number().int().nonnegative().safe().nullable(),
  effort:z.enum(['unknown','low','medium','high']),estimatedCostMinor:z.number().int().nonnegative().safe().nullable(),currency:z.string().regex(/^[A-Z]{3}$/).nullable(),
  dependencies:z.array(id).max(20),featureChange:z.enum(['none','enable','disable','modify']),featureKey:id.nullable(),
@@ -42,6 +43,14 @@ export function fromAnalyticsHandoff(h:AnalyticsHandoff,scope:{organizationId:st
   title:'Review '+h.category+' measurement opportunity',problem:h.problem,solution:h.action,benefit:'Customer value requires validation',
   evidenceRefs:h.evidenceIds,targetTiers:[],usageLimit:null,effort:'unknown',estimatedCostMinor:null,currency:null,dependencies:[],
   featureChange:'none',featureKey:null,requirements:[],acceptance:[],security:'',privacy:'',tests:'',rollback:'',rollout:'',requiredRole:'owner',state:'local-review-only'});
+}
+export function fromRevenueHandoff(raw:RevenueHandoff,scope:{organizationId:string;websiteId:string}):ProductProposal{
+ const h=validateRevenueHandoff(raw,scope);
+ return proposal.parse({id:'proposal-'+crypto.randomUUID(),...scope,origin:'revenue-preview',originRef:h.id,title:h.title,
+  problem:h.reason,solution:'Review a scoped monetization or conversion improvement',benefit:h.customerBenefit,
+  evidenceRefs:h.evidenceRefs,targetTiers:[],usageLimit:null,effort:'unknown',estimatedCostMinor:null,currency:null,
+  dependencies:[],featureChange:'none',featureKey:null,requirements:[],acceptance:[],security:'',privacy:'',tests:'',rollback:'',rollout:'',
+  requiredRole:'owner',state:'local-review-only'});
 }
 export function assessProductReadiness(x:ProductProposal,scope:{organizationId:string;websiteId:string},featureState:'unknown'|'enabled'|'disabled'|'unavailable'){
  const parsed=proposal.parse(x);if(parsed.organizationId!==scope.organizationId||parsed.websiteId!==scope.websiteId)throw Error('BACKLOG_SCOPE_DENIED');
