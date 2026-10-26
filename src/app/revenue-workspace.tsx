@@ -2,6 +2,8 @@
 import {useState} from 'react';
 import type {WebsiteScope} from '../core/workspace-journey';
 import type {CompetitorPackage} from '../core/local-competitor-workspace';
+import {addRevenueEvidence,emptyRevenueEvidence,exportRevenueEvidence,importRevenueEvidence,portfolioRevenueCoverage,revenueEvidenceSummary,
+ type RevenueEvidenceBundle,type RevenueEvidence} from '../core/local-revenue-evidence';
 import {analyzeFunnel,calculateRevenueScenario,compareCompetitorPricing,emptyRevenuePreview,exportRevenuePreview,importRevenuePreview,
  prepareRevenueHandoff,revenueChannels,revenueOpportunities,validateRevenuePreview,type FunnelSnapshot,type PricingExperiment,type RevenueHandoff,
  type RevenuePreview,type RevenueScenario} from '../core/local-revenue-workspace';
@@ -9,8 +11,9 @@ const funnelFields=['landingVisits','signupStarts','signupCompletions','activati
 const today=()=>new Date().toISOString().slice(0,10);
 const lines=(raw:string)=>raw.split('\n').map(s=>s.trim()).filter(Boolean);
 const blankCounts=Object.fromEntries(funnelFields.map(key=>[key,''])) as Record<typeof funnelFields[number],string>;
-type Props={scope:WebsiteScope|null;websiteId:string;role:string;competitors:CompetitorPackage|null;onPrepareHandoff:(handoff:RevenueHandoff)=>boolean};
-export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHandoff}:Props){
+type Props={scope:WebsiteScope|null;websiteId:string;role:string;competitors:CompetitorPackage|null;onPrepareHandoff:(handoff:RevenueHandoff)=>boolean;
+ evidenceBundles:RevenueEvidenceBundle[];onEvidenceChange:(bundle:RevenueEvidenceBundle)=>boolean};
+export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHandoff,evidenceBundles,onEvidenceChange}:Props){
  const organizationId=scope?.organizationId??'',site=scope?.websites.find(w=>w.id===websiteId);
  const identity={organizationId,websiteId};const canEdit=!!site&&['owner','admin','editor'].includes(role);
  const [preview,setPreview]=useState<RevenuePreview|null>(null),[pending,setPending]=useState<RevenuePreview|null>(null);
@@ -26,7 +29,15 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
  const [hypothesis,setHypothesis]=useState(''),[segment,setSegment]=useState(''),[customerBenefit,setCustomerBenefit]=useState('');
  const [measurement,setMeasurement]=useState(''),[successCriteria,setSuccessCriteria]=useState(''),[rollback,setRollback]=useState(''),[risks,setRisks]=useState('');
  const [error,setError]=useState(''),[notice,setNotice]=useState('');
+ const [pendingEvidence,setPendingEvidence]=useState<RevenueEvidenceBundle|null>(null);
+ const [evidenceSource,setEvidenceSource]=useState<RevenueEvidence['source']>('subscription'),[evidenceLabel,setEvidenceLabel]=useState(''),[evidenceRef,setEvidenceRef]=useState('');
+ const [evidenceFrom,setEvidenceFrom]=useState(''),[evidenceThrough,setEvidenceThrough]=useState(''),[evidenceObserved,setEvidenceObserved]=useState('');
+ const [evidenceAmount,setEvidenceAmount]=useState(''),[evidenceCurrency,setEvidenceCurrency]=useState('USD');
+ const [evidenceBasis,setEvidenceBasis]=useState<RevenueEvidence['basis']>('gross-reported');
  const current=preview&&preview.organizationId===organizationId&&preview.websiteId===websiteId?preview:null;
+ const evidence=evidenceBundles.find(b=>b.organizationId===organizationId&&b.websiteId===websiteId)??null;
+ const evidenceSummary=site?revenueEvidenceSummary(evidence??emptyRevenueEvidence(identity),identity,today()):null;
+ const portfolio=scope?portfolioRevenueCoverage(evidenceBundles,organizationId,scope.websites.map(w=>w.id),today()):[];
  const competitor=competitors&&competitors.organizationId===organizationId&&competitors.websiteId===websiteId?competitors:null;
  const opportunities=current?revenueOpportunities(current,identity,today(),competitor):[];
  const comparisons=current&&competitor?compareCompetitorPricing(competitor,identity,today(),current):[];
@@ -56,6 +67,20 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
    customerBenefit,risks,measurement,successCriteria,rollback,state:'local-review-only'};
   update({...old,experiments:[...old.experiments,item]});
  });}
+ function saveEvidence(){act(()=>{if(!canEdit||!site)throw Error('REVENUE_ROLE_DENIED');if(evidenceAmount.trim()==='')throw Error('REVENUE_EVIDENCE_AMOUNT_REQUIRED');
+  const record:RevenueEvidence={id:'evidence-'+crypto.randomUUID(),...identity,source:evidenceSource,sourceLabel:evidenceLabel,externalReference:evidenceRef,
+   from:evidenceFrom,through:evidenceThrough,observedOn:evidenceObserved,currency:evidenceCurrency,amountMinor:Number(evidenceAmount),
+   basis:evidenceBasis,provenance:'manual-unverified',reconciliation:'not-reconciled',authority:'none'};
+  const next=addRevenueEvidence(evidence??emptyRevenueEvidence(identity),record,identity,today());
+  if(!onEvidenceChange(next))throw Error('REVENUE_EVIDENCE_SCOPE_CHANGED');setNotice('Manual revenue observation retained in browser memory only; not reconciled or verified.');
+ });}
+ async function inspectEvidence(file:File|undefined){setPendingEvidence(null);if(!file)return;try{if(!canEdit)throw Error('REVENUE_ROLE_DENIED');
+  if(file.size>250_000)throw Error('REVENUE_EVIDENCE_SIZE_DENIED');const next=importRevenueEvidence(new Uint8Array(await file.arrayBuffer()),identity,today());
+  setPendingEvidence(next);setError('');setNotice(`Evidence import preview: ${next.observations.length} unverified records. Current local evidence unchanged.`);
+ }catch(e){setError(e instanceof Error?e.message:'Evidence package refused');}}
+ function downloadEvidence(){act(()=>{if(!evidence)throw Error('REVENUE_EVIDENCE_UNAVAILABLE');const blob=new Blob([exportRevenueEvidence(evidence,identity,today())],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='growthos-revenue-evidence-review-only.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ });}
  function transfer(id:string){act(()=>{if(!canEdit||!current)throw Error('REVENUE_ROLE_DENIED');
   const h=prepareRevenueHandoff(current,identity,today(),id,competitor);
   if(!window.confirm('Prepare an unverified local revenue proposal for the product backlog? No pricing, entitlement or payment change will occur.'))return;
@@ -71,8 +96,9 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
  if(!scope)return <section className="panel"><h2>Revenue intelligence</h2><p>Website scope unavailable. No revenue data is shown.</p></section>;
  return <section className="panel revenueWorkspace" aria-label="Revenue intelligence local workspace"><h2>Revenue intelligence · review only</h2>
   <p>Manual observations, unverified competitor claims and hypothetical scenarios only. Actual settled revenue, conversion evidence and current prices are unavailable without trusted sources. No payment or publishing action is available.</p>
-  {!site?<><p>Choose a website in the portfolio selector to prepare a scoped review. Loaded portfolio websites: {scope.websites.length}.</p>
-   <div className="revenueCards">{scope.websites.map(w=><article key={w.id}><strong>{w.domain}</strong><p>Business model: Unavailable · revenue: Unavailable · pricing readiness: Unavailable</p></article>)}</div></>:
+  {!site?<><p>Choose a website in the portfolio selector to prepare a scoped review. Coverage below includes loaded websites only; it does not aggregate unverified records into earnings.</p>
+   <div className="revenueCards">{portfolio.map(p=><article key={p.websiteId}><strong>{scope.websites.find(w=>w.id===p.websiteId)?.domain}</strong>
+    <p>{p.observationCount} local observation(s); sources: {p.sourceCoverage.join(', ')||'Unavailable'}; actual revenue: Unavailable; reconciliation: Unavailable.</p></article>)}</div></>:
   <><p><strong>{site.domain}</strong> · organization {organizationId} · {site.status}. Local profile: {current?.profile.subscriptionModel??'Unavailable'}; verified revenue: Unavailable.</p>
    {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
    {!canEdit&&<p>Read-only role. Local revenue editing and handoffs are unavailable.</p>}
@@ -109,6 +135,28 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
     <article><h3>Revenue evidence</h3><p>Verified revenue: Unavailable. Imported revenue attribution is not payment settlement.</p></article>
     <article><h3>Conversion evidence</h3><p>{current?.funnels.length??0} unverified local funnel(s). No live analytics.</p></article>
     <article><h3>Pricing review</h3><p>{current?.profile.tiers.length??0} proposed tiers; {comparisons.length} applicable competitor feature claim(s). Region and equivalence require review.</p></article></div>
+   <h3>Revenue evidence and reconciliation preparation</h3><p>{evidenceSummary?.observationCount??0} scoped local observation(s). Represented: {evidenceSummary?.representedSources.join(', ')||'Unavailable'}.
+    Missing evidence channels: {evidenceSummary?.missingSources.join(', ')||'none among supported categories'}. Actual verified and reconciled revenue: Unavailable.</p>
+   {canEdit&&<fieldset className="revenueForm"><legend>Add manual revenue observation · unverified</legend>
+    <label>Revenue source<select value={evidenceSource} onChange={e=>setEvidenceSource(e.target.value as RevenueEvidence['source'])}>{['subscription','advertising','affiliate','lead-generation','digital-products','business-services','other'].map(v=><option key={v}>{v}</option>)}</select></label>
+    <label>Source account or report label<input value={evidenceLabel} maxLength={240} onChange={e=>setEvidenceLabel(e.target.value)}/></label>
+    <label>External transaction, payout or report reference<input value={evidenceRef} maxLength={240} onChange={e=>setEvidenceRef(e.target.value)}/></label>
+    <label>Period from<input type="date" value={evidenceFrom} onChange={e=>setEvidenceFrom(e.target.value)}/></label>
+    <label>Period through<input type="date" value={evidenceThrough} onChange={e=>setEvidenceThrough(e.target.value)}/></label>
+    <label>Report observed on<input type="date" value={evidenceObserved} onChange={e=>setEvidenceObserved(e.target.value)}/></label>
+    <label>Amount in minor currency units<input type="number" min="0" step="1" value={evidenceAmount} onChange={e=>setEvidenceAmount(e.target.value)}/></label>
+    <label>Currency<input value={evidenceCurrency} maxLength={3} onChange={e=>setEvidenceCurrency(e.target.value.toUpperCase())}/></label>
+    <label>Reporting basis<select value={evidenceBasis} onChange={e=>setEvidenceBasis(e.target.value as RevenueEvidence['basis'])}>{['gross-reported','net-reported','attributed','estimated'].map(v=><option key={v}>{v}</option>)}</select></label>
+    <button type="button" onClick={saveEvidence}>Add unverified observation locally</button></fieldset>}
+   {evidenceSummary?.groups.length?<div className="revenueCards">{evidenceSummary.groups.map(g=><article key={[g.currency,g.source,g.basis,g.from,g.through].join(':')}>
+    <strong>{g.source} · {g.currency} {g.amountMinor} minor units</strong><p>{g.basis}, {g.from}–{g.through}; {g.observationIds.length} observation(s).</p>
+    <small>Comparable local report group only. Not settled, independently verified or portfolio earnings.</small></article>)}</div>:<p>No local revenue evidence. Revenue remains unavailable.</p>}
+   <details><summary>Reconciliation requirements</summary><ul>{evidenceSummary?.blockers.map(b=><li key={b}>{b}</li>)}</ul></details>
+   {canEdit&&<div className="revenueTransfer"><label>Inspect revenue evidence JSON (250 KB maximum)<input type="file" accept=".json,application/json" onChange={e=>void inspectEvidence(e.target.files?.[0])}/></label>
+    {pendingEvidence&&<div role="group" aria-label="Confirm revenue evidence import"><p>Replace local evidence with {pendingEvidence.observations.length} unverified records?</p>
+     <button type="button" onClick={()=>{if(!onEvidenceChange(pendingEvidence)){setError('REVENUE_EVIDENCE_SCOPE_CHANGED');return;}setPendingEvidence(null);setNotice('Local evidence replaced. No records were verified.');}}>Confirm local replacement</button>
+     <button type="button" onClick={()=>setPendingEvidence(null)}>Cancel</button></div>}
+    <button type="button" disabled={!evidence} onClick={downloadEvidence}>Export evidence review JSON</button></div>}
    <h3>Manual conversion and retention review</h3>{current?.funnels.length?<div className="revenueCards">{current.funnels.map(f=>{const r=analyzeFunnel(f);return <article key={f.id}><strong>{f.from}–{f.through} · {f.source}</strong>
     <p>Signup: {r.signup===null?'Unavailable':(r.signup*100).toFixed(1)+'%'}; activation: {r.activation===null?'Unavailable':(r.activation*100).toFixed(1)+'%'}; checkout: {r.checkout===null?'Unavailable':(r.checkout*100).toFixed(1)+'%'}; cancellation: {r.cancellation===null?'Unavailable':(r.cancellation*100).toFixed(1)+'%'}.</p>
     <small>{r.provenance}. One source and period; not verified website performance.</small></article>;})}</div>:<p>No compatible funnel observations. Conversion rates unavailable.</p>}

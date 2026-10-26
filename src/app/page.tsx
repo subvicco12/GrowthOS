@@ -1,5 +1,5 @@
 'use client';
-import { useEffect,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import { OrganizationSelector } from './organization-selector';
 import { OrganizationWebsiteRegistry } from './organization-website-registry';
 import { OrganizationApprovalInbox } from './organization-approval-inbox';
@@ -16,6 +16,7 @@ import { CompetitorWorkspace } from './competitor-workspace';
 import { RevenueWorkspace } from './revenue-workspace';
 import type {RevenueHandoff} from '../core/local-revenue-workspace';
 import type {CompetitorPackage} from '../core/local-competitor-workspace';
+import type {RevenueEvidenceBundle} from '../core/local-revenue-evidence';
 import { journeySteps,onboardingReadiness,requireSelectedWebsite,type WebsiteScope } from '../core/workspace-journey';
 import type {AnalyticsHandoff} from '../core/local-analytics-handoff';
 import {includeScopedRegistryWebsite} from '../core/scoped-website-pages';
@@ -50,6 +51,12 @@ export default function Dashboard(){
   const [analyticsHandoff,setAnalyticsHandoff]=useState<AnalyticsHandoff|null>(null);
   const [revenueHandoff,setRevenueHandoff]=useState<RevenueHandoff|null>(null);
   const [competitorPackage,setCompetitorPackage]=useState<CompetitorPackage|null>(null);
+  const [revenueEvidence,setRevenueEvidence]=useState<Record<string,RevenueEvidenceBundle>>({});
+  const evidenceOrganization=useRef<string|null>(null);
+  useEffect(()=>{const current=websitePages.scope?.organizationId;
+    if(current&&evidenceOrganization.current&&current!==evidenceOrganization.current)setRevenueEvidence({});
+    if(current)evidenceOrganization.current=current;
+  },[websitePages.scope?.organizationId]);
   useEffect(()=>{
     const expired=()=>setAuth('signed-out');
     const hashChanged=()=>{const next=window.location.hash.slice(1);if(navigation.some(item=>item.id===next)){
@@ -61,7 +68,7 @@ export default function Dashboard(){
     void checkAuth();
     return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
-  useEffect(()=>{if(!websitePages.fatal)return;setSelectedWebsite('');setSupplementalSite(null);setAnalyticsHandoff(null);setRevenueHandoff(null);setCompetitorPackage(null);setWebsitesVisited(false);setIntelligenceVisited(false);setAnalyticsVisited(false);setCompetitorsVisited(false);setRevenueVisited(false);setWorkspaceEpoch(n=>n+1);},[websitePages.fatal]);
+  useEffect(()=>{if(!websitePages.fatal)return;setSelectedWebsite('');setSupplementalSite(null);setAnalyticsHandoff(null);setRevenueHandoff(null);setCompetitorPackage(null);setRevenueEvidence({});setWebsitesVisited(false);setIntelligenceVisited(false);setAnalyticsVisited(false);setCompetitorsVisited(false);setRevenueVisited(false);setWorkspaceEpoch(n=>n+1);},[websitePages.fatal]);
   async function checkAuth(){
     try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});
       setAuth(response.ok?'ready':response.status===401?'signed-out':'unavailable');
@@ -137,7 +144,11 @@ export default function Dashboard(){
       {intelligenceVisited&&<div hidden={section!=='intelligence'}><IntelligencePanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} onDirtyChange={setLocalWorkDirty}/></div>}
       {analyticsVisited&&<div hidden={section!=='analytics'}><AnalyticsPanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} onPrepareHandoff={prepareAnalyticsReview}/></div>}
       {competitorsVisited&&<div hidden={section!=='competitors'}><CompetitorWorkspace key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} analyticsHandoff={analyticsHandoff} onHandoffConsumed={()=>setAnalyticsHandoff(null)} revenueHandoff={revenueHandoff} onRevenueConsumed={()=>setRevenueHandoff(null)} onPackageChange={setCompetitorPackage}/></div>}
-      {revenueVisited&&<div hidden={section!=='revenue'}><RevenueWorkspace key={workspaceEpoch} scope={websiteScope} websiteId={selectedWebsite} role={websitePages.organization?.role??'viewer'} competitors={competitorPackage} onPrepareHandoff={prepareRevenueReview}/></div>}
+      {revenueVisited&&<div hidden={section!=='revenue'}><RevenueWorkspace key={workspaceEpoch} scope={websiteScope} websiteId={selectedWebsite} role={websitePages.organization?.role??'viewer'} competitors={competitorPackage} onPrepareHandoff={prepareRevenueReview}
+        evidenceBundles={Object.values(revenueEvidence).filter(b=>b.organizationId===websiteScope?.organizationId&&websiteScope.websites.some(w=>w.id===b.websiteId))}
+        onEvidenceChange={b=>{if(!websiteScope||b.organizationId!==websiteScope.organizationId||b.websiteId!==selectedWebsite)return false;
+          try{requireSelectedWebsite(websiteScope,b.websiteId);}catch{return false;}
+          setRevenueEvidence(old=>({...old,[b.organizationId+':'+b.websiteId]:b}));return true;}}/></div>}
       {section==='recommendations'&&<RecommendationReviewPanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
