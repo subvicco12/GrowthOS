@@ -6,6 +6,7 @@ import {addRevenueEvidence,emptyRevenueEvidence,exportRevenueEvidence,importReve
  type RevenueEvidenceBundle,type RevenueEvidence} from '../core/local-revenue-evidence';
 import {appendProviderRevenue,emptyProviderRevenue,exportProviderRevenue,importProviderRevenue,prepareProviderReconciliationHandoff,providerPortfolioCoverage,reconcileProviderRevenue,
  type ProviderRevenueBundle,type ProviderRevenueEvent,type ProviderCategory} from '../core/local-provider-revenue';
+import {portfolioProviderReadiness,providerIdentityReadiness} from '../core/provider-trust-readiness';
 import {analyzeFunnel,calculateRevenueScenario,compareCompetitorPricing,emptyRevenuePreview,exportRevenuePreview,importRevenuePreview,
  prepareRevenueHandoff,revenueChannels,revenueOpportunities,validateRevenuePreview,type FunnelSnapshot,type PricingExperiment,type RevenueHandoff,
  type RevenuePreview,type RevenueScenario} from '../core/local-revenue-workspace';
@@ -51,6 +52,8 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
  const providerBundle=providerBundles.find(b=>b.organizationId===organizationId&&b.websiteId===websiteId)??null;
  const reconciliation=site?reconcileProviderRevenue(providerBundle??emptyProviderRevenue(identity),identity,new Date().toISOString()):null;
  const providerPortfolio=scope?providerPortfolioCoverage(providerBundles,organizationId,scope.websites.map(w=>w.id),new Date().toISOString()):[];
+ const identityReadiness=site?providerIdentityReadiness(providerBundle??emptyProviderRevenue(identity),identity,new Date().toISOString()):null;
+ const portfolioReadiness=scope?portfolioProviderReadiness(providerBundles,organizationId,scope.websites.map(w=>w.id),new Date().toISOString()):[];
  const competitor=competitors&&competitors.organizationId===organizationId&&competitors.websiteId===websiteId?competitors:null;
  const opportunities=current?revenueOpportunities(current,identity,today(),competitor):[];
  const comparisons=current&&competitor?compareCompetitorPricing(competitor,identity,today(),current):[];
@@ -132,7 +135,7 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
   <p>Manual observations, unverified competitor claims and hypothetical scenarios only. Actual settled revenue, conversion evidence and current prices are unavailable without trusted sources. No payment or publishing action is available.</p>
   {!site?<><p>Choose a website in the portfolio selector to prepare a scoped review. Coverage below includes loaded websites only; it does not aggregate unverified records into earnings.</p>
    <div className="revenueCards">{portfolio.map(p=>{const provider=providerPortfolio.find(x=>x.websiteId===p.websiteId);return <article key={p.websiteId}><strong>{scope.websites.find(w=>w.id===p.websiteId)?.domain}</strong>
-    <p>{p.observationCount} local observation(s); sources: {p.sourceCoverage.join(', ')||'Unavailable'}; {provider?.events??0} provider-shaped event(s); providers: {provider?.providers.join(', ')||'Unavailable'}; {provider?.exceptions??0} unresolved exception(s). Actual revenue: Unavailable.</p></article>;})}</div></>:
+    <p>{p.observationCount} local observation(s); sources: {p.sourceCoverage.join(', ')||'Unavailable'}; {provider?.events??0} provider-shaped event(s); providers: {provider?.providers.join(', ')||'Unavailable'}; {portfolioReadiness.find(x=>x.websiteId===p.websiteId)?.identityClaims??0} unverified identity claim(s); {provider?.exceptions??0} unresolved exception(s). Actual revenue: Unavailable.</p></article>;})}</div></>:
   <><p><strong>{site.domain}</strong> · organization {organizationId} · {site.status}. Local profile: {current?.profile.subscriptionModel??'Unavailable'}; verified revenue: Unavailable.</p>
    {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
    {!canEdit&&<p>Read-only role. Local revenue editing and handoffs are unavailable.</p>}
@@ -192,6 +195,10 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
      <button type="button" onClick={()=>setPendingEvidence(null)}>Cancel</button></div>}
     <button type="button" disabled={!evidence} onClick={downloadEvidence}>Export evidence review JSON</button></div>}
    <h3>Provider settlement intelligence · offline and unverified</h3><p>Provider-shaped observations do not authenticate an account, settle a payout or certify reconciliation. Verified revenue: Unavailable.</p>
+   <div className="revenueCards">{identityReadiness?.identities.map(p=><article key={[p.category,p.providerId,p.accountId,p.resourceId].join(':')}>
+    <strong>{p.category} · {p.providerId}</strong><p>Account claim: {p.accountId}; resource claim: {p.resourceId}; {p.eventCount} event(s). Last local event: {p.lastEventAt}.</p>
+    <p>Identity: {p.identityState}; signature: {p.signatureState}; settlement: {p.settlementState}. Verification requirements:</p>
+    <ul>{p.requirements.map(x=><li key={x}>{x}</li>)}</ul></article>)}</div>
    {canEdit&&<fieldset className="revenueForm"><legend>Prepare one manual provider-shaped event</legend>
     <label>Provider category<select value={providerKind} onChange={e=>setProviderKind(e.target.value as ProviderCategory)}>{['paddle','stripe','payment-other','adsense','advertising-other','affiliate','woocommerce','commerce-other','lead-generation','digital-product','service-payment','manual'].map(v=><option key={v}>{v}</option>)}</select></label>
     <label>Provider ID<input value={providerId} maxLength={160} onChange={e=>setProviderId(e.target.value)}/></label>
@@ -212,7 +219,7 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
     <button type="button" onClick={saveProvider}>Add unverified event locally</button></fieldset>}
    <p>Provider categories represented: {reconciliation?.providerCoverage.join(', ')||'Unavailable'}. {reconciliation?.rows.length??0} source record(s); {reconciliation?.exceptions.length??0} unresolved exception(s).</p>
    {reconciliation?.rows.length?<div className="revenueCards">{reconciliation.rows.map(row=><article key={row.recordKey}><strong>{row.provider} · {row.sourceRecordId}</strong>
-    <p>{row.state} · {row.status} · {row.currency} · {row.periodFrom}–{row.periodThrough}. Amount and settled revenue: Unavailable.</p></article>)}</div>:<p>No provider-shaped events available.</p>}
+    <p>{row.state} · {row.status} · settlement: {row.settlementReadiness} · {row.currency} · {row.periodFrom}–{row.periodThrough}. Amount and settled revenue: Unavailable.</p></article>)}</div>:<p>No provider-shaped events available.</p>}
    {reconciliation?.exceptions.length?<div className="revenueCards">{reconciliation.exceptions.map(x=><article key={x.id}><strong>{x.category} · {x.severity}</strong><p>{x.explanation}</p>
     <details><summary>Investigation checklist</summary><p>{x.investigation}</p><p>Event IDs: {x.eventIds.join(', ')}. Open local review; cannot be financially resolved here.</p></details></article>)}</div>:<p>No local exception detected. This does not certify provider settlement.</p>}
    <details><summary>Requirements for independent verification</summary><ul>{reconciliation?.requirements.map(x=><li key={x}>{x}</li>)}</ul></details>

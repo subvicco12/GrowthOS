@@ -95,7 +95,7 @@ export function reconcileProviderRevenue(raw:unknown,scope:{organizationId:strin
  const flag=(key:string,category:string,events:ProviderRevenueEvent[],explanation:string,investigation:string,severity:'review'|'high'='review')=>
   exceptions.push({id:localFingerprint(key+category),...scope,category,severity,eventIds:events.map(e=>e.id),explanation,investigation,status:'open-local-review' as const});
  for(const [key,events] of groups){const sorted=[...events].sort((a,b)=>Date.parse(a.occurredAt)-Date.parse(b.occurredAt)||a.id.localeCompare(b.id));
-  const last=sorted.at(-1)!;const settlements=sorted.filter(e=>e.settlementReference),gross=sorted.filter(e=>e.basis==='gross'&&['captured','completed','paid','finalized','payment-received'].includes(e.state));
+  const last=sorted.at(-1)!;const settlements=sorted.filter(e=>e.settlementReference),gross=sorted.filter(e=>e.basis==='gross'&&['captured','completed','approved','paid','finalized','payment-received'].includes(e.state));
   const refunds=sorted.filter(e=>e.basis==='refund');
   const payout=sorted.filter(e=>e.basis==='payout'),fees=sorted.filter(e=>e.basis==='fee');
   if(gross.length>1&&new Set(gross.map(e=>e.amountMinor)).size>1)flag(key,'amount-conflict',sorted,'Conflicting gross amounts for one source record','Check corrected provider event and signed statement','high');
@@ -112,9 +112,12 @@ export function reconcileProviderRevenue(raw:unknown,scope:{organizationId:strin
   if(estimate&&finalized&&estimate.amountMinor!==finalized.amountMinor)flag(key,'estimate-final-difference',sorted,'Advertising estimate differs from finalized report','Review adjustments before payment matching');
   if(refunds.length&&gross.length===0)flag(key,'missing-original',sorted,'Refund has no captured original in this local package','Inspect original transaction and cross-report lineage','high');
   if(sorted.some(e=>e.basis==='fee')&&gross.length===0)flag(key,'fee-unmatched',sorted,'Fee has no comparable gross event','Obtain fee and settlement statements');
+  const localIssues=exceptions.some(x=>x.eventIds.some(id=>events.some(e=>e.id===id)));
+  const settlementReadiness=!gross.length?'missing-source-payment':!payout.length||!payout.at(-1)?.settlementReference?'missing-settlement-evidence':
+   localIssues?'conflicting-local-evidence':'potential-local-match';
   rows.push({recordKey:key,provider:last.category,providerId:last.providerId,sourceRecordId:last.sourceRecordId,state:last.state,
    currency:last.currency,periodFrom:last.periodFrom,periodThrough:last.periodThrough,observationCount:events.length,
-   status:exceptions.some(x=>x.eventIds.some(id=>events.some(e=>e.id===id)))?'unresolved-exception' as const:'potential-local-match' as const,
+   status:localIssues?'unresolved-exception' as const:'potential-local-match' as const,settlementReadiness,
    certified:false,amountMinor:null as null});
  }
  return {rows,exceptions,providerCoverage:[...new Set(b.events.map(e=>e.category))].sort(),verifiedRevenue:'Unavailable' as const,

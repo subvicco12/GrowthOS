@@ -41,12 +41,16 @@ test('payment completion is not settlement; refund, fee, dispute and missing set
  assert.ok(reconcileProviderRevenue(fee,scope,now).exceptions.some(x=>x.category==='fee-discrepancy'));
  const settled=put([event(),{...event('e6','settled','payout'),amountMinor:9000,settlementReference:'payout-1',occurredAt:'2026-10-11T10:00:00.000Z'}]);
  assert.ok(reconcileProviderRevenue(settled,scope,now).exceptions.some(x=>x.category==='payout-discrepancy'));
+ const equal=put([event(),{...event('e7','settled','payout'),settlementReference:'payout-2',occurredAt:'2026-10-11T10:00:00.000Z'}]);
+ assert.equal(reconcileProviderRevenue(equal,scope,now).rows[0].settlementReadiness,'potential-local-match');
+ assert.equal(reconcileProviderRevenue(equal,scope,now).certifiedReconciliation,false);
 });
 test('affiliate approval is not payment; reversal and payout have distinct meaning',()=>{
  const approved={...event('a1','approved','gross'),category:'affiliate' as const,amountMinor:2500};
  assert.ok(reconcileProviderRevenue(put([approved]),scope,now).exceptions.some(x=>x.category==='pending-payment-evidence'));
  const paid={...event('a2','paid','payout'),category:'affiliate' as const,amountMinor:2500,settlementReference:'payout-1',occurredAt:'2026-10-11T10:00:00.000Z'};
  assert.equal(reconcileProviderRevenue(put([approved,paid]),scope,now).exceptions.length,0);
+ assert.equal(reconcileProviderRevenue(put([approved,paid]),scope,now).rows[0].settlementReadiness,'potential-local-match');
  assert.throws(()=>put([{...approved,category:'affiliate',state:'paid',basis:'gross'}]),/BASIS_DENIED/);
  assert.equal(put([approved,{...paid,id:'a3',sourceEventId:'a3',state:'reversed',basis:'status',amountMinor:0,settlementReference:null}]).events.length,2);
 });
