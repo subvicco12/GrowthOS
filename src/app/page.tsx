@@ -1,5 +1,5 @@
 'use client';
-import { useEffect,useRef,useState } from 'react';
+import { useEffect,useState } from 'react';
 import { OrganizationSelector } from './organization-selector';
 import { OrganizationWebsiteRegistry } from './organization-website-registry';
 import { OrganizationApprovalInbox } from './organization-approval-inbox';
@@ -14,9 +14,9 @@ import { RecommendationReviewPanel } from './recommendation-review-panel';
 import { AnalyticsPanel } from './analytics-panel';
 import { CompetitorWorkspace } from './competitor-workspace';
 import { journeySteps,onboardingReadiness,requireSelectedWebsite,type WebsiteScope } from '../core/workspace-journey';
-import { workspaceError } from './workspace-response';
 import type {AnalyticsHandoff} from '../core/local-analytics-handoff';
-import {appendScopedWebsitePage,includeScopedRegistryWebsite,type ScopedWebsitePage} from '../core/scoped-website-pages';
+import {includeScopedRegistryWebsite} from '../core/scoped-website-pages';
+import {useScopedWebsitePager} from './use-scoped-website-pager';
 import type {WebsiteSummary} from '../core/workspace-journey';
 
 type Section='home'|'websites'|'intelligence'|'analytics'|'competitors'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
@@ -35,12 +35,13 @@ export default function Dashboard(){
   const [competitorsVisited,setCompetitorsVisited]=useState(false);
   const [auth,setAuth]=useState<'loading'|'ready'|'signed-out'|'unavailable'>('loading');
   const [localWorkDirty,setLocalWorkDirty]=useState(false);
-  const [websiteScope,setWebsiteScope]=useState<WebsiteScope|null>(null);
-  const [websiteScopeStatus,setWebsiteScopeStatus]=useState('Loading website portfolio…');
+  const {state:websitePages,pager:websitePager}=useScopedWebsitePager(auth==='ready','Website portfolio');
   const [selectedWebsite,setSelectedWebsite]=useState('');
-  const [nextWebsiteCursor,setNextWebsiteCursor]=useState<string|null>(null);
-  const [loadingWebsites,setLoadingWebsites]=useState(false);
-  const visitedWebsiteCursors=useRef(new Set<string>());
+  const [supplementalSite,setSupplementalSite]=useState<WebsiteSummary|null>(null);
+  const [websiteSearch,setWebsiteSearch]=useState('');
+  let websiteScope:WebsiteScope|null=websitePages.scope;
+  if(websiteScope&&supplementalSite)try{websiteScope=includeScopedRegistryWebsite(websiteScope,websiteScope.organizationId,supplementalSite);}catch{websiteScope=null;}
+  const visibleWebsites=websiteScope?.websites.filter(site=>site.domain.toLocaleLowerCase().includes(websiteSearch.trim().toLocaleLowerCase()))??[];
   const [workspaceEpoch,setWorkspaceEpoch]=useState(0);
   const [analyticsHandoff,setAnalyticsHandoff]=useState<AnalyticsHandoff|null>(null);
   useEffect(()=>{
@@ -54,25 +55,7 @@ export default function Dashboard(){
     void checkAuth();
     return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
-  useEffect(()=>{if(auth!=='ready')return;let active=true;
-    void fetch('/api/organization-websites',{credentials:'include',cache:'no-store'}).then(async response=>{
-      if(!response.ok)throw workspaceError(response,'Website portfolio');
-      const page=await response.json() as ScopedWebsitePage;
-      const scope=appendScopedWebsitePage(null,page);visitedWebsiteCursors.current.clear();
-      if(active){setWebsiteScope(scope);setNextWebsiteCursor(page.nextCursor);setWebsiteScopeStatus(scope.websites.length?'':'No registered websites. Begin with draft onboarding.');}
-    }).catch(error=>{if(active){setWebsiteScope(null);setWebsiteScopeStatus(error instanceof Error?error.message:'Website portfolio unavailable');}});
-    return()=>{active=false;};},[auth]);
-  async function loadMoreWebsites(){if(!websiteScope||!nextWebsiteCursor||loadingWebsites)return;
-    const cursor=nextWebsiteCursor,expected=websiteScope.organizationId;setLoadingWebsites(true);
-    try{const response=await fetch('/api/organization-websites?cursor='+encodeURIComponent(cursor),{credentials:'include',cache:'no-store'});
-      if(!response.ok)throw workspaceError(response,'Website portfolio');
-      const page=await response.json() as ScopedWebsitePage;
-      if(page.organization.id!==expected)throw Error('Workspace changed. Reload before continuing.');
-      const next=appendScopedWebsitePage(websiteScope,page,visitedWebsiteCursors.current,cursor);
-      visitedWebsiteCursors.current.add(cursor);setWebsiteScope(next);setNextWebsiteCursor(page.nextCursor);setWebsiteScopeStatus('');
-    }catch(error){setWebsiteScope(null);setNextWebsiteCursor(null);setWebsiteScopeStatus(error instanceof Error?error.message:'Website portfolio unavailable');}
-    finally{setLoadingWebsites(false);}
-  }
+  useEffect(()=>{if(!websitePages.fatal)return;setSelectedWebsite('');setSupplementalSite(null);setAnalyticsHandoff(null);setWebsitesVisited(false);setIntelligenceVisited(false);setAnalyticsVisited(false);setCompetitorsVisited(false);setWorkspaceEpoch(n=>n+1);},[websitePages.fatal]);
   async function checkAuth(){
     try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});
       setAuth(response.ok?'ready':response.status===401?'signed-out':'unavailable');
@@ -97,7 +80,7 @@ export default function Dashboard(){
     }catch{return false;}
     if(id===selectedWebsite)return true;
     if((selectedWebsite||localWorkDirty)&&!window.confirm('Switch website? Other local workspaces will be cleared to prevent stale website data. Export previews first if needed.'))return false;
-    setWebsiteScope(nextScope);setSelectedWebsite(id);setAnalyticsHandoff(null);
+    setSupplementalSite(registrySite??null);setSelectedWebsite(id);setAnalyticsHandoff(null);
     setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
     return true;
   }
@@ -109,6 +92,7 @@ export default function Dashboard(){
     window.history.pushState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
   if(auth==='loading')return <main className="authShell" role="status">Checking session…</main>;
   if(auth==='signed-out')return <AuthPanel onAuthenticated={()=>{setAuth('ready');window.location.reload();}}/>;
+  if(websitePages.fatal)return <main className="authShell"><div className="panel"><h1>Website scope unavailable</h1><p role="alert">{websitePages.error}. Previously loaded website data has been hidden.</p><OrganizationSelector/></div></main>;
   if(auth==='unavailable')return <main className="authShell"><div className="panel"><h1>Workspace unavailable</h1><p>Authentication status could not be verified. No workspace data is shown.</p><button onClick={()=>void checkAuth()}>Retry</button></div></main>;
   const title=navigation.find(x=>x.id===section)?.label??'Portfolio';
   return <main className="appShell">
@@ -117,10 +101,22 @@ export default function Dashboard(){
       <div className="sidebarFooter">Publishing and automation are not started here.</div>
     </aside>
     <section className="appContent"><header className="appHeader"><div><p className="eyebrow">FIRST-PARTY ADMIN</p><h1>{title}</h1><p className="lede">Selected organization scope. Unknown metrics are shown as unavailable.</p></div>
-      <div className="headerActions"><OrganizationSelector onBeforeSelection={()=>!(websitesVisited||intelligenceVisited||analyticsVisited||competitorsVisited||localWorkDirty)||window.confirm('Change organization? Unsaved local profiles, analytics and planning previews will be discarded after selection. Export them first if needed.')}/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
-      <div className="workspaceSiteBar"><label>Current website<select value={selectedWebsite} disabled={!websiteScope} onChange={e=>switchWebsite(e.target.value)}>
-        <option value="">Portfolio / choose website</option>{websiteScope?.websites.map(site=><option key={site.id} value={site.id}>{site.domain} · {site.status}</option>)}</select></label>
-        {websiteScopeStatus&&<small role="status">{websiteScopeStatus}</small>}{nextWebsiteCursor&&<button type="button" className="secondary" disabled={loadingWebsites} onClick={()=>void loadMoreWebsites()}>{loadingWebsites?'Loading…':'Load more websites'}</button>}</div>
+      <div className="headerActions"><OrganizationSelector onSelectionCommitted={()=>{websitePager.invalidate();setSelectedWebsite('');setSupplementalSite(null);setAnalyticsHandoff(null);}} onBeforeSelection={()=>!(websitesVisited||intelligenceVisited||analyticsVisited||competitorsVisited||localWorkDirty)||window.confirm('Change organization? Unsaved local profiles, analytics and planning previews will be discarded after selection. Export them first if needed.')}/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
+      <div className="workspaceSiteBar" aria-label="Website selection">
+        <label>Filter loaded websites<input type="search" value={websiteSearch} maxLength={253} disabled={!websiteScope} onChange={e=>setWebsiteSearch(e.target.value)} placeholder="Filter websites already loaded" /></label>
+        <label>Current website<select value={selectedWebsite} disabled={!websiteScope} onChange={e=>switchWebsite(e.target.value)}>
+          <option value="">Portfolio / choose website</option>
+          {websiteScope?.websites.filter(site=>!websiteSearch||site.id===selectedWebsite||visibleWebsites.some(visible=>visible.id===site.id)).map(site=><option key={site.id} value={site.id}>{site.domain} · {site.status}</option>)}
+        </select></label>
+        <div className="websitePageControls" role="status" aria-live="polite">
+          {websiteScope&&<small>{visibleWebsites.length} matching loaded websites of {websiteScope.websites.length} loaded{websitePages.nextCursor?' · more pages available':''}. Filtering does not search unloaded websites.</small>}
+          {websitePages.busy&&<small>Loading website page…</small>}
+          {websitePages.error&&<small>{websitePages.error}</small>}
+          {!websiteScope&&!websitePages.error&&!websitePages.busy&&<small>No registered websites available in this workspace.</small>}
+          {websitePages.error&&!websitePages.fatal&&<button type="button" className="secondary" disabled={websitePages.busy} onClick={()=>void(websitePages.scope?websitePager.loadMore():websitePager.loadInitial())}>Retry website page</button>}
+          {websitePages.nextCursor&&!websitePages.error&&<button type="button" className="secondary" disabled={websitePages.busy} onClick={()=>void websitePager.loadMore()}>Load more websites</button>}
+        </div>
+      </div>
       {section==='home'&&<><OrganizationDashboard/><section className="panel" aria-label="Growth workflow overview"><h2>Website growth journey</h2>
         {selectedWebsite&&websiteScope&&<div><p>Selected: {requireSelectedWebsite(websiteScope,selectedWebsite).domain}. Website-specific local previews remain unverified.</p>
           <ul>{onboardingReadiness(requireSelectedWebsite(websiteScope,selectedWebsite)).checks.map(c=><li key={c.name}>{c.name}: {c.state}</li>)}</ul></div>}

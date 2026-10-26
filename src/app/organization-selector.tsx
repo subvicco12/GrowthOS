@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 type Organization = { id: string; name: string; role: 'owner' | 'admin' | 'editor' | 'viewer' };
 
-export function OrganizationSelector({onBeforeSelection}:{onBeforeSelection?:()=>boolean}={}) {
+export function OrganizationSelector({onBeforeSelection,onSelectionCommitted}:{onBeforeSelection?:()=>boolean;onSelectionCommitted?:()=>void}={}) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selected, setSelected] = useState('');
   const [status, setStatus] = useState('Loading organizations…');
@@ -48,6 +48,7 @@ export function OrganizationSelector({onBeforeSelection}:{onBeforeSelection?:()=
         body: JSON.stringify({ organizationId: id })
       });
       if (!response.ok) throw new Error('Workspace selection was rejected.');
+      onSelectionCommitted?.();
       setSelected(id);
       window.location.reload();
     } catch (error) {

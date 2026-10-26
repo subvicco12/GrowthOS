@@ -11,7 +11,8 @@ test('workspace shell routes sections to organization-scoped views', () => {
  assert.match(source,/section==='home'&&<><OrganizationDashboard/);
  assert.match(source,/hidden=\{section!=='websites'\}.*<OrganizationWebsiteRegistry/);
  assert.match(source,/preferredWebsiteId=\{selectedWebsite\}/);
- assert.match(source,/<OrganizationSelector\s+onBeforeSelection=/);
+ assert.match(source,/<OrganizationSelector\s+onSelectionCommitted=/);
+ assert.match(source,/onBeforeSelection=/);
  assert.match(source,/setIntelligenceVisited\(section==='intelligence'\)/);
  assert.match(source,/hidden=\{section!=='intelligence'\}/);
  assert.doesNotMatch(source,/22 engines|Twenty GrowthOS engines/);
