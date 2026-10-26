@@ -4,6 +4,8 @@ import type {WebsiteScope} from '../core/workspace-journey';
 import type {CompetitorPackage} from '../core/local-competitor-workspace';
 import {addRevenueEvidence,emptyRevenueEvidence,exportRevenueEvidence,importRevenueEvidence,portfolioRevenueCoverage,revenueEvidenceSummary,
  type RevenueEvidenceBundle,type RevenueEvidence} from '../core/local-revenue-evidence';
+import {appendProviderRevenue,emptyProviderRevenue,exportProviderRevenue,importProviderRevenue,prepareProviderReconciliationHandoff,providerPortfolioCoverage,reconcileProviderRevenue,
+ type ProviderRevenueBundle,type ProviderRevenueEvent,type ProviderCategory} from '../core/local-provider-revenue';
 import {analyzeFunnel,calculateRevenueScenario,compareCompetitorPricing,emptyRevenuePreview,exportRevenuePreview,importRevenuePreview,
  prepareRevenueHandoff,revenueChannels,revenueOpportunities,validateRevenuePreview,type FunnelSnapshot,type PricingExperiment,type RevenueHandoff,
  type RevenuePreview,type RevenueScenario} from '../core/local-revenue-workspace';
@@ -13,7 +15,8 @@ const lines=(raw:string)=>raw.split('\n').map(s=>s.trim()).filter(Boolean);
 const blankCounts=Object.fromEntries(funnelFields.map(key=>[key,''])) as Record<typeof funnelFields[number],string>;
 type Props={scope:WebsiteScope|null;websiteId:string;role:string;competitors:CompetitorPackage|null;onPrepareHandoff:(handoff:RevenueHandoff)=>boolean;
  evidenceBundles:RevenueEvidenceBundle[];onEvidenceChange:(bundle:RevenueEvidenceBundle)=>boolean};
-export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHandoff,evidenceBundles,onEvidenceChange}:Props){
+type ProviderProps={providerBundles:ProviderRevenueBundle[];onProviderChange:(bundle:ProviderRevenueBundle)=>boolean};
+export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHandoff,evidenceBundles,onEvidenceChange,providerBundles,onProviderChange}:Props&ProviderProps){
  const organizationId=scope?.organizationId??'',site=scope?.websites.find(w=>w.id===websiteId);
  const identity={organizationId,websiteId};const canEdit=!!site&&['owner','admin','editor'].includes(role);
  const [preview,setPreview]=useState<RevenuePreview|null>(null),[pending,setPending]=useState<RevenuePreview|null>(null);
@@ -34,10 +37,20 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
  const [evidenceFrom,setEvidenceFrom]=useState(''),[evidenceThrough,setEvidenceThrough]=useState(''),[evidenceObserved,setEvidenceObserved]=useState('');
  const [evidenceAmount,setEvidenceAmount]=useState(''),[evidenceCurrency,setEvidenceCurrency]=useState('USD');
  const [evidenceBasis,setEvidenceBasis]=useState<RevenueEvidence['basis']>('gross-reported');
+ const [pendingProvider,setPendingProvider]=useState<ProviderRevenueBundle|null>(null),[providerKind,setProviderKind]=useState<ProviderCategory>('paddle');
+ const [providerId,setProviderId]=useState(''),[providerAccount,setProviderAccount]=useState(''),[providerResource,setProviderResource]=useState('');
+ const [sourceRecord,setSourceRecord]=useState(''),[sourceEvent,setSourceEvent]=useState(''),[batch,setBatch]=useState('');
+ const [providerState,setProviderState]=useState('completed'),[providerBasis,setProviderBasis]=useState<ProviderRevenueEvent['basis']>('gross');
+ const [providerAmount,setProviderAmount]=useState(''),[providerCurrency,setProviderCurrency]=useState('USD');
+ const [providerFrom,setProviderFrom]=useState(''),[providerThrough,setProviderThrough]=useState(''),[providerAt,setProviderAt]=useState('');
+ const [providerSettlement,setProviderSettlement]=useState(''),[relatedEvent,setRelatedEvent]=useState('');
  const current=preview&&preview.organizationId===organizationId&&preview.websiteId===websiteId?preview:null;
  const evidence=evidenceBundles.find(b=>b.organizationId===organizationId&&b.websiteId===websiteId)??null;
  const evidenceSummary=site?revenueEvidenceSummary(evidence??emptyRevenueEvidence(identity),identity,today()):null;
  const portfolio=scope?portfolioRevenueCoverage(evidenceBundles,organizationId,scope.websites.map(w=>w.id),today()):[];
+ const providerBundle=providerBundles.find(b=>b.organizationId===organizationId&&b.websiteId===websiteId)??null;
+ const reconciliation=site?reconcileProviderRevenue(providerBundle??emptyProviderRevenue(identity),identity,new Date().toISOString()):null;
+ const providerPortfolio=scope?providerPortfolioCoverage(providerBundles,organizationId,scope.websites.map(w=>w.id),new Date().toISOString()):[];
  const competitor=competitors&&competitors.organizationId===organizationId&&competitors.websiteId===websiteId?competitors:null;
  const opportunities=current?revenueOpportunities(current,identity,today(),competitor):[];
  const comparisons=current&&competitor?compareCompetitorPricing(competitor,identity,today(),current):[];
@@ -81,6 +94,27 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
  function downloadEvidence(){act(()=>{if(!evidence)throw Error('REVENUE_EVIDENCE_UNAVAILABLE');const blob=new Blob([exportRevenueEvidence(evidence,identity,today())],{type:'application/json'});
   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='growthos-revenue-evidence-review-only.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
  });}
+ function saveProvider(){act(()=>{if(!canEdit||!site)throw Error('REVENUE_ROLE_DENIED');if(providerAmount.trim()===''||!providerAt)throw Error('PROVIDER_INPUT_REQUIRED');
+  const e:ProviderRevenueEvent={id:'pe-'+crypto.randomUUID(),...identity,category:providerKind,providerId,accountId:providerAccount,resourceId:providerResource,
+   sourceRecordId:sourceRecord,sourceEventId:sourceEvent,importBatchId:batch,periodFrom:providerFrom,periodThrough:providerThrough,
+   occurredAt:new Date(providerAt).toISOString(),currency:providerCurrency as ProviderRevenueEvent['currency'],amountMinor:Number(providerAmount),
+   basis:providerBasis,state:providerState,settlementReference:providerSettlement||null,relatedEventId:relatedEvent||null,
+   provenance:'manual-unverified',verification:'unverified',authority:'none'};
+  const next=appendProviderRevenue(providerBundle??emptyProviderRevenue(identity),e,identity,new Date().toISOString());
+  if(!onProviderChange(next))throw Error('PROVIDER_SCOPE_CHANGED');setNotice('Provider-shaped manual record added locally; no settlement verified.');
+ });}
+ async function inspectProvider(file:File|undefined){setPendingProvider(null);if(!file)return;try{if(!canEdit)throw Error('REVENUE_ROLE_DENIED');
+  if(file.size>250_000)throw Error('PROVIDER_PACKAGE_SIZE_DENIED');const next=importProviderRevenue(new Uint8Array(await file.arrayBuffer()),identity,new Date().toISOString());
+  setPendingProvider(next);setError('');setNotice(`Provider package preview: ${next.events.length} unverified events. Nothing replaced yet.`);
+ }catch(e){setError(e instanceof Error?e.message:'Provider package refused');}}
+ function downloadProvider(){act(()=>{if(!providerBundle)throw Error('PROVIDER_PACKAGE_UNAVAILABLE');const blob=new Blob([exportProviderRevenue(providerBundle,identity,new Date().toISOString())],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='growthos-provider-reconciliation-review-only.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ });}
+ function transferReconciliation(){act(()=>{if(!canEdit||!reconciliation?.exceptions.length)throw Error('PROVIDER_HANDOFF_DENIED');
+  const h=prepareProviderReconciliationHandoff(providerBundle??emptyProviderRevenue(identity),identity,new Date().toISOString());
+  if(!window.confirm('Prepare a review-only reconciliation gap in the local product backlog? No provider or payment change will occur.'))return;
+  if(!onPrepareHandoff(h))throw Error('PROVIDER_HANDOFF_SCOPE_CHANGED');setNotice('Review-only reconciliation handoff prepared.');
+ });}
  function transfer(id:string){act(()=>{if(!canEdit||!current)throw Error('REVENUE_ROLE_DENIED');
   const h=prepareRevenueHandoff(current,identity,today(),id,competitor);
   if(!window.confirm('Prepare an unverified local revenue proposal for the product backlog? No pricing, entitlement or payment change will occur.'))return;
@@ -97,8 +131,8 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
  return <section className="panel revenueWorkspace" aria-label="Revenue intelligence local workspace"><h2>Revenue intelligence · review only</h2>
   <p>Manual observations, unverified competitor claims and hypothetical scenarios only. Actual settled revenue, conversion evidence and current prices are unavailable without trusted sources. No payment or publishing action is available.</p>
   {!site?<><p>Choose a website in the portfolio selector to prepare a scoped review. Coverage below includes loaded websites only; it does not aggregate unverified records into earnings.</p>
-   <div className="revenueCards">{portfolio.map(p=><article key={p.websiteId}><strong>{scope.websites.find(w=>w.id===p.websiteId)?.domain}</strong>
-    <p>{p.observationCount} local observation(s); sources: {p.sourceCoverage.join(', ')||'Unavailable'}; actual revenue: Unavailable; reconciliation: Unavailable.</p></article>)}</div></>:
+   <div className="revenueCards">{portfolio.map(p=>{const provider=providerPortfolio.find(x=>x.websiteId===p.websiteId);return <article key={p.websiteId}><strong>{scope.websites.find(w=>w.id===p.websiteId)?.domain}</strong>
+    <p>{p.observationCount} local observation(s); sources: {p.sourceCoverage.join(', ')||'Unavailable'}; {provider?.events??0} provider-shaped event(s); providers: {provider?.providers.join(', ')||'Unavailable'}; {provider?.exceptions??0} unresolved exception(s). Actual revenue: Unavailable.</p></article>;})}</div></>:
   <><p><strong>{site.domain}</strong> · organization {organizationId} · {site.status}. Local profile: {current?.profile.subscriptionModel??'Unavailable'}; verified revenue: Unavailable.</p>
    {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
    {!canEdit&&<p>Read-only role. Local revenue editing and handoffs are unavailable.</p>}
@@ -157,6 +191,37 @@ export function RevenueWorkspace({scope,websiteId,role,competitors,onPrepareHand
      <button type="button" onClick={()=>{if(!onEvidenceChange(pendingEvidence)){setError('REVENUE_EVIDENCE_SCOPE_CHANGED');return;}setPendingEvidence(null);setNotice('Local evidence replaced. No records were verified.');}}>Confirm local replacement</button>
      <button type="button" onClick={()=>setPendingEvidence(null)}>Cancel</button></div>}
     <button type="button" disabled={!evidence} onClick={downloadEvidence}>Export evidence review JSON</button></div>}
+   <h3>Provider settlement intelligence · offline and unverified</h3><p>Provider-shaped observations do not authenticate an account, settle a payout or certify reconciliation. Verified revenue: Unavailable.</p>
+   {canEdit&&<fieldset className="revenueForm"><legend>Prepare one manual provider-shaped event</legend>
+    <label>Provider category<select value={providerKind} onChange={e=>setProviderKind(e.target.value as ProviderCategory)}>{['paddle','stripe','payment-other','adsense','advertising-other','affiliate','woocommerce','commerce-other','lead-generation','digital-product','service-payment','manual'].map(v=><option key={v}>{v}</option>)}</select></label>
+    <label>Provider ID<input value={providerId} maxLength={160} onChange={e=>setProviderId(e.target.value)}/></label>
+    <label>Account ID<input value={providerAccount} maxLength={160} onChange={e=>setProviderAccount(e.target.value)}/></label>
+    <label>Resource ID<input value={providerResource} maxLength={160} onChange={e=>setProviderResource(e.target.value)}/></label>
+    <label>Source record ID<input value={sourceRecord} maxLength={160} onChange={e=>setSourceRecord(e.target.value)}/></label>
+    <label>Unique source event ID<input value={sourceEvent} maxLength={160} onChange={e=>setSourceEvent(e.target.value)}/></label>
+    <label>Import batch reference<input value={batch} maxLength={160} onChange={e=>setBatch(e.target.value)}/></label>
+    <label>Lifecycle state<input value={providerState} maxLength={30} onChange={e=>setProviderState(e.target.value)}/></label>
+    <label>Financial basis<select value={providerBasis} onChange={e=>setProviderBasis(e.target.value as ProviderRevenueEvent['basis'])}>{['gross','refund','fee','payout','estimate'].map(v=><option key={v}>{v}</option>)}</select></label>
+    <label>Nonnegative amount in exact minor units<input type="number" min="0" step="1" value={providerAmount} onChange={e=>setProviderAmount(e.target.value)}/></label>
+    <label>Currency code<input value={providerCurrency} maxLength={3} onChange={e=>setProviderCurrency(e.target.value.toUpperCase())}/></label>
+    <label>Period from<input type="date" value={providerFrom} onChange={e=>setProviderFrom(e.target.value)}/></label>
+    <label>Period through<input type="date" value={providerThrough} onChange={e=>setProviderThrough(e.target.value)}/></label>
+    <label>Event time<input type="datetime-local" value={providerAt} onChange={e=>setProviderAt(e.target.value)}/></label>
+    <label>Settlement or payout reference (blank = missing)<input value={providerSettlement} maxLength={160} onChange={e=>setProviderSettlement(e.target.value)}/></label>
+    <label>Related local event ID for refund or fee<input value={relatedEvent} maxLength={120} onChange={e=>setRelatedEvent(e.target.value)}/></label>
+    <button type="button" onClick={saveProvider}>Add unverified event locally</button></fieldset>}
+   <p>Provider categories represented: {reconciliation?.providerCoverage.join(', ')||'Unavailable'}. {reconciliation?.rows.length??0} source record(s); {reconciliation?.exceptions.length??0} unresolved exception(s).</p>
+   {reconciliation?.rows.length?<div className="revenueCards">{reconciliation.rows.map(row=><article key={row.recordKey}><strong>{row.provider} · {row.sourceRecordId}</strong>
+    <p>{row.state} · {row.status} · {row.currency} · {row.periodFrom}–{row.periodThrough}. Amount and settled revenue: Unavailable.</p></article>)}</div>:<p>No provider-shaped events available.</p>}
+   {reconciliation?.exceptions.length?<div className="revenueCards">{reconciliation.exceptions.map(x=><article key={x.id}><strong>{x.category} · {x.severity}</strong><p>{x.explanation}</p>
+    <details><summary>Investigation checklist</summary><p>{x.investigation}</p><p>Event IDs: {x.eventIds.join(', ')}. Open local review; cannot be financially resolved here.</p></details></article>)}</div>:<p>No local exception detected. This does not certify provider settlement.</p>}
+   <details><summary>Requirements for independent verification</summary><ul>{reconciliation?.requirements.map(x=><li key={x}>{x}</li>)}</ul></details>
+   {canEdit&&<div className="revenueTransfer"><button type="button" disabled={!reconciliation?.exceptions.length} onClick={transferReconciliation}>Prepare reconciliation gap in product backlog</button>
+    <label>Inspect provider package JSON (250 KB maximum)<input type="file" accept=".json,application/json" onChange={e=>void inspectProvider(e.target.files?.[0])}/></label>
+    {pendingProvider&&<div role="group" aria-label="Confirm provider import"><p>Replace local provider preview with {pendingProvider.events.length} unverified event(s)?</p>
+     <button type="button" onClick={()=>{if(!onProviderChange(pendingProvider)){setError('PROVIDER_SCOPE_CHANGED');return;}setPendingProvider(null);setNotice('Provider-shaped records replaced locally; no verification or settlement authority.');}}>Confirm local replacement</button>
+     <button type="button" onClick={()=>setPendingProvider(null)}>Cancel</button></div>}
+    <button type="button" disabled={!providerBundle} onClick={downloadProvider}>Export provider review JSON</button></div>}
    <h3>Manual conversion and retention review</h3>{current?.funnels.length?<div className="revenueCards">{current.funnels.map(f=>{const r=analyzeFunnel(f);return <article key={f.id}><strong>{f.from}–{f.through} · {f.source}</strong>
     <p>Signup: {r.signup===null?'Unavailable':(r.signup*100).toFixed(1)+'%'}; activation: {r.activation===null?'Unavailable':(r.activation*100).toFixed(1)+'%'}; checkout: {r.checkout===null?'Unavailable':(r.checkout*100).toFixed(1)+'%'}; cancellation: {r.cancellation===null?'Unavailable':(r.cancellation*100).toFixed(1)+'%'}.</p>
     <small>{r.provenance}. One source and period; not verified website performance.</small></article>;})}</div>:<p>No compatible funnel observations. Conversion rates unavailable.</p>}

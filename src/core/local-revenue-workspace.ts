@@ -108,7 +108,7 @@ export function revenueOpportunities(raw:unknown,scope:{organizationId:string;we
  }
  return results.sort((a,b)=>b.priority-a.priority||a.id.localeCompare(b.id));
 }
-const handoffSchema=z.object({id,organizationId:id,websiteId:id,kind:z.enum(['tier-differentiation','conversion-friction','renewal-review','category-channel','competitor-package']),
+const handoffSchema=z.object({id,organizationId:id,websiteId:id,kind:z.enum(['tier-differentiation','conversion-friction','renewal-review','category-channel','competitor-package','reconciliation-gap']),
  title:text,reason:text,customerBenefit:text,evidenceRefs:z.array(id).min(1).max(30),priority:z.number().int().min(1).max(5),
  provenance:z.enum(['unverified-manual','synthetic-or-mixed']),authority:z.literal('review-only'),cost:z.literal('unknown'),impact:z.literal('unknown')}).strict();
 export type RevenueHandoff=z.infer<typeof handoffSchema>;
