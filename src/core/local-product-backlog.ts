@@ -1,10 +1,11 @@
 import {z} from 'zod';
 import type {ProductOpportunity} from './local-competitor-workspace';
+import type {AnalyticsHandoff} from './local-analytics-handoff';
 const id=z.string().trim().min(1).max(120).regex(/^[a-zA-Z0-9:_-]+$/);
 const safe=z.string().trim().max(2000).refine(v=>!/[<>\u0000-\u001f]/.test(v));
 const brief=z.string().trim().min(3).max(240).refine(v=>!/[<>\u0000-\u001f]/.test(v));
 const tier=z.enum(['free','pro','business']);
-const proposal=z.object({id,organizationId:id,websiteId:id,origin:z.enum(['manual','competitor-preview']),title:brief,problem:brief,solution:brief,
+const proposal=z.object({id,organizationId:id,websiteId:id,origin:z.enum(['manual','competitor-preview','analytics-import']),originRef:id.optional(),title:brief,problem:brief,solution:brief,
  benefit:brief,evidenceRefs:z.array(id).max(30),targetTiers:z.array(tier).max(3),usageLimit:z.number().int().nonnegative().safe().nullable(),
  effort:z.enum(['unknown','low','medium','high']),estimatedCostMinor:z.number().int().nonnegative().safe().nullable(),currency:z.string().regex(/^[A-Z]{3}$/).nullable(),
  dependencies:z.array(id).max(20),featureChange:z.enum(['none','enable','disable','modify']),featureKey:id.nullable(),
@@ -17,6 +18,7 @@ export const emptyBacklog=(scope:{organizationId:string;websiteId:string}):Produ
 export function validateBacklog(raw:unknown,scope:{organizationId:string;websiteId:string}):ProductBacklog{
  const p=bundle.parse(raw);if(p.organizationId!==scope.organizationId||p.websiteId!==scope.websiteId||p.proposals.some(x=>x.organizationId!==scope.organizationId||x.websiteId!==scope.websiteId))throw Error('BACKLOG_SCOPE_DENIED');
  const ids=new Set(p.proposals.map(x=>x.id));if(ids.size!==p.proposals.length)throw Error('BACKLOG_DUPLICATE_ID');
+ const originRefs=p.proposals.filter(x=>x.originRef).map(x=>x.origin+':'+x.originRef);if(new Set(originRefs).size!==originRefs.length)throw Error('BACKLOG_DUPLICATE_ORIGIN');
  for(const x of p.proposals){if(new Set(x.targetTiers).size!==x.targetTiers.length||new Set(x.dependencies).size!==x.dependencies.length||
    x.dependencies.includes(x.id)||x.dependencies.some(y=>!ids.has(y))||Boolean(x.estimatedCostMinor!==null)!==Boolean(x.currency!==null)||
    (x.featureChange!=='none'&&!x.featureKey)||(x.featureChange==='none'&&x.featureKey))throw Error('BACKLOG_REFERENCE_DENIED');}
@@ -27,10 +29,19 @@ export function validateBacklog(raw:unknown,scope:{organizationId:string;website
 }
 export function fromCompetitorOpportunity(o:ProductOpportunity,scope:{organizationId:string;websiteId:string}):ProductProposal{
  if(o.websiteId!==scope.websiteId||!o.id.startsWith(scope.websiteId+':')||!o.claimIds.length||o.approval!=='not-requested'||o.cost!=='unknown'||o.impact!=='unknown')throw Error('BACKLOG_COMPETITOR_SCOPE_DENIED');
- return {id:'proposal-'+crypto.randomUUID(),...scope,origin:'competitor-preview',title:o.title,problem:'Review reported competitor gap and customer need',
+ return {id:'proposal-'+crypto.randomUUID(),...scope,origin:'competitor-preview',originRef:o.id,title:o.title,problem:'Review reported competitor gap and customer need',
   solution:'Evaluate a scoped product improvement',benefit:'Customer benefit to validate',evidenceRefs:[...o.claimIds],targetTiers:[],usageLimit:null,
   effort:'unknown',estimatedCostMinor:null,currency:null,dependencies:[],featureChange:'none',featureKey:null,
   requirements:[],acceptance:[],security:'',privacy:'',tests:'',rollback:'',rollout:'',requiredRole:'owner',state:'local-review-only'};
+}
+export function fromAnalyticsHandoff(h:AnalyticsHandoff,scope:{organizationId:string;websiteId:string}):ProductProposal{
+ if(h.organizationId!==scope.organizationId||h.websiteId!==scope.websiteId||!h.originRef.startsWith(scope.websiteId+':')||
+  !h.evidenceIds.length||h.evidenceIds.length>30||h.authority!=='review-only'||h.cost!=='unknown'||h.impact!=='unknown'||
+  !['synthetic-or-mixed','unverified-import'].includes(h.provenance))throw Error('BACKLOG_ANALYTICS_SCOPE_DENIED');
+ return proposal.parse({id:'proposal-'+crypto.randomUUID(),...scope,origin:'analytics-import',originRef:h.originRef,
+  title:'Review '+h.category+' measurement opportunity',problem:h.problem,solution:h.action,benefit:'Customer value requires validation',
+  evidenceRefs:h.evidenceIds,targetTiers:[],usageLimit:null,effort:'unknown',estimatedCostMinor:null,currency:null,dependencies:[],
+  featureChange:'none',featureKey:null,requirements:[],acceptance:[],security:'',privacy:'',tests:'',rollback:'',rollout:'',requiredRole:'owner',state:'local-review-only'});
 }
 export function assessProductReadiness(x:ProductProposal,scope:{organizationId:string;websiteId:string},featureState:'unknown'|'enabled'|'disabled'|'unavailable'){
  const parsed=proposal.parse(x);if(parsed.organizationId!==scope.organizationId||parsed.websiteId!==scope.websiteId)throw Error('BACKLOG_SCOPE_DENIED');

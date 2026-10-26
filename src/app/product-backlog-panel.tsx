@@ -1,13 +1,14 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {assessProductReadiness,developmentHandoff,emptyBacklog,exportBacklog,fromCompetitorOpportunity,HANDOFF_WARNING,importBacklog,validateBacklog,type ProductBacklog,type ProductProposal} from '../core/local-product-backlog';
+import {assessProductReadiness,developmentHandoff,emptyBacklog,exportBacklog,fromCompetitorOpportunity,fromAnalyticsHandoff,HANDOFF_WARNING,importBacklog,validateBacklog,type ProductBacklog,type ProductProposal} from '../core/local-product-backlog';
 import type {ProductOpportunity} from '../core/local-competitor-workspace';
+import type {AnalyticsHandoff} from '../core/local-analytics-handoff';
 const tiers=['free','pro','business'] as const;
-type Props={organizationId:string;websiteId:string;role:string;opportunities:ProductOpportunity[];controls:{automationEnabled:boolean;autoPublishEnabled:boolean}|null};
+type Props={organizationId:string;websiteId:string;role:string;opportunities:ProductOpportunity[];controls:{automationEnabled:boolean;autoPublishEnabled:boolean}|null;analyticsHandoff?:AnalyticsHandoff|null;onHandoffConsumed?:()=>void};
 function EditableText({label,value,onCommit,maxLength=240}:{label:string;value:string;onCommit:(value:string)=>void;maxLength?:number}){
  const [draft,setDraft]=useState(value);useEffect(()=>setDraft(value),[value]);return <label>{label}<input value={draft} maxLength={maxLength} onChange={e=>setDraft(e.target.value)} onBlur={()=>{if(draft!==value)onCommit(draft);}}/></label>;
 }
-export function ProductBacklogPanel({organizationId,websiteId,role,opportunities,controls}:Props){
+export function ProductBacklogPanel({organizationId,websiteId,role,opportunities,controls,analyticsHandoff,onHandoffConsumed}:Props){
  const scope={organizationId,websiteId},canEdit=['owner','admin','editor'].includes(role)&&!!organizationId&&!!websiteId;
  const [backlog,setBacklog]=useState<ProductBacklog>(()=>emptyBacklog(scope)),[pending,setPending]=useState<ProductBacklog|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState('');
  const [title,setTitle]=useState(''),[problem,setProblem]=useState(''),[solution,setSolution]=useState(''),[benefit,setBenefit]=useState('');
@@ -23,6 +24,8 @@ export function ProductBacklogPanel({organizationId,websiteId,role,opportunities
    requirements:[],acceptance:[],security:'',privacy:'',tests:'',rollback:'',rollout:'',requiredRole:'owner',state:'local-review-only'};
   update([...backlog.proposals,p]);setTitle('');setProblem('');setSolution('');setBenefit('');}
  function addOpportunity(o:ProductOpportunity){if(!canEdit){setError('BACKLOG_ROLE_DENIED');return;}try{update([...backlog.proposals,fromCompetitorOpportunity(o,scope)]);}catch(e){setError(e instanceof Error?e.message:'Opportunity refused');}}
+ function addAnalytics(){if(!canEdit||!analyticsHandoff){setError('BACKLOG_ROLE_DENIED');return;}try{const item=fromAnalyticsHandoff(analyticsHandoff,scope);const next=validateBacklog({...backlog,proposals:[...backlog.proposals,item]},scope);setBacklog(next);setSelected(item.id);onHandoffConsumed?.();setError('');}
+   catch(e){setError(e instanceof Error?e.message:'Analytics handoff refused');}}
  function patch<K extends keyof ProductProposal>(key:K,value:ProductProposal[K]){if(!canEdit||!current)return;update(backlog.proposals.map(p=>p.id===current.id?{...p,[key]:value}:p));}
  const lines=(v:string)=>v.split('\n').map(s=>s.trim()).filter(Boolean);
  function download(content:string,name:string,type:string){const u=URL.createObjectURL(new Blob([content],{type}));const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);}
@@ -30,7 +33,11 @@ export function ProductBacklogPanel({organizationId,websiteId,role,opportunities
    const p=importBacklog(new Uint8Array(await file.arrayBuffer()),scope);setPending(p);setError('');}catch(e){setError(e instanceof Error?e.message:'Import refused');}}
  return <section className="productBacklog" aria-label="Local product improvement backlog"><h3>Product improvement backlog · local preview</h3>
   <p>{HANDOFF_WARNING} Proposals and handoffs are browser-memory preparation, not saved approvals, entitlements or feature mutations.</p>{error&&<p role="alert">{error}</p>}
-  {canEdit&&<><h4>Add competitor opportunity</h4><div className="backlogCards">{opportunities.map(o=><article key={o.id}><strong>{o.title}</strong><p>Claim references: {o.claimIds.join(', ')}. Impact and cost unknown.</p><button type="button" onClick={()=>addOpportunity(o)}>Copy to local backlog</button></article>)}</div>
+  {analyticsHandoff&&<div className="backlogTransfer" role="group" aria-label="Analytics opportunity handoff"><h4>Analytics review handoff · unverified</h4>
+   <p>Website: {analyticsHandoff.websiteId}; period: {analyticsHandoff.from} to {analyticsHandoff.through}; source: {analyticsHandoff.provenance}; evidence IDs: {analyticsHandoff.evidenceIds.join(', ')}.</p>
+   <p>Adding this creates only a local review proposal. No implementation or analytics verification occurs.</p>
+   <button type="button" disabled={!canEdit||backlog.proposals.some(p=>p.origin==='analytics-import'&&p.originRef===analyticsHandoff.originRef)} onClick={addAnalytics}>Confirm local backlog copy</button></div>}
+  {canEdit&&<><h4>Add competitor opportunity</h4><div className="backlogCards">{opportunities.map(o=><article key={o.id}><strong>{o.title}</strong><p>Claim references: {o.claimIds.join(', ')}. Impact and cost unknown.</p><button type="button" disabled={backlog.proposals.some(p=>p.origin==='competitor-preview'&&p.originRef===o.id)} onClick={()=>addOpportunity(o)}>Copy to local backlog</button></article>)}</div>
    <fieldset className="backlogFields"><legend>Manual improvement proposal</legend><label>Title<input value={title} onChange={e=>setTitle(e.target.value)} maxLength={240}/></label>
     <label>Customer problem<input value={problem} onChange={e=>setProblem(e.target.value)} maxLength={240}/></label>
     <label>Proposed solution<input value={solution} onChange={e=>setSolution(e.target.value)} maxLength={240}/></label>

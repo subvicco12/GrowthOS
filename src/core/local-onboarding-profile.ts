@@ -13,3 +13,5 @@ export function prepareOnboardingProfile(raw:unknown,scope:{organizationId:strin
   ...(p.monetizationModel==='unknown'?['Monetization model']:[])];
  return {profile:p,missing,completeForLocalPlanning:missing.length===0,verified:false,activation:'disabled' as const};
 }
+
+export const emptyOnboardingProfile=(scope:{organizationId:string;websiteId:string;domain:string}):OnboardingProfile=>({organizationId:scope.organizationId,websiteId:scope.websiteId,canonicalDomain:scope.domain,name:'',category:'',businessObjective:'',targetMarket:'',subscriptionModel:'unknown',monetizationModel:'unknown',authority:'local-preview-only'});

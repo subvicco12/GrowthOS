@@ -3,13 +3,14 @@ import { useEffect,useState } from 'react';
 import { compareReportingPeriods,performanceOpportunities,periodBuckets,summarizeAnalytics,type AnalyticsObservation } from '../core/offline-analytics';
 import { exportAnalytics,exportAnalyticsCsv,importAnalytics,type AnalyticsPackage } from '../core/offline-analytics-transfer';
 import { workspaceError } from './workspace-response';
+import {prepareAnalyticsHandoff,type AnalyticsHandoff} from '../core/local-analytics-handoff';
 import { providerCapabilities } from '../core/analytics-provider-catalog';
 type Site={id:string;domain:string};
 type Page={websites:Site[];nextCursor:string|null;organization:{id:string;role:string}};
 const display=(n:number|null,unit='')=>n===null?'Unavailable':new Intl.NumberFormat().format(n)+unit;
 const percent=(n:number|null)=>n===null?'Unavailable':(n*100).toFixed(2)+'%';
 const money=(n:number|null,currency:string|null)=>n===null||!currency?'Unavailable':`${currency} ${(n/100).toFixed(2)} (reported)`;
-export function AnalyticsPanel({preferredWebsiteId,onWebsiteChange}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean}={}){
+export function AnalyticsPanel({preferredWebsiteId,onWebsiteChange,onPrepareHandoff}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean;onPrepareHandoff?:(handoff:AnalyticsHandoff)=>boolean}={}){
  const [sites,setSites]=useState<Site[]>([]),[org,setOrg]=useState(''),[role,setRole]=useState('viewer');
  const [status,setStatus]=useState('Loading website scope…'),[rows,setRows]=useState<AnalyticsObservation[]>([]);
  const [siteId,setSiteId]=useState(''),[from,setFrom]=useState(''),[through,setThrough]=useState('');
@@ -44,6 +45,11 @@ export function AnalyticsPanel({preferredWebsiteId,onWebsiteChange}:{preferredWe
    const content=kind==='json'?exportAnalytics(selected,scope):exportAnalyticsCsv(selected,scope);
    download(content,'growthos-offline-analytics.'+kind,kind==='json'?'application/json':'text/csv');setError('');
   }catch(e){setError(e instanceof Error?e.message:'Export unavailable');}}
+ function handoff(idea:typeof opportunities[number]){try{if(!canImport||!siteId||!start||!end)throw Error('Select one permitted website and reporting period');
+   const transfer=prepareAnalyticsHandoff(selected,{...scope,from:start,through:end},idea);
+   if(!window.confirm('Prepare an unverified local product review from these observation references? No approval or server record will be created.'))return;
+   if(!onPrepareHandoff?.(transfer))throw Error('ANALYTICS_HANDOFF_SCOPE_CHANGED');setError('');
+  }catch(e){setError(e instanceof Error?e.message:'Handoff refused');}}
  function template(){try{if(!canImport)throw Error('ANALYTICS_IMPORT_ROLE_DENIED');const at=new Date().toISOString();
    const example:AnalyticsObservation={id:crypto.randomUUID(),organizationId:org,websiteId:scope.websiteIds[0],source:'synthetic-template',
      sourceKind:'synthetic-fixture',observedAt:at,day:at.slice(0,10),visitorDefinition:'sessions',attribution:'unattributed',
@@ -89,7 +95,8 @@ export function AnalyticsPanel({preferredWebsiteId,onWebsiteChange}:{preferredWe
      {!group(key).length&&<p>Unavailable. Local campaign and draft previews are not published or measured content.</p>}</div>)}
    <h3>Performance-linked review ideas</h3>{opportunities.length?<ul>{opportunities.map(o=><li key={o.category}>
      <strong>{o.category}</strong> · priority {o.priority} (deterministic rule). {o.reason}. {o.action}
-     <small> Unverified evidence IDs: {o.evidenceIds.join(', ')}. Impact and cost unknown; review only.</small></li>)}</ul>:
+     <small> Unverified evidence IDs: {o.evidenceIds.join(', ')}. Impact and cost unknown; review only.</small>
+     <button type="button" disabled={!canImport||!siteId} onClick={()=>handoff(o)}>Prepare in product backlog</button></li>)}</ul>:
      <p>No evidence-backed rule produced an opportunity. No uplift projection is available.</p>}
   </>:<p className="emptyState">Choose a valid period and import scoped observations to view performance. Missing values stay unavailable.</p>}
   <div className="analyticsTransfer"><h3>Offline import and export</h3>

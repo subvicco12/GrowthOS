@@ -8,7 +8,8 @@ test('editorial UI exposes native file transfer, local confirmation, revision co
  const shell=read('app/page.tsx');const css=read('app/globals.css');
  for(const phrase of ['type="file"','Replace local preview','Revision history','Undo as new revision','beforeunload',
    'Download local JSON package','onDirtyChange','Local editorial preparation state'])assert.ok(studio.includes(phrase),phrase);
- assert.ok(panel.includes('mayReplaceLocalWork'));assert.ok(shell.includes('allowLeavingStudio'));
+ assert.ok(panel.includes('mayReplaceLocalWork'));assert.ok(shell.includes('Unsaved local profiles, analytics and planning previews will be discarded'));
+ assert.ok(shell.includes('localWorkDirty'));
  assert.ok(css.includes('.studioTransfer'));assert.ok(css.includes('@media(max-width:760px){.studioActions'));
  assert.ok(!studio.includes('fetch('));
 });

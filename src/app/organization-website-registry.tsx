@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { workspaceError } from './workspace-response';
 import { LocalOnboardingProfile } from './local-onboarding-profile';
+import {emptyOnboardingProfile,type OnboardingProfile} from '../core/local-onboarding-profile';
 
 type Website = {
   id: string; domain: string; platform: string; status: string;
@@ -10,13 +11,14 @@ type Website = {
 };
 type Payload = { organization: { id: string; name: string; role: string }; websites: Website[]; nextCursor: string | null };
 
-export function OrganizationWebsiteRegistry() {
+export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean}={}) {
   const [data, setData] = useState<Payload | null>(null);
   const [message, setMessage] = useState('Loading organization websites…');
   const [domain, setDomain] = useState('');
   const [platform, setPlatform] = useState<'wordpress'|'nextjs'|'react'|'static'|'custom'>('wordpress');
   const [submitting, setSubmitting] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [profiles,setProfiles]=useState<Record<string,OnboardingProfile>>({});
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   async function getPage(cursor?: string): Promise<Payload> {
@@ -40,7 +42,7 @@ export function OrganizationWebsiteRegistry() {
   }
   useEffect(() => {
     let active = true;
-    getPage().then(result => { if (active) { setData(result); setNextCursor(result.nextCursor); setMessage(''); } })
+    getPage().then(result => { if (active) { setData(result); setNextCursor(result.nextCursor);if(preferredWebsiteId&&result.websites.some(site=>site.id===preferredWebsiteId))setSelected(preferredWebsiteId);setMessage(''); } })
       .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Website registry unavailable.'); });
     return () => { active = false; };
   }, []);
@@ -102,10 +104,10 @@ export function OrganizationWebsiteRegistry() {
           <div className="siteRowMain"><strong>{site.domain}</strong>
             <span>{site.platform} · {site.status} · Automation {site.automationEnabled ? 'enabled' : 'disabled'} · Publishing {site.autoPublishEnabled ? 'enabled' : 'disabled'}</span>
           </div>
-          <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>setSelected(selected===site.id?null:site.id)}>{selected===site.id?'Hide settings':'View settings'}</button>
+          <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>{if(selected!==site.id&&onWebsiteChange?.(site.id)===false)return;setSelected(selected===site.id?null:site.id);}}>{selected===site.id?'Hide settings':'View settings'}</button>
           {selected===site.id&&<div className="websiteDetail"><h3>Onboarding and settings</h3><ol><li>Draft registration: {site.status === 'draft' ? 'current' : 'recorded'}</li><li>Ownership verification: {site.verifiedAt ? 'recorded' : 'not verified'}</li><li>Connector health: unknown until a persisted check is available</li><li>Activation: unavailable from this workspace</li></ol><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
             <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable.</p>
-            <LocalOnboardingProfile key={site.id} organizationId={data.organization.id} site={site}/>
+            <LocalOnboardingProfile organizationId={data.organization.id} site={site} canEdit={['owner','admin','editor'].includes(data.organization.role)} profile={profiles[site.id]??emptyOnboardingProfile({organizationId:data.organization.id,websiteId:site.id,domain:site.domain})} onChange={next=>setProfiles(old=>({...old,[site.id]:next}))}/>
             {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
               {site.automationEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}
               {site.autoPublishEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'auto_publish')}>Disable publishing</button>}

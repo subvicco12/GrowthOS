@@ -15,6 +15,7 @@ import { AnalyticsPanel } from './analytics-panel';
 import { CompetitorWorkspace } from './competitor-workspace';
 import { journeySteps,onboardingReadiness,requireSelectedWebsite,type WebsiteScope } from '../core/workspace-journey';
 import { workspaceError } from './workspace-response';
+import type {AnalyticsHandoff} from '../core/local-analytics-handoff';
 
 type Section='home'|'websites'|'intelligence'|'analytics'|'competitors'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
 const navigation:{id:Section;label:string}[]=[
@@ -26,6 +27,7 @@ const navigation:{id:Section;label:string}[]=[
 ];
 export default function Dashboard(){
   const [section,setSection]=useState<Section>('home');
+  const [websitesVisited,setWebsitesVisited]=useState(false);
   const [intelligenceVisited,setIntelligenceVisited]=useState(false);
   const [analyticsVisited,setAnalyticsVisited]=useState(false);
   const [competitorsVisited,setCompetitorsVisited]=useState(false);
@@ -35,14 +37,15 @@ export default function Dashboard(){
   const [websiteScopeStatus,setWebsiteScopeStatus]=useState('Loading website portfolio…');
   const [selectedWebsite,setSelectedWebsite]=useState('');
   const [workspaceEpoch,setWorkspaceEpoch]=useState(0);
+  const [analyticsHandoff,setAnalyticsHandoff]=useState<AnalyticsHandoff|null>(null);
   useEffect(()=>{
     const expired=()=>setAuth('signed-out');
     const hashChanged=()=>{const next=window.location.hash.slice(1);if(navigation.some(item=>item.id===next)){
-      setSection(next as Section);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);}};
+      setSection(next as Section);if(next==='websites')setWebsitesVisited(true);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);}};
     window.addEventListener('growthos-session-expired',expired);
     window.addEventListener('hashchange',hashChanged);
     const initial=window.location.hash.slice(1);
-    if(navigation.some(item=>item.id===initial)){setSection(initial as Section);if(initial==='intelligence')setIntelligenceVisited(true);if(initial==='analytics')setAnalyticsVisited(true);if(initial==='competitors')setCompetitorsVisited(true);}
+    if(navigation.some(item=>item.id===initial)){setSection(initial as Section);if(initial==='websites')setWebsitesVisited(true);if(initial==='intelligence')setIntelligenceVisited(true);if(initial==='analytics')setAnalyticsVisited(true);if(initial==='competitors')setCompetitorsVisited(true);}
     void checkAuth();
     return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
@@ -65,21 +68,24 @@ export default function Dashboard(){
       if(!response.ok)throw Error('Logout failed.');setAuth('signed-out');
     }catch{setAuth('unavailable');}
   }
-  function allowLeavingStudio(){return !localWorkDirty||window.confirm('Local drafts and campaigns will be discarded. Export a JSON package first if you want to preserve them. Continue?');}
   function switchWebsite(id:string){if(!websiteScope)return;
     if(id)try{requireSelectedWebsite(websiteScope,id);}catch{return;}
     if(id===selectedWebsite)return;
     if((selectedWebsite||localWorkDirty)&&!window.confirm('Switch website? Unsaved local previews and editorial drafts in open workspaces may be discarded. Export them first if needed.'))return;
-    setSelectedWebsite(id);setWorkspaceEpoch(n=>n+1);setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
+    setSelectedWebsite(id);setAnalyticsHandoff(null);setWorkspaceEpoch(n=>n+1);setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
   }
   function syncModuleWebsite(id:string){if(!websiteScope)return false;
     if(id)try{requireSelectedWebsite(websiteScope,id);}catch{return false;}
     if(id===selectedWebsite)return true;
     if(selectedWebsite&&!window.confirm('Switch website? Other local workspaces will be cleared to prevent stale website data. Export previews first if needed.'))return false;
-    setSelectedWebsite(id);setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');
+    setSelectedWebsite(id);setAnalyticsHandoff(null);setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');
     return true;
   }
-  function navigate(next:Section){setSection(next);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);
+  function prepareAnalyticsReview(h:AnalyticsHandoff){if(!websiteScope||h.organizationId!==websiteScope.organizationId||h.websiteId!==selectedWebsite)return false;
+    try{requireSelectedWebsite(websiteScope,h.websiteId);}catch{return false;}
+    setAnalyticsHandoff(h);navigate('competitors');return true;
+  }
+  function navigate(next:Section){setSection(next);if(next==='websites')setWebsitesVisited(true);if(next==='intelligence')setIntelligenceVisited(true);if(next==='analytics')setAnalyticsVisited(true);if(next==='competitors')setCompetitorsVisited(true);
     window.history.pushState(null,'','#'+next);window.scrollTo({top:0,behavior:'smooth'});}
   if(auth==='loading')return <main className="authShell" role="status">Checking session…</main>;
   if(auth==='signed-out')return <AuthPanel onAuthenticated={()=>{setAuth('ready');window.location.reload();}}/>;
@@ -91,7 +97,7 @@ export default function Dashboard(){
       <div className="sidebarFooter">Publishing and automation are not started here.</div>
     </aside>
     <section className="appContent"><header className="appHeader"><div><p className="eyebrow">FIRST-PARTY ADMIN</p><h1>{title}</h1><p className="lede">Selected organization scope. Unknown metrics are shown as unavailable.</p></div>
-      <div className="headerActions"><OrganizationSelector onBeforeSelection={()=>{if(!allowLeavingStudio())return false;setSection('home');setSelectedWebsite('');setWebsiteScope(null);setIntelligenceVisited(false);setAnalyticsVisited(false);setCompetitorsVisited(false);setLocalWorkDirty(false);return true;}}/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
+      <div className="headerActions"><OrganizationSelector onBeforeSelection={()=>!(websitesVisited||intelligenceVisited||analyticsVisited||competitorsVisited||localWorkDirty)||window.confirm('Change organization? Unsaved local profiles, analytics and planning previews will be discarded after selection. Export them first if needed.')}/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
       <div className="workspaceSiteBar"><label>Current website<select value={selectedWebsite} disabled={!websiteScope} onChange={e=>switchWebsite(e.target.value)}>
         <option value="">Portfolio / choose website</option>{websiteScope?.websites.map(site=><option key={site.id} value={site.id}>{site.domain} · {site.status}</option>)}</select></label>
         {websiteScopeStatus&&<small role="status">{websiteScopeStatus}</small>}</div>
@@ -101,10 +107,10 @@ export default function Dashboard(){
         <div className="journeyGrid">{journeySteps.map(step=><article key={step.id}><h3>{step.label}</h3><p>{step.boundary}</p>
           <button type="button" onClick={()=>navigate(step.section)}>{step.label}</button></article>)}</div>
         <p>Traffic, revenue, opportunity counts, connector health and costs remain unavailable unless their own scoped sources provide evidence. No local preview is an approval.</p>
-       </section></>}{section==='websites'&&<OrganizationWebsiteRegistry/>}
+       </section></>}{websitesVisited&&<div hidden={section!=='websites'}><OrganizationWebsiteRegistry key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite}/></div>}
       {intelligenceVisited&&<div hidden={section!=='intelligence'}><IntelligencePanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} onDirtyChange={setLocalWorkDirty}/></div>}
-      {analyticsVisited&&<div hidden={section!=='analytics'}><AnalyticsPanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite}/></div>}
-      {competitorsVisited&&<div hidden={section!=='competitors'}><CompetitorWorkspace key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite}/></div>}
+      {analyticsVisited&&<div hidden={section!=='analytics'}><AnalyticsPanel key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} onPrepareHandoff={prepareAnalyticsReview}/></div>}
+      {competitorsVisited&&<div hidden={section!=='competitors'}><CompetitorWorkspace key={workspaceEpoch} preferredWebsiteId={selectedWebsite} onWebsiteChange={syncModuleWebsite} analyticsHandoff={analyticsHandoff} onHandoffConsumed={()=>setAnalyticsHandoff(null)}/></div>}
       {section==='recommendations'&&<RecommendationReviewPanel/>}
       {section==='approvals'&&<OrganizationApprovalInbox/>}{section==='costs'&&<CostCenter/>}
       {section==='automation'&&<OrganizationAutomationStatus/>}{section==='connectors'&&<ConnectorsPanel/>}
