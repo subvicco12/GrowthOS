@@ -2,7 +2,7 @@ export type WebsiteSummary={id:string;domain:string;status:string;platform:strin
  automationEnabled:boolean;autoPublishEnabled:boolean;monthlyBudgetMinor:string};
 export type WebsiteScope={organizationId:string;websites:WebsiteSummary[]};
 export function requireSelectedWebsite(scope:WebsiteScope,websiteId:string){
- if(!scope.organizationId||scope.websites.length>250||new Set(scope.websites.map(s=>s.id)).size!==scope.websites.length)throw Error('WORKSPACE_SCOPE_UNAVAILABLE');
+ if(!scope.organizationId||new Set(scope.websites.map(s=>s.id)).size!==scope.websites.length)throw Error('WORKSPACE_SCOPE_UNAVAILABLE');
  const site=scope.websites.find(s=>s.id===websiteId);if(!site)throw Error('WORKSPACE_WEBSITE_DENIED');return site;
 }
 export function onboardingReadiness(site:WebsiteSummary){

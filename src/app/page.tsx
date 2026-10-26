@@ -1,5 +1,5 @@
 'use client';
-import { useEffect,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import { OrganizationSelector } from './organization-selector';
 import { OrganizationWebsiteRegistry } from './organization-website-registry';
 import { OrganizationApprovalInbox } from './organization-approval-inbox';
@@ -16,6 +16,8 @@ import { CompetitorWorkspace } from './competitor-workspace';
 import { journeySteps,onboardingReadiness,requireSelectedWebsite,type WebsiteScope } from '../core/workspace-journey';
 import { workspaceError } from './workspace-response';
 import type {AnalyticsHandoff} from '../core/local-analytics-handoff';
+import {appendScopedWebsitePage,includeScopedRegistryWebsite,type ScopedWebsitePage} from '../core/scoped-website-pages';
+import type {WebsiteSummary} from '../core/workspace-journey';
 
 type Section='home'|'websites'|'intelligence'|'analytics'|'competitors'|'recommendations'|'approvals'|'costs'|'automation'|'connectors'|'governance';
 const navigation:{id:Section;label:string}[]=[
@@ -36,6 +38,9 @@ export default function Dashboard(){
   const [websiteScope,setWebsiteScope]=useState<WebsiteScope|null>(null);
   const [websiteScopeStatus,setWebsiteScopeStatus]=useState('Loading website portfolio…');
   const [selectedWebsite,setSelectedWebsite]=useState('');
+  const [nextWebsiteCursor,setNextWebsiteCursor]=useState<string|null>(null);
+  const [loadingWebsites,setLoadingWebsites]=useState(false);
+  const visitedWebsiteCursors=useRef(new Set<string>());
   const [workspaceEpoch,setWorkspaceEpoch]=useState(0);
   const [analyticsHandoff,setAnalyticsHandoff]=useState<AnalyticsHandoff|null>(null);
   useEffect(()=>{
@@ -49,15 +54,25 @@ export default function Dashboard(){
     void checkAuth();
     return()=>{window.removeEventListener('growthos-session-expired',expired);window.removeEventListener('hashchange',hashChanged);};
   },[]);
-  useEffect(()=>{if(auth!=='ready')return;let active=true;void(async()=>{try{let cursor:string|null=null,organizationId='',websites:WebsiteScope['websites']=[];
-    do{const response=await fetch('/api/organization-websites'+(cursor?'?cursor='+encodeURIComponent(cursor):''),{credentials:'include',cache:'no-store'});
-      if(!response.ok)throw workspaceError(response,'Website portfolio');const result=await response.json() as {organization:{id:string};websites:WebsiteScope['websites'];nextCursor:string|null};
-      if(organizationId&&organizationId!==result.organization.id)throw Error('Organization changed. Reload before continuing.');
-      organizationId=result.organization.id;websites=[...websites,...result.websites];cursor=result.nextCursor;
-      if(websites.length>250)throw Error('Website portfolio exceeds the local navigation limit');
-    }while(cursor&&active);
-    if(active){setWebsiteScope({organizationId,websites});setWebsiteScopeStatus(websites.length?'':'No registered websites. Begin with draft onboarding.');}
-   }catch(error){if(active){setWebsiteScope(null);setWebsiteScopeStatus(error instanceof Error?error.message:'Website portfolio unavailable');}}})();return()=>{active=false;};},[auth]);
+  useEffect(()=>{if(auth!=='ready')return;let active=true;
+    void fetch('/api/organization-websites',{credentials:'include',cache:'no-store'}).then(async response=>{
+      if(!response.ok)throw workspaceError(response,'Website portfolio');
+      const page=await response.json() as ScopedWebsitePage;
+      const scope=appendScopedWebsitePage(null,page);visitedWebsiteCursors.current.clear();
+      if(active){setWebsiteScope(scope);setNextWebsiteCursor(page.nextCursor);setWebsiteScopeStatus(scope.websites.length?'':'No registered websites. Begin with draft onboarding.');}
+    }).catch(error=>{if(active){setWebsiteScope(null);setWebsiteScopeStatus(error instanceof Error?error.message:'Website portfolio unavailable');}});
+    return()=>{active=false;};},[auth]);
+  async function loadMoreWebsites(){if(!websiteScope||!nextWebsiteCursor||loadingWebsites)return;
+    const cursor=nextWebsiteCursor,expected=websiteScope.organizationId;setLoadingWebsites(true);
+    try{const response=await fetch('/api/organization-websites?cursor='+encodeURIComponent(cursor),{credentials:'include',cache:'no-store'});
+      if(!response.ok)throw workspaceError(response,'Website portfolio');
+      const page=await response.json() as ScopedWebsitePage;
+      if(page.organization.id!==expected)throw Error('Workspace changed. Reload before continuing.');
+      const next=appendScopedWebsitePage(websiteScope,page,visitedWebsiteCursors.current,cursor);
+      visitedWebsiteCursors.current.add(cursor);setWebsiteScope(next);setNextWebsiteCursor(page.nextCursor);setWebsiteScopeStatus('');
+    }catch(error){setWebsiteScope(null);setNextWebsiteCursor(null);setWebsiteScopeStatus(error instanceof Error?error.message:'Website portfolio unavailable');}
+    finally{setLoadingWebsites(false);}
+  }
   async function checkAuth(){
     try{const response=await fetch('/api/organizations',{credentials:'include',cache:'no-store'});
       setAuth(response.ok?'ready':response.status===401?'signed-out':'unavailable');
@@ -74,11 +89,16 @@ export default function Dashboard(){
     if((selectedWebsite||localWorkDirty)&&!window.confirm('Switch website? Unsaved local previews and editorial drafts in open workspaces may be discarded. Export them first if needed.'))return;
     setSelectedWebsite(id);setAnalyticsHandoff(null);setWorkspaceEpoch(n=>n+1);setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
   }
-  function syncModuleWebsite(id:string){if(!websiteScope)return false;
-    if(id)try{requireSelectedWebsite(websiteScope,id);}catch{return false;}
+  function syncModuleWebsite(id:string,registrySite?:WebsiteSummary,registryOrganizationId?:string){if(!websiteScope)return false;
+    let nextScope=websiteScope;
+    try{if(registrySite){if(registrySite.id!==id)throw Error('WORKSPACE_SCOPE_UNAVAILABLE');
+      nextScope=includeScopedRegistryWebsite(websiteScope,registryOrganizationId??'',registrySite);}
+      if(id)requireSelectedWebsite(nextScope,id);
+    }catch{return false;}
     if(id===selectedWebsite)return true;
-    if(selectedWebsite&&!window.confirm('Switch website? Other local workspaces will be cleared to prevent stale website data. Export previews first if needed.'))return false;
-    setSelectedWebsite(id);setAnalyticsHandoff(null);setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');
+    if((selectedWebsite||localWorkDirty)&&!window.confirm('Switch website? Other local workspaces will be cleared to prevent stale website data. Export previews first if needed.'))return false;
+    setWebsiteScope(nextScope);setSelectedWebsite(id);setAnalyticsHandoff(null);
+    setWebsitesVisited(section==='websites');setIntelligenceVisited(section==='intelligence');setAnalyticsVisited(section==='analytics');setCompetitorsVisited(section==='competitors');setLocalWorkDirty(false);
     return true;
   }
   function prepareAnalyticsReview(h:AnalyticsHandoff){if(!websiteScope||h.organizationId!==websiteScope.organizationId||h.websiteId!==selectedWebsite)return false;
@@ -100,7 +120,7 @@ export default function Dashboard(){
       <div className="headerActions"><OrganizationSelector onBeforeSelection={()=>!(websitesVisited||intelligenceVisited||analyticsVisited||competitorsVisited||localWorkDirty)||window.confirm('Change organization? Unsaved local profiles, analytics and planning previews will be discarded after selection. Export them first if needed.')}/><button type="button" className="secondary" onClick={()=>void logout()}>Sign out</button></div></header>
       <div className="workspaceSiteBar"><label>Current website<select value={selectedWebsite} disabled={!websiteScope} onChange={e=>switchWebsite(e.target.value)}>
         <option value="">Portfolio / choose website</option>{websiteScope?.websites.map(site=><option key={site.id} value={site.id}>{site.domain} · {site.status}</option>)}</select></label>
-        {websiteScopeStatus&&<small role="status">{websiteScopeStatus}</small>}</div>
+        {websiteScopeStatus&&<small role="status">{websiteScopeStatus}</small>}{nextWebsiteCursor&&<button type="button" className="secondary" disabled={loadingWebsites} onClick={()=>void loadMoreWebsites()}>{loadingWebsites?'Loading…':'Load more websites'}</button>}</div>
       {section==='home'&&<><OrganizationDashboard/><section className="panel" aria-label="Growth workflow overview"><h2>Website growth journey</h2>
         {selectedWebsite&&websiteScope&&<div><p>Selected: {requireSelectedWebsite(websiteScope,selectedWebsite).domain}. Website-specific local previews remain unverified.</p>
           <ul>{onboardingReadiness(requireSelectedWebsite(websiteScope,selectedWebsite)).checks.map(c=><li key={c.name}>{c.name}: {c.state}</li>)}</ul></div>}

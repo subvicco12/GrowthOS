@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { workspaceError } from './workspace-response';
 import { LocalOnboardingProfile } from './local-onboarding-profile';
 import {emptyOnboardingProfile,type OnboardingProfile} from '../core/local-onboarding-profile';
+import type {WebsiteSummary} from '../core/workspace-journey';
 
 type Website = {
   id: string; domain: string; platform: string; status: string;
@@ -11,7 +12,7 @@ type Website = {
 };
 type Payload = { organization: { id: string; name: string; role: string }; websites: Website[]; nextCursor: string | null };
 
-export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean}={}) {
+export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string,site:WebsiteSummary,organizationId:string)=>boolean}={}) {
   const [data, setData] = useState<Payload | null>(null);
   const [message, setMessage] = useState('Loading organization websites…');
   const [domain, setDomain] = useState('');
@@ -104,7 +105,7 @@ export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}
           <div className="siteRowMain"><strong>{site.domain}</strong>
             <span>{site.platform} · {site.status} · Automation {site.automationEnabled ? 'enabled' : 'disabled'} · Publishing {site.autoPublishEnabled ? 'enabled' : 'disabled'}</span>
           </div>
-          <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>{if(selected!==site.id&&onWebsiteChange?.(site.id)===false)return;setSelected(selected===site.id?null:site.id);}}>{selected===site.id?'Hide settings':'View settings'}</button>
+          <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>{if(selected!==site.id&&onWebsiteChange?.(site.id,site,data.organization.id)===false)return;setSelected(selected===site.id?null:site.id);}}>{selected===site.id?'Hide settings':'View settings'}</button>
           {selected===site.id&&<div className="websiteDetail"><h3>Onboarding and settings</h3><ol><li>Draft registration: {site.status === 'draft' ? 'current' : 'recorded'}</li><li>Ownership verification: {site.verifiedAt ? 'recorded' : 'not verified'}</li><li>Connector health: unknown until a persisted check is available</li><li>Activation: unavailable from this workspace</li></ol><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
             <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable.</p>
             <LocalOnboardingProfile organizationId={data.organization.id} site={site} canEdit={['owner','admin','editor'].includes(data.organization.role)} profile={profiles[site.id]??emptyOnboardingProfile({organizationId:data.organization.id,websiteId:site.id,domain:site.domain})} onChange={next=>setProfiles(old=>({...old,[site.id]:next}))}/>
