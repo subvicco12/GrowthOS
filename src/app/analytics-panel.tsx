@@ -9,7 +9,7 @@ type Page={websites:Site[];nextCursor:string|null;organization:{id:string;role:s
 const display=(n:number|null,unit='')=>n===null?'Unavailable':new Intl.NumberFormat().format(n)+unit;
 const percent=(n:number|null)=>n===null?'Unavailable':(n*100).toFixed(2)+'%';
 const money=(n:number|null,currency:string|null)=>n===null||!currency?'Unavailable':`${currency} ${(n/100).toFixed(2)} (reported)`;
-export function AnalyticsPanel(){
+export function AnalyticsPanel({preferredWebsiteId,onWebsiteChange}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean}={}){
  const [sites,setSites]=useState<Site[]>([]),[org,setOrg]=useState(''),[role,setRole]=useState('viewer');
  const [status,setStatus]=useState('Loading website scope…'),[rows,setRows]=useState<AnalyticsObservation[]>([]);
  const [siteId,setSiteId]=useState(''),[from,setFrom]=useState(''),[through,setThrough]=useState('');
@@ -22,7 +22,7 @@ export function AnalyticsPanel(){
      organization=page.organization.id;userRole=page.organization.role;found.push(...page.websites);cursor=page.nextCursor;
      if(found.length>250)throw Error('Website list exceeds local reporting limit.');
    }while(cursor&&active);
-   if(active){setSites(found);setOrg(organization);setRole(userRole);setStatus(found.length?'No analytics imported. Live analytics are unavailable.':'No websites available.');}
+   if(active){setSites(found);setOrg(organization);setRole(userRole);setSiteId(found.some(site=>site.id===preferredWebsiteId)?preferredWebsiteId!:'');setStatus(found.length?'No analytics imported. Live analytics are unavailable.':'No websites available.');}
   }catch(e){if(active)setStatus(e instanceof Error?e.message:'Website scope unavailable.');}})();return()=>{active=false;};},[]);
  const scope={organizationId:org,websiteIds:siteId?[siteId]:sites.map(s=>s.id)};
  const canImport=!!org&&scope.websiteIds.length>0&&['owner','admin','editor'].includes(role);
@@ -63,7 +63,7 @@ export function AnalyticsPanel(){
    </tbody></table></div>
    <p>Trust progression: synthetic or manual → imported unverified → provider reported → provider authenticated → independently verified. Each step needs current scoped evidence; revocation or missing authority blocks promotion. No local package carries approval, payment settlement or publishing authority.</p>
   </details>{error&&<p role="alert">{error}</p>}
-  <div className="analyticsControls"><label>Website<select value={siteId} onChange={e=>{setSiteId(e.target.value);setPending(null);setFrom('');setThrough('');}}>
+  <div className="analyticsControls"><label>Website<select value={siteId} onChange={e=>{if(onWebsiteChange?.(e.target.value)===false)return;setSiteId(e.target.value);setPending(null);setFrom('');setThrough('');}}>
     <option value="">Portfolio · compatible measurements only</option>{sites.map(s=><option key={s.id} value={s.id}>{s.domain}</option>)}</select></label>
     <label>From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label>
     <label>Through<input type="date" value={through} onChange={e=>setThrough(e.target.value)}/></label>

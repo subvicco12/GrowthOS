@@ -4,7 +4,7 @@ import {compareCompetitorFeatures,exportCompetitorPackage,exportOpportunityCsv,i
 import {workspaceError} from './workspace-response';
 import {ProductBacklogPanel} from './product-backlog-panel';
 type Site={id:string;domain:string;automationEnabled?:boolean;autoPublishEnabled?:boolean};type Page={websites:Site[];nextCursor:string|null;organization:{id:string;role:string}};
-export function CompetitorWorkspace(){
+export function CompetitorWorkspace({preferredWebsiteId,onWebsiteChange}:{preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean}={}){
  const [org,setOrg]=useState(''),[role,setRole]=useState('viewer'),[sites,setSites]=useState<Site[]>([]),[site,setSite]=useState('');
  const [status,setStatus]=useState('Loading website scope…'),[error,setError]=useState(''),[data,setData]=useState<CompetitorPackage|null>(null),[pending,setPending]=useState<CompetitorPackage|null>(null);
  const [name,setName]=useState(''),[reference,setReference]=useState(''),[feature,setFeature]=useState(''),[category,setCategory]=useState('other');
@@ -16,7 +16,7 @@ export function CompetitorWorkspace(){
    if(organization&&organization!==page.organization.id)throw Error('Organization changed; reload required');
    organization=page.organization.id;userRole=page.organization.role;found.push(...page.websites);cursor=page.nextCursor;
    if(found.length>250)throw Error('Website scope exceeds local limit');}while(cursor&&active);
-  if(active){setOrg(organization);setRole(userRole);setSites(found);setStatus(found.length?'No competitor package loaded. Local preview only.':'No websites available.');}
+  if(active){setOrg(organization);setRole(userRole);setSites(found);setSite(found.some(site=>site.id===preferredWebsiteId)?preferredWebsiteId!:'');setStatus(found.length?'No competitor package loaded. Local preview only.':'No websites available.');}
  }catch(e){if(active)setStatus(e instanceof Error?e.message:'Website scope unavailable');}})();return()=>{active=false;};},[]);
  const scope={organizationId:org,websiteId:site},today=new Date().toISOString().slice(0,10),canEdit=!!org&&!!site&&['owner','admin','editor'].includes(role);
  const opportunities=data&&site?compareCompetitorFeatures(data,scope,today):[];
@@ -38,7 +38,7 @@ export function CompetitorWorkspace(){
  const plan=data?productImprovementPreview(data,selected,scope,today):null;
  return <section className="panel competitorWorkspace" aria-label="Competitor intelligence local preview"><h2>Competitor intelligence</h2>
   <p>Manually supplied, unverified claims only. No website is crawled; no package changes, approvals or implementation work are authorized.</p><p role="status">{status}</p>{error&&<p role="alert">{error}</p>}
-  <label>Managed website<select value={site} onChange={e=>{setSite(e.target.value);setData(null);setPending(null);setSelected([]);setError('');}}><option value="">Select website</option>{sites.map(s=><option key={s.id} value={s.id}>{s.domain}</option>)}</select></label>
+  <label>Managed website<select value={site} onChange={e=>{if(onWebsiteChange?.(e.target.value)===false)return;setSite(e.target.value);setData(null);setPending(null);setSelected([]);setError('');}}><option value="">Select website</option>{sites.map(s=><option key={s.id} value={s.id}>{s.domain}</option>)}</select></label>
   {canEdit&&<fieldset className="competitorForm"><legend>Add manual competitor feature observation</legend>
    <label>Competitor name<input value={name} maxLength={240} onChange={e=>setName(e.target.value)}/></label>
    <label>HTTPS source URL<input type="url" value={reference} maxLength={2048} onChange={e=>setReference(e.target.value)}/></label>

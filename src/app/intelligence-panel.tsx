@@ -15,7 +15,7 @@ type Recorded = { id: string; sourceLabel: string; state: 'unverified' | 'expire
 type Observation = { websiteId: string; pages: { url: string; status: number; indexable: boolean; title: string; description?: string; canonical?: string;
   h1Count: number; wordCount: number; internalLinks: number }[] };
 
-export function IntelligencePanel({onDirtyChange}:{onDirtyChange?:(dirty:boolean)=>void}={}) {
+export function IntelligencePanel({onDirtyChange,preferredWebsiteId,onWebsiteChange}:{onDirtyChange?:(dirty:boolean)=>void;preferredWebsiteId?:string;onWebsiteChange?:(id:string)=>boolean}={}) {
   const [sites, setSites] = useState<Site[]>([]);
   const [siteId, setSiteId] = useState('');
   const [url, setUrl] = useState('');
@@ -65,7 +65,7 @@ export function IntelligencePanel({onDirtyChange}:{onDirtyChange?:(dirty:boolean
         if (all.length > 250) { cursor = null; break; }
       } while (cursor && active);
       if (active) { setSites(all); selectedOrganization.current=organizationId??'';
-        selectedSite.current=all[0]?.id ?? '';setSiteId(selectedSite.current); setRole(currentRole);
+        selectedSite.current=all.some(site=>site.id===preferredWebsiteId)?preferredWebsiteId!:all[0]?.id ?? '';setSiteId(selectedSite.current);if(selectedSite.current)onWebsiteChange?.(selectedSite.current);setRole(currentRole);
         setStatus(all.length > 250 ? 'Website list limited to the first page set.':all.length ? '' : 'No websites registered.'); }
     }
     void load().catch(error => { if (active) setStatus(error instanceof Error ? error.message : 'Website registry unavailable.'); });
@@ -159,7 +159,7 @@ export function IntelligencePanel({onDirtyChange}:{onDirtyChange?:(dirty:boolean
     <p role="status">Discovery job: unavailable until website ownership, crawl destination safety and a durable job authority are certified.</p>
     {status && <p role="status">{status}</p>}
     {site && <form className="registryForm" onSubmit={event => void preview(event)} onChangeCapture={event=>{if(studioDirty){if(!mayReplaceLocalWork()){event.stopPropagation();return;}updateStudioDirty(false);}}}>
-      <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setSelectedIdeas([]); setDraftIdea(''); setObservation(null); setRecorded(null); setRecordedStatus(''); setReviewStatus(''); }}>
+      <div><label htmlFor="intelligence-site">Website</label><select id="intelligence-site" value={siteId} disabled={busy} onChange={event => { if(onWebsiteChange?.(event.target.value)===false)return;selectedSite.current=event.target.value;setSiteId(event.target.value); setUrl(''); setTitle(''); setDescription(''); setCanonical(''); setHttpStatus(''); setIndexable(''); setH1Count(''); setWordCount(''); setInternalLinks(''); setCompetitorUrl(''); setCompetitorFeature(''); setOurAvailability('unknown'); setResult(null); setSelectedIdeas([]); setDraftIdea(''); setObservation(null); setRecorded(null); setRecordedStatus(''); setReviewStatus(''); }}>
         {sites.map(s => <option key={s.id} value={s.id}>{s.domain}</option>)}</select></div>
       <div><label htmlFor="intelligence-url">Observed HTTPS page URL on {site.domain}</label><input id="intelligence-url" type="url" required maxLength={2048} value={url} onChange={event => {setUrl(event.target.value);setResult(null);setObservation(null);}} placeholder={'https://' + site.domain + '/'} /></div>
       <div><label htmlFor="intelligence-title">Observed page title (blank if absent)</label><input id="intelligence-title" maxLength={300} value={title} onChange={event => {setTitle(event.target.value);setResult(null);setObservation(null);}} /></div>

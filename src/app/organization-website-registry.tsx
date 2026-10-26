@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { workspaceError } from './workspace-response';
+import { LocalOnboardingProfile } from './local-onboarding-profile';
 
 type Website = {
   id: string; domain: string; platform: string; status: string;
@@ -104,6 +105,7 @@ export function OrganizationWebsiteRegistry() {
           <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>setSelected(selected===site.id?null:site.id)}>{selected===site.id?'Hide settings':'View settings'}</button>
           {selected===site.id&&<div className="websiteDetail"><h3>Onboarding and settings</h3><ol><li>Draft registration: {site.status === 'draft' ? 'current' : 'recorded'}</li><li>Ownership verification: {site.verifiedAt ? 'recorded' : 'not verified'}</li><li>Connector health: unknown until a persisted check is available</li><li>Activation: unavailable from this workspace</li></ol><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
             <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable.</p>
+            <LocalOnboardingProfile key={site.id} organizationId={data.organization.id} site={site}/>
             {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
               {site.automationEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}
               {site.autoPublishEnabled&&<button type="button" onClick={()=>void disableFeature(site.id,'auto_publish')}>Disable publishing</button>}
