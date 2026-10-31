@@ -1,23 +1,21 @@
-# GrowthOS — Session 01 Progress
+# GrowthOS — Session 02 Progress
 
-Updated: 2026-10-31T14:42:44.518139+00:00
+Updated: 2026-10-31T20:56:08.473240+00:00
 
-**Implemented and tested:** persisted draft website platform/timezone settings, safe pause/archive/return-to-draft controls, and website-scoped immutable shutdown history. Frontend controls connect to new authenticated APIs and real MySQL persistence. Registry and portfolio state update after confirmed saves.
+Session 1 preserved in local checkpoint **`3fbcd17638c88cc0a64c2d415742fb4b9a5f478a`**. Session 2 implementation checkpoint: **`e29d3d6ac98a6b48d66f471b23c7c93e67ea9a9d`**. Required branch remains `feat/growthos-final-product-closure-20261024`; no push, merge or deployment.
 
-Repository: `subvicco12/GrowthOS`. Branch: `feat/growthos-final-product-closure-20261024`.
-Starting and ending HEAD: `9d813e8f614c43bcba9e19d1bf34315c006a6e37`. Source, tests and reports are uncommitted working-tree changes for review; no reset or previous application changes were discarded. Node 22.23.4 was used.
+Implemented secure ownership challenges and bounded proof transport, persisted connector drafts, manual technical/SEO/competitor research records, prioritized recommendations with internal approval status, durable analysis jobs with scheduling/retry/cancellation, quotas, pause/shutdown enforcement, and immutable workflow history. Frontend controls use real authenticated APIs and persistence.
 
-## Actual results
+New persistence is a separately reviewable **proposal 017**, enabled and tested **only in an explicit disposable local schema**. Normal deployment remains unavailable for these new paths. **Migrations 010–016 were not executed or changed.** No live connector, external automation or publisher was activated.
 
-- Full unit suite: **exit 0; 605 PASS, 0 FAIL, 2 SKIP** (DB opt-in cases).
-- Typecheck, offline security, DB guards, auth/session, mutation security, existing registration/shutdown regressions, and optimized application build: **exit 0**.
-- New focused tests: **10 PASS**.
-- Real disposable MariaDB: approved 001–009 schema checks, existing approval integration, and new real-session settings/concurrency/rollback/history integration: **exit 0**. Both skipped DB cases were separately executed successfully.
-- Real local HTTPS browser: **5 scenarios PASS, exit 0**, including persistence after reload, 409 recovery, safe lifecycle transitions, 390px width and viewer controls.
-- Migrations **010–016 were not executed**. No schema contracts or lockfile changed. Disposable services and credentials were cleaned up.
+## Actual verification
 
-**Release: HOLD for production; GO for review and continued isolated development.** Ownership verification, live connectors, remaining durable intelligence/jobs, general metadata/lifecycle auditing, and external execution authority remain incomplete or gated. Website shutdown does not claim to cancel work already running externally. No production, deployment, merge, paid services, GitHub Actions, or live automation activation occurred.
+- Full suite: **620 total; 617 PASS, 0 FAIL, 3 SKIP; exit 0**. All three opt-in DB scenarios passed separately.
+- Typecheck, offline security/DB guards/auth/session/mutation regressions and optimized build: **exit 0**.
+- MariaDB 11.8.9: approved 001–009 checks plus independent disposable proposal install, new workflow integration and prior approval/settings integrations: **exit 0**.
+- Real local HTTPS browser: **6 new scenarios + 5 Session 1 regressions PASS**, both scripts exit 0.
+- Session-owned database/app services and test credentials were cleaned up.
 
-Detailed implementation, file inventory, integration evidence, security limits, remaining priorities and exact command results: [SESSION_01_IMPLEMENTATION.md](SESSION_01_IMPLEMENTATION.md).
-Machine-readable evidence: [SESSION_01_TEST_RESULTS.json](SESSION_01_TEST_RESULTS.json).
-Previous environment report preserved: [RUNTIME_CERTIFICATION_20261031.md](RUNTIME_CERTIFICATION_20261031.md).
+**Release: HOLD.** Live ownership/network certification, trusted connector credentials/health, schema approval, full history pagination, background workers and external execution/spend authority remain incomplete. Research is explicitly unverified manual input; scheduling requires manual run. Proxy-only ownership requests fail closed rather than bypassing platform egress.
+
+Details and file inventory: [SESSION_02_IMPLEMENTATION.md](SESSION_02_IMPLEMENTATION.md). Exact evidence: [SESSION_02_TEST_RESULTS.json](SESSION_02_TEST_RESULTS.json). Session 1 reports remain preserved in their checkpoint and existing report files.

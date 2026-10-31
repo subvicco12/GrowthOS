@@ -1,0 +1,172 @@
+{
+  "recordedAt": "2026-10-31T20:56:08.473240+00:00",
+  "session01Checkpoint": "3fbcd17638c88cc0a64c2d415742fb4b9a5f478a",
+  "session02ImplementationCommit": "e29d3d6ac98a6b48d66f471b23c7c93e67ea9a9d",
+  "branch": "feat/growthos-final-product-closure-20261024",
+  "node": "22.23.4",
+  "unitSuite": {
+    "command": "npm test",
+    "exit": 0,
+    "total": 620,
+    "pass": 617,
+    "fail": 0,
+    "skip": 3,
+    "newUnitCases": 12,
+    "skips": "Three opt-in disposable integration scenarios; each independently executed successfully."
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exit": 0
+  },
+  "build": {
+    "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+    "exit": 0
+  },
+  "offline": [
+    {
+      "command": "npm run test:security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:security:offline\n> node scripts/validate-security-offline.cjs\n\nPASS: offline source checks. No database or network accessed.\n"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:db-guards:offline\n> node scripts/test-disposable-db-guards.cjs\n\nPASS: migration runner refuses remote host\nPASS: migration runner refuses production database name\nPASS: migration runner refuses non-test database name\nPASS: migration runner refuses missing disposable opt-in\nPASS: approval integration refuses remote host\nPASS: approval integration refuses production database name\nPASS: approval integration refuses non-test database name\nPASS: approval integration refuses missing disposable opt-in\nPASS: 8 offline database guard refusals. No connection attempts were authorized.\n"
+    },
+    {
+      "command": "npm run test:auth-and-session:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:auth-and-session:offline\n> npm run test:auth-cookies:offline && npm run test:session:offline\n\n\n> growthos@1.0.0 test:auth-cookies:offline\n> node scripts/test-auth-cookie-routes-mocked.cjs\n\nPASS login sets secure session and clears organization cookie\nPASS cross-origin login refused before authentication\nPASS malformed login credentials are not cached or authenticated\nPASS malformed JSON is non-cacheable and refused before authentication\nPASS oversized login body is non-cacheable and refused before authentication\nPASS invalid credentials, throttling and service failures never issue session cookies\nPASS duplicate session and organization cookies fail closed\nPASS organization context requires session, explicit choice, and verified membership\nPASS organization discovery rejects ambiguous session cookies\nPASS organization listing rejects anonymous access and returns non-cacheable scoped choices\nPASS logout revokes session and clears both cookies\nPASS logout service failure is generic and non-cacheable\nPASS cross-origin logout refused before revocation\nPASS forged Host logout refused before revocation\n\n> growthos@1.0.0 test:session:offline\n> node scripts/test-mysql-session-mocked.cjs\n\nPASS isolated session issuance, hashing, expiry, disabled-user refusal and revocation\n"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:mutation-security:offline\n> node scripts/test-mutation-security-mocked.cjs\n\nPASS auth/login/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS organizations/selection/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS websites/register/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approvals/decide/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS api/organization-websites/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approval unauthorized role refused before mutation\nPASS cross-tenant organization selection refused\nPASS forwarding headers cannot override canonical Host and Origin\nPASS missing/invalid canonical configuration and malformed length fail closed\nPASS malformed Content-Length, invalid UTF-8, stream failures, aborts and streaming size cap\nPASS 52 offline mutation security assertions\n"
+    },
+    {
+      "command": "node scripts/test-website-registration-scope-mocked.cjs",
+      "exit": 0,
+      "output": "PASS 11 mocked registration and registry assertions\n"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exit": 0,
+      "output": "PASS enabled feature disabled and audited\nPASS repeated disable is idempotent\nPASS missing website rolls back\nPASS viewer denied\nPASS audit failure rolls back\nPASS malformed JSON refused before DB access\nPASS oversized actual body refused before DB access\nPASS oversized declared body refused before DB access\nPASS ordinary numeric Content-Length accepted\nPASS forged Host/Origin combinations refused before DB access\n"
+    }
+  ],
+  "proposalInstall": {
+    "command": "node scripts/install-session02-disposable.cjs",
+    "exit": 0,
+    "output": "PASS: proposal 017 installed ONLY in explicit disposable schema; 010\u2013016 untouched.\n"
+  },
+  "database": {
+    "session02": {
+      "exit": 0,
+      "tests": 1,
+      "pass": 1,
+      "output": "TAP version 13\n# Subtest: real-session ownership, connector drafts, durable analysis lifecycle, quotas, approvals and immutable evidence history\nok 1 - real-session ownership, connector drafts, durable analysis lifecycle, quotas, approvals and immutable evidence history\n  ---\n  duration_ms: 467.352046\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 934.95387\n"
+    },
+    "session01Regression": {
+      "exit": 0,
+      "tests": 1,
+      "pass": 1,
+      "output": "TAP version 13\n# Subtest: real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\nok 1 - real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\n  ---\n  duration_ms: 134.85429\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 453.555574\n"
+    },
+    "existingApprovalRegression": {
+      "exit": 0,
+      "tests": 1,
+      "pass": 1
+    },
+    "inventory": {
+      "migrations": [
+        {
+          "migration_id": "001_core_schema.sql"
+        },
+        {
+          "migration_id": "002_budget_incidents.sql"
+        },
+        {
+          "migration_id": "003_sessions.sql"
+        },
+        {
+          "migration_id": "004_login_throttles.sql"
+        },
+        {
+          "migration_id": "005_installation_state.sql"
+        },
+        {
+          "migration_id": "006_approval_queue.sql"
+        },
+        {
+          "migration_id": "007_approval_audit.sql"
+        },
+        {
+          "migration_id": "008_approval_audit_guards.sql"
+        },
+        {
+          "migration_id": "009_website_feature_audit.sql"
+        }
+      ],
+      "tables": [
+        {
+          "name": "growth_dev_analysis_jobs"
+        },
+        {
+          "name": "growth_dev_analysis_recommendations"
+        },
+        {
+          "name": "growth_dev_connector_drafts"
+        },
+        {
+          "name": "growth_dev_contract"
+        },
+        {
+          "name": "growth_dev_ownership"
+        },
+        {
+          "name": "growth_dev_workflow_events"
+        }
+      ],
+      "triggers": [
+        {
+          "name": "dev_events_no_delete"
+        },
+        {
+          "name": "dev_events_no_update"
+        },
+        {
+          "name": "dev_recommendations_no_delete"
+        },
+        {
+          "name": "dev_recommendations_no_update"
+        }
+      ],
+      "version": [
+        {
+          "version": "11.8.9-MariaDB-ubu2404"
+        }
+      ]
+    }
+  },
+  "browser": {
+    "session02": {
+      "exit": 0,
+      "scenarios": 6,
+      "output": "PASS browser: persisted ownership challenge and explicit unavailable external proof\nPASS browser: persisted source, approval-gated local analysis and derived recommendations\nPASS browser: result and recommendation status survive full reload\nPASS browser: queued analysis cancellation is durable\nPASS browser: durable workflow panel fits 390px viewport\nPASS browser: viewer sees persisted records without mutation controls\nPASS 6 Session 02 browser scenarios; no external requests or live automation\n"
+    },
+    "session01Regression": {
+      "exit": 0,
+      "scenarios": 5,
+      "output": "PASS browser: configuration persists after full reload\nPASS browser: stale edit refusal and reload recovery\nPASS browser: safe lifecycle controls persist with both switches disabled\nPASS browser: settings fit a 390px viewport\nPASS browser: viewer sees read-only settings\nPASS 5 browser scenarios with real local HTTPS API and MariaDB\n"
+    }
+  },
+  "safeRefusals": {
+    "installerWithoutOptInExit": 2,
+    "integrationWithoutOptInExit": 2,
+    "browserWithoutOptInExit": 2
+  },
+  "externalOwnershipCertification": "NOT RUN against a live external website; controlled transport tests only. Browser verifies explicit unavailable state.",
+  "migrations010Through016Executed": false,
+  "productionRelease": "HOLD",
+  "cleanup": "Session-owned local HTTPS application stopped, disposable container removed, test credential and TLS files deleted."
+}
