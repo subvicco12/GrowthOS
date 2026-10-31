@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {useScopedWebsitePager} from './use-scoped-website-pager';
 import { workspaceError } from './workspace-response';
+import { IsolatedOperationsPanel } from './isolated-operations-panel';
 import { IsolatedWorkflowPanel } from './isolated-workflow-panel';
 import { WebsiteSettingsPanel } from './website-settings-panel';
 import { LocalOnboardingProfile } from './local-onboarding-profile';
@@ -91,6 +92,7 @@ export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}
             <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable. Safe lifecycle controls are available below.</p>
             <WebsiteSettingsPanel key={data.organization.id+site.id} organizationId={data.organization.id} websiteId={site.id} role={data.organization.role} disabled={pages.busy||mutating} onAccessDenied={()=>pager.failClosed()}/>
             <IsolatedWorkflowPanel key={"workflow"+data.organization.id+site.id} organizationId={data.organization.id} site={site} role={data.organization.role} onAccessDenied={()=>pager.failClosed()}/>
+            <IsolatedOperationsPanel key={"operations"+data.organization.id+site.id} organizationId={data.organization.id} site={site} role={data.organization.role} onAccessDenied={()=>pager.failClosed()}/>
             <LocalOnboardingProfile organizationId={data.organization.id} site={site} canEdit={['owner','admin','editor'].includes(data.organization.role)} profile={profiles[site.id]??emptyOnboardingProfile({organizationId:data.organization.id,websiteId:site.id,domain:site.domain})} onChange={next=>setProfiles(old=>({...old,[site.id]:next}))}/>
             {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
               {site.automationEnabled&&<button type="button" disabled={pages.busy||mutating} onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}

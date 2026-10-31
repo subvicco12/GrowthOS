@@ -1,3 +1,4 @@
+import { bumpStopFence } from './session03-authority';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { assertWebsiteSettingsChange, type WebsiteSettings, type WebsiteSettingsPatch, type ShutdownEvent } from '../core/website-settings';
@@ -37,11 +38,16 @@ export function createMySQLWebsiteSettingsStore(pool: Pick<Pool, 'execute' | 'ge
         if (!rows.length) throw Error('WEBSITE_NOT_FOUND');
         const before = project(rows[0], organizationId);
         if (before.stateToken !== patch.expectedState) throw Error('SETTINGS_CONFLICT');
+        if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES' && patch.action === 'metadata') {
+          const [grants] = await connection.execute<import('mysql2/promise').RowDataPacket[]>('SELECT website_id FROM growth_dev_ownership_grants WHERE organization_id=? AND website_id=? FOR UPDATE',[organizationId,patch.websiteId]);
+          if (grants.length) throw Error('METADATA_LOCKED');
+        }
         assertWebsiteSettingsChange(before, patch);
         if (patch.action === 'metadata') {
           await connection.execute('UPDATE growth_websites SET platform=?,timezone=? WHERE organization_id=? AND id=?',
             [patch.platform, patch.timezone, organizationId, patch.websiteId]);
         } else {
+          if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES') await bumpStopFence(connection,{organizationId,websiteId:patch.websiteId});
           // Stop controls and their existing append-only shutdown events commit together.
           await connection.execute('UPDATE growth_websites SET status=?,automation_enabled=FALSE,auto_publish_enabled=FALSE WHERE organization_id=? AND id=?',
             [patch.status, organizationId, patch.websiteId]);

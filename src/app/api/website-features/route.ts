@@ -42,6 +42,10 @@ export async function PATCH(request: Request): Promise<Response> {
           [randomUUID(), organization.id, parsed.data.websiteId, userId, parsed.data.feature]
         );
       }
+      if (typeof process !== 'undefined' && process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES') {
+        const { bumpStopFence } = await import('../../../server/session03-authority');
+        await bumpStopFence(connection,{organizationId:organization.id,websiteId:parsed.data.websiteId});
+      }
       await connection.commit();
     } catch (error) {
       await connection.rollback();

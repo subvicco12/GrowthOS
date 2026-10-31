@@ -1,0 +1,33 @@
+# Independent static reconciliation review: 010–018
+
+This is a fresh static source review and executable inventory, not approval or database certification of 010–016. Run `npm run schema:review:offline` to inspect hashes, CREATE TABLE names, foreign-key references and ALTER TABLE targets. The tool never imports a database client or executes SQL. No automatic rename/copy/upgrade script is provided.
+
+| Existing candidate | Overlap with isolated 017/018 | Required boundary |
+| --- | --- | --- |
+| 010 content/connector health and publication claims | Connector drafts, synthetic enrollment/health | A synthetic signed loopback simulation is not issuer-verified live health. Never copy its `synthetic_healthy` state into production connector evidence. |
+| 011 issuer state, connector evidence and authorization tokens | Ownership grant epochs, encrypted synthetic credentials | Local ownership epochs and simulation keys are not independently trusted issuer/fence authority. Rotate/re-enroll through an approved authority; never promote development secrets. |
+| 012 quota-v2 reservations/postings | Local job quota, zero-external-cost worker | Local analysis performs no AI/provider call. Zero spend is not a paid reservation, payment or refundable credit. Future provider jobs need the canonical quota ledger and reconciliation. |
+| 013 funded publication jobs and revision authority | Manual analysis jobs, leases and attempts | These are different job kinds/authority scopes. Preserve publication transaction/grant checks; do not replace 013 with development worker leases. |
+| 014 observation scope linking claims and jobs | Research and worker event scope | Preserve the exact production claim/content/channel/issuer bindings. A manual source hash cannot substitute for an authenticated publication observation. |
+| 015 immutable intelligence evidence, assignments and authority | Stored user observations/competitor claims/results | 017 input remains unverified manual evidence. Production transfer needs scoped, immutable provenance, observation/expiry times, revocation history, and no fabricated trust upgrade. |
+| 016 evidence-bound recommendation review | Existing internal approval queue plus immutable development revocations | Queue approval is internal planning only. Evidence expiry, revision and issuer checks in 016 must not be bypassed. Preserve original decisions; append revocation rather than rewrite audit history. |
+
+There are no direct CREATE TABLE name collisions among the reviewed files. That does not establish schema compatibility: 017/018 have weaker/different authority semantics, JSON payload contracts, retention and grants. All development tables use distinct `growth_dev_*` names. 017 references approved core/approval tables; 018 references approved core tables and the unchanged isolated 017 tables, with composite organization/website foreign keys. Neither requires installing 010–016. Existing proposal bytes and production migration registration remain unchanged.
+
+## Safe reconciliation sequence (requires separate authorization)
+
+1. Pin reviewed SQL hashes and verify exact baseline ledger, charset/collation, table engines and grants in a nonproduction copy. Keep 010–016, 017 and 018 as separate contracts; SQL DDL implicitly commits. Abort partial installs instead of resuming blindly.
+2. Obtain independent review/certification for the canonical production chain. Review retention/privacy, immutable event permissions, indexes and key custody before any staging or production promotion. 017/018's disposable guards must not be removed as a shortcut.
+3. Define a versioned, additive bridge/export contract with a per-tenant mapping ledger and source hashes. Export only explicitly authorized manual observations and internal review records. Preserve source trust as unverified and provenance/decision/revocation identity. No dev credential, ownership grant, lease, synthetic health, claim or paid quota authority is transferable.
+4. Dry-run on a populated disposable clone: two-tenant isolation, duplicate/replay refusal, foreign-key checks, revocation/expiry races, stop fences, rollback/unknown COMMIT, key rotation and worker recovery. Verify monotonic mappings and counts/hashes; require signed review evidence before writing any canonical destination.
+5. Exercise backup/restore and a failure runbook. Freeze writers for an approved export checkpoint; reconcile immutable source events before allowing canonical readers. Retain the old development stores read-only until independently approved archival. Do not silently update existing migration contracts or fabricate a downgrade/rollback for committed DDL.
+
+## Proposal 018 test scope
+
+018 adds an isolated contract marker, seven-day ownership grants with epochs/revocation, encrypted read-only synthetic enrollment, immutable approval revocations, worker leases/history and monotonic stop fences. It adds tables/triggers without ALTERing 001–017. Its explicit disposable installer checks MariaDB 11.8, the unchanged 017 marker, all disposable flags, a loopback host and a `growthos_test_*` name. It refuses existing/partial 018 installs. It is not registered with startup or production migration tooling.
+
+Runtime requires Session 02 and Session 03 disposable opt-ins. Missing authority fails closed. Proving ownership in development does not activate a connector; health adapters are synthetic-only, contain no DNS/fetch/socket path and cannot follow a rebinding target. The existing optional public ownership transport retains its exact allowlist, DNS pinning, TLS, no-redirect, bounded-response and proxy refusal rules; no production WordPress target is used here.
+
+Worker credentials/tokens remain server-side. Leases expire after 30 seconds, have a monotonically increasing fence, revalidate role/approval/revocation/stop state at compute and commit, and support heartbeat/recovery. Retries are 5/10/20 seconds with a maximum of three claims. A durable stop fence catches pause/resume ABA even when feature flags were already off. Historical/pre-018 jobs without a stop-fence snapshot fail closed and require a new review. Ownership revocation clears ownership/feature switches and revokes synthetic enrollment. Revoking ownership never unlocks metadata editing for a site with a recorded grant.
+
+Remaining gates: production schema/grants/backup/restore approval, live WordPress enrollment and read-only health certification, independently trusted ownership verification/revocation, proxy-aware egress, external provider spending/reservations, worker service deployment and large-scale operational testing. **Production HOLD.**

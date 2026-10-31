@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { analyzeManualEvidence, assertObservationTime, createAnalysisInput, type CreateAnalysis, type AnalysisAction, type WorkflowView } from '../core/isolated-workflows';
+import { recordOwnershipGrant, assertOwnershipGrant, assertApprovalNotRevoked, readStopFence } from './session03-authority';
 import type { OwnershipTransport } from './bounded-ownership-fetch';
 
 type Row = RowDataPacket & Record<string, any>;
@@ -11,8 +12,8 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 const scopeParams = (scope: WorkScope) => [scope.organizationId, scope.websiteId];
 
 export class MySQLIsolatedWorkflows {
-  constructor(private readonly pool: Pick<Pool, 'getConnection'>, private readonly ownership: OwnershipTransport, private readonly now: () => number = Date.now) {}
-  private async transaction<T>(fn: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  constructor(protected readonly pool: Pick<Pool, 'getConnection'>, private readonly ownership: OwnershipTransport, protected readonly now: () => number = Date.now) {}
+  protected async transaction<T>(fn: (connection: PoolConnection) => Promise<T>): Promise<T> {
     const connection = await this.pool.getConnection(); let committing = false;
     try {
       await connection.beginTransaction();
@@ -24,7 +25,7 @@ export class MySQLIsolatedWorkflows {
       throw error;
     } finally { connection.release(); }
   }
-  private async site(connection: PoolConnection, scope: WorkScope, roles: readonly string[] = ['owner','admin']) {
+  protected async site(connection: PoolConnection, scope: WorkScope, roles: readonly string[] = ['owner','admin']) {
     const [contract] = await connection.execute<Row[]>("SELECT contract_version FROM growth_dev_contract WHERE id=1");
     if (contract[0]?.contract_version !== 'session02-v1') throw Error('ISOLATED_SCHEMA_REQUIRED');
     const [members] = await connection.execute<Row[]>('SELECT m.role FROM growth_memberships m JOIN growth_users u ON u.id=m.user_id WHERE m.organization_id=? AND m.user_id=? AND u.disabled=FALSE FOR UPDATE', [scope.organizationId,scope.actorId]);
@@ -33,11 +34,11 @@ export class MySQLIsolatedWorkflows {
     if (sites.length !== 1) throw Error('WEBSITE_NOT_FOUND');
     return sites[0];
   }
-  private async event(connection: PoolConnection, scope: WorkScope, resourceId: string, eventType: string) {
+  protected async event(connection: PoolConnection, scope: WorkScope, resourceId: string, eventType: string) {
     await connection.execute('INSERT INTO growth_dev_workflow_events(id,organization_id,website_id,actor_id,resource_id,event_type) VALUES (?,?,?,?,?,?)',
       [randomUUID(), scope.organizationId, scope.websiteId, scope.actorId, resourceId, eventType]);
   }
-  private async approval(connection: PoolConnection, scope: WorkScope, title: string, actionType: string): Promise<string> {
+  protected async approval(connection: PoolConnection, scope: WorkScope, title: string, actionType: string): Promise<string> {
     const id = randomUUID();
     await connection.execute('INSERT INTO growth_approval_queue(id,organization_id,website_id,title,action_type) VALUES (?,?,?,?,?)',
       [id, scope.organizationId, scope.websiteId, title.slice(0,240), actionType]); return id;
@@ -68,6 +69,7 @@ export class MySQLIsolatedWorkflows {
     return this.transaction(async connection => {
       const site = await this.site(connection, scope);
       if (['paused','archived'].includes(site.status) && !revoke) throw Error('WEBSITE_STOPPED');
+      if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES' && !revoke) await assertOwnershipGrant(connection,scope,this.now());
       if (!site.verified_at || site.platform !== 'wordpress') throw Error('CONNECTOR_PREREQUISITE_REQUIRED');
       const [rows] = await connection.execute<Row[]>('SELECT id FROM growth_dev_connector_drafts WHERE organization_id=? AND website_id=? FOR UPDATE', scopeParams(scope));
       const id = rows[0]?.id || randomUUID(), state = revoke ? 'revoked' : 'draft', endpoint = `https://${site.domain}/wp-json/growthos/v1/`;
@@ -111,7 +113,10 @@ export class MySQLIsolatedWorkflows {
       const challenge = rows[0];
       if (!challenge || challenge.state !== 'checking' || challenge.domain !== site.domain || site.status === 'archived' || new Date(challenge.expires_at).getTime() <= this.now()) throw Error('OWNERSHIP_CHALLENGE_INVALID');
       await connection.execute('UPDATE growth_dev_ownership SET state=? WHERE organization_id=? AND website_id=? AND id=?', [matched ? 'verified' : 'failed', ...scopeParams(scope), challengeId]);
-      if (matched) await connection.execute('UPDATE growth_websites SET verified_at=UTC_TIMESTAMP() WHERE organization_id=? AND id=?', scopeParams(scope));
+      if (matched) {
+        await connection.execute('UPDATE growth_websites SET verified_at=UTC_TIMESTAMP() WHERE organization_id=? AND id=?', scopeParams(scope));
+        if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES') await recordOwnershipGrant(connection,scope,challengeId,this.now());
+      }
       await this.event(connection, scope, challengeId, matched ? 'ownership_verified' : 'ownership_check_failed');
       return { verified: matched, errorCode, connectorActivated: false };
     });
@@ -127,10 +132,11 @@ export class MySQLIsolatedWorkflows {
       if (existing[0]) { if (existing[0].input_hash !== digest) throw Error('IDEMPOTENCY_CONFLICT'); return { id: existing[0].id as string, duplicate: true }; }
       const [[count]] = await connection.execute<Row[]>('SELECT COUNT(*) AS total FROM growth_dev_analysis_jobs WHERE organization_id=? AND website_id=? AND created_at>=UTC_TIMESTAMP()-INTERVAL 1 DAY', scopeParams(scope));
       if (Number(count.total) >= 20) throw Error('ANALYSIS_QUOTA_EXCEEDED');
-      const [[shutdowns]] = await connection.execute<Row[]>('SELECT COUNT(*) AS total FROM growth_website_feature_audit WHERE organization_id=? AND website_id=?', scopeParams(scope));
+      const [shutdowns] = await connection.execute<Row[]>('SELECT id FROM growth_website_feature_audit WHERE organization_id=? AND website_id=? FOR UPDATE', scopeParams(scope));
+      const stopFence = process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES' ? await readStopFence(connection,scope) : undefined;
       const id = randomUUID(), approvalId = await this.approval(connection, scope, 'Analyze manual evidence: ' + input.sourceLabel, 'manual_analysis');
       await connection.execute('INSERT INTO growth_dev_analysis_jobs(id,organization_id,website_id,actor_id,request_key,input_hash,source_label,observed_at,input_json,approval_id,run_after) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-        [id, ...scopeParams(scope), scope.actorId, input.requestKey, digest, input.sourceLabel, new Date(input.observedAt), JSON.stringify({ request: input, shutdownCount: Number(shutdowns.total) }), approvalId, new Date(input.runAfter)]);
+        [id, ...scopeParams(scope), scope.actorId, input.requestKey, digest, input.sourceLabel, new Date(input.observedAt), JSON.stringify({ request: input, shutdownCount: shutdowns.length, stopFence }), approvalId, new Date(input.runAfter)]);
       await this.event(connection, scope, id, 'analysis_created_awaiting_approval'); return { id, duplicate: false };
     });
   }
@@ -146,9 +152,14 @@ export class MySQLIsolatedWorkflows {
       }
       if (['paused','archived'].includes(site.status)) throw Error('WEBSITE_STOPPED');
       const storedInput = parse(job.input_json);
-      const [[shutdowns]] = await connection.execute<Row[]>('SELECT COUNT(*) AS total FROM growth_website_feature_audit WHERE organization_id=? AND website_id=?', scopeParams(scope));
-      if (!Number.isSafeInteger(storedInput.shutdownCount) || storedInput.shutdownCount !== Number(shutdowns.total)) throw Error('WEBSITE_STOPPED');
+      if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES' && storedInput.stopFence !== await readStopFence(connection,scope)) throw Error('WEBSITE_STOPPED');
+      const [shutdowns] = await connection.execute<Row[]>('SELECT id FROM growth_website_feature_audit WHERE organization_id=? AND website_id=? FOR UPDATE', scopeParams(scope));
+      if (!Number.isSafeInteger(storedInput.shutdownCount) || storedInput.shutdownCount !== shutdowns.length) throw Error('WEBSITE_STOPPED');
       if (['completed','cancelled','running'].includes(job.status)) throw Error('JOB_STATE_CONFLICT');
+      if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES' && ['retry','schedule'].includes(input.action) && job.error_code && new Date(job.run_after).getTime()>this.now()) {
+        const [leases]=await connection.execute<Row[]>('SELECT job_id FROM growth_dev_worker_leases WHERE organization_id=? AND website_id=? AND job_id=?',[...scopeParams(scope),job.id]);
+        if (leases.length && (input.action==='retry' || (input.action==='schedule' && Date.parse(input.runAfter)<new Date(job.run_after).getTime()))) throw Error('JOB_NOT_DUE');
+      }
       if (input.action === 'schedule') {
         assertObservationTime(stamp(job.observed_at), input.runAfter, this.now());
         await connection.execute('UPDATE growth_dev_analysis_jobs SET run_after=?,updated_at=UTC_TIMESTAMP(6) WHERE organization_id=? AND website_id=? AND id=?', [new Date(input.runAfter), ...scopeParams(scope), job.id]);
@@ -160,6 +171,7 @@ export class MySQLIsolatedWorkflows {
         await this.event(connection, scope, job.id, 'analysis_retry_scheduled'); return { status: 'scheduled', externalAction: false };
       }
       if (job.status === 'failed' || job.attempts >= 3) throw Error('JOB_STATE_CONFLICT');
+      if (process.env.GROWTHOS_SESSION03_DISPOSABLE === 'YES') await assertApprovalNotRevoked(connection,scope,job.approval_id);
       if (job.approval_status !== 'approved') throw Error('APPROVAL_REQUIRED');
       if (new Date(job.run_after).getTime() > this.now()) throw Error('JOB_NOT_DUE');
       await connection.execute("UPDATE growth_dev_analysis_jobs SET status='running',attempts=attempts+1,updated_at=UTC_TIMESTAMP(6) WHERE organization_id=? AND website_id=? AND id=?", [...scopeParams(scope), job.id]);
