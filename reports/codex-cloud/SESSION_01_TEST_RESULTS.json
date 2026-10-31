@@ -1,0 +1,81 @@
+{
+  "recordedAt": "2026-10-31T14:42:44.518139+00:00",
+  "head": "9d813e8f614c43bcba9e19d1bf34315c006a6e37",
+  "branch": "feat/growthos-final-product-closure-20261024",
+  "node": "22.23.4",
+  "npmTest": {
+    "exit": 0,
+    "tests": 607,
+    "pass": 605,
+    "fail": 0,
+    "skip": 2,
+    "notes": "Two DB integration cases skipped without opt-in; separately executed against MariaDB."
+  },
+  "typecheck": {
+    "exit": 0
+  },
+  "build": {
+    "exit": 0
+  },
+  "focusedUnitTests": {
+    "exit": 0,
+    "tests": 10,
+    "pass": 10
+  },
+  "database": {
+    "exit": 0,
+    "version": "11.8.9-MariaDB-ubu2404",
+    "schema": "growthos_test_session01",
+    "allowedMigrations": "001\u2013009",
+    "prohibitedMigrationsExecuted": false,
+    "output": "\n> growthos@1.0.0 test:website-settings:mysql\n> node scripts/run-website-settings-integration.mjs\n\nTAP version 13\n# Subtest: real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\nok 1 - real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\n  ---\n  duration_ms: 132.910061\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 446.674621\n"
+  },
+  "existingApprovalIntegration": {
+    "exit": 0,
+    "tests": 1,
+    "pass": 1
+  },
+  "browser": {
+    "exit": 0,
+    "scenarios": 5,
+    "output": "PASS browser: configuration persists after full reload\nPASS browser: stale edit refusal and reload recovery\nPASS browser: safe lifecycle controls persist with both switches disabled\nPASS browser: settings fit a 390px viewport\nPASS browser: viewer sees read-only settings\nPASS 5 browser scenarios with real local HTTPS API and MariaDB\n"
+  },
+  "offline": [
+    {
+      "command": "npm run test:security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:security:offline\n> node scripts/validate-security-offline.cjs\n\nPASS: offline source checks. No database or network accessed.\n"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:db-guards:offline\n> node scripts/test-disposable-db-guards.cjs\n\nPASS: migration runner refuses remote host\nPASS: migration runner refuses production database name\nPASS: migration runner refuses non-test database name\nPASS: migration runner refuses missing disposable opt-in\nPASS: approval integration refuses remote host\nPASS: approval integration refuses production database name\nPASS: approval integration refuses non-test database name\nPASS: approval integration refuses missing disposable opt-in\nPASS: 8 offline database guard refusals. No connection attempts were authorized.\n"
+    },
+    {
+      "command": "npm run test:auth-and-session:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:auth-and-session:offline\n> npm run test:auth-cookies:offline && npm run test:session:offline\n\n\n> growthos@1.0.0 test:auth-cookies:offline\n> node scripts/test-auth-cookie-routes-mocked.cjs\n\nPASS login sets secure session and clears organization cookie\nPASS cross-origin login refused before authentication\nPASS malformed login credentials are not cached or authenticated\nPASS malformed JSON is non-cacheable and refused before authentication\nPASS oversized login body is non-cacheable and refused before authentication\nPASS invalid credentials, throttling and service failures never issue session cookies\nPASS duplicate session and organization cookies fail closed\nPASS organization context requires session, explicit choice, and verified membership\nPASS organization discovery rejects ambiguous session cookies\nPASS organization listing rejects anonymous access and returns non-cacheable scoped choices\nPASS logout revokes session and clears both cookies\nPASS logout service failure is generic and non-cacheable\nPASS cross-origin logout refused before revocation\nPASS forged Host logout refused before revocation\n\n> growthos@1.0.0 test:session:offline\n> node scripts/test-mysql-session-mocked.cjs\n\nPASS isolated session issuance, hashing, expiry, disabled-user refusal and revocation\n"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:mutation-security:offline\n> node scripts/test-mutation-security-mocked.cjs\n\nPASS auth/login/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS organizations/selection/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS websites/register/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approvals/decide/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS api/organization-websites/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approval unauthorized role refused before mutation\nPASS cross-tenant organization selection refused\nPASS forwarding headers cannot override canonical Host and Origin\nPASS missing/invalid canonical configuration and malformed length fail closed\nPASS malformed Content-Length, invalid UTF-8, stream failures, aborts and streaming size cap\nPASS 52 offline mutation security assertions\n"
+    },
+    {
+      "command": "node scripts/test-website-registration-scope-mocked.cjs",
+      "exit": 0,
+      "output": "PASS 11 mocked registration and registry assertions\n"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exit": 0,
+      "output": "PASS enabled feature disabled and audited\nPASS repeated disable is idempotent\nPASS missing website rolls back\nPASS viewer denied\nPASS audit failure rolls back\nPASS malformed JSON refused before DB access\nPASS oversized actual body refused before DB access\nPASS oversized declared body refused before DB access\nPASS ordinary numeric Content-Length accepted\nPASS forged Host/Origin combinations refused before DB access\n"
+    }
+  ],
+  "guardChecks": {
+    "integrationWithoutOptInExit": 2,
+    "browserWithoutOptInExit": 2,
+    "result": "Expected refusal before connecting"
+  },
+  "cleanup": "Session-owned HTTPS app stopped, disposable container removed, local test credentials and private TLS material deleted."
+}

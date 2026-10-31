@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useState} from 'react';
+import type {WebsiteSummary} from '../core/workspace-journey';
 import {ScopedWebsitePager,WebsitePageAccessError,readScopedWebsiteResponse,type WebsitePageState} from '../core/scoped-website-pages';
 
 export function useScopedWebsitePager(active:boolean,subject:string){
@@ -12,5 +13,13 @@ export function useScopedWebsitePager(active:boolean,subject:string){
    return readScopedWebsiteResponse(response);
  },setState),[subject]);
  useEffect(()=>{if(active)void pager.loadInitial();else pager.invalidate();return()=>pager.dispose();},[active,pager]);
+ useEffect(()=>{
+   const updated=(event:Event)=>{const detail=(event as CustomEvent<{organizationId:string;website:WebsiteSummary}>).detail;
+     if(active&&detail?.organizationId===pager.snapshot.scope?.organizationId&&detail.website)
+       pager.updateSite(detail.website.id,site=>({...site,...detail.website}));
+   };
+   window.addEventListener('growthos-website-updated',updated);
+   return()=>window.removeEventListener('growthos-website-updated',updated);
+ },[active,pager]);
  return {state,pager};
 }

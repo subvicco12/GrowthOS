@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {useScopedWebsitePager} from './use-scoped-website-pager';
 import { workspaceError } from './workspace-response';
+import { WebsiteSettingsPanel } from './website-settings-panel';
 import { LocalOnboardingProfile } from './local-onboarding-profile';
 import {emptyOnboardingProfile,type OnboardingProfile} from '../core/local-onboarding-profile';
 import type {WebsiteSummary} from '../core/workspace-journey';
@@ -86,7 +87,8 @@ export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}
           </div>
           <button type="button" className="secondary" aria-expanded={selected===site.id} onClick={()=>{if(selected!==site.id&&onWebsiteChange?.(site.id,site,data.organization.id)===false)return;setSelected(selected===site.id?null:site.id);}}>{selected===site.id?'Hide settings':'View settings'}</button>
           {selected===site.id&&<div className="websiteDetail"><h3>Onboarding and settings</h3><ol><li>Draft registration: {site.status === 'draft' ? 'current' : 'recorded'}</li><li>Ownership verification: {site.verifiedAt ? 'recorded' : 'not verified'}</li><li>Connector health: unknown until a persisted check is available</li><li>Activation: unavailable from this workspace</li></ol><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
-            <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable.</p>
+            <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable. Safe lifecycle controls are available below.</p>
+            <WebsiteSettingsPanel key={data.organization.id+site.id} organizationId={data.organization.id} websiteId={site.id} role={data.organization.role} disabled={pages.busy||mutating} onAccessDenied={()=>pager.failClosed()}/>
             <LocalOnboardingProfile organizationId={data.organization.id} site={site} canEdit={['owner','admin','editor'].includes(data.organization.role)} profile={profiles[site.id]??emptyOnboardingProfile({organizationId:data.organization.id,websiteId:site.id,domain:site.domain})} onChange={next=>setProfiles(old=>({...old,[site.id]:next}))}/>
             {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
               {site.automationEnabled&&<button type="button" disabled={pages.busy||mutating} onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}
