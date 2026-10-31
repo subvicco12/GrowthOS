@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {useScopedWebsitePager} from './use-scoped-website-pager';
 import { workspaceError } from './workspace-response';
+import { IsolatedWorkflowPanel } from './isolated-workflow-panel';
 import { WebsiteSettingsPanel } from './website-settings-panel';
 import { LocalOnboardingProfile } from './local-onboarding-profile';
 import {emptyOnboardingProfile,type OnboardingProfile} from '../core/local-onboarding-profile';
@@ -64,7 +65,7 @@ export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}
   }
   return <section className="panel" aria-label="Organization website registry">
     <h2>Websites and onboarding</h2>
-    <p>Registration creates a draft with zero budget and both feature switches off. Ownership verification and connector setup are unavailable.</p>
+    <p>Registration creates a draft with zero budget and both feature switches off. Ownership verification and connector drafts require the isolated workflow schema below; live activation remains unavailable.</p>
     {(message||pages.error||pages.busy)&&<p role="status">{message||pages.error||'Loading website registry…'}</p>}
     {pages.error&&!pages.fatal&&<button type="button" className="secondary" disabled={pages.busy||mutating} onClick={()=>void(refreshNeeded?pager.refresh().then(ok=>{if(ok)setRefreshNeeded(false);}):pages.scope?pager.loadMore():pager.loadInitial())}>{refreshNeeded?'Retry registry refresh':'Retry website page'}</button>}
     {data && ['owner','admin'].includes(data.organization.role) && <form className="registryForm" onSubmit={event => void register(event)}>
@@ -89,6 +90,7 @@ export function OrganizationWebsiteRegistry({preferredWebsiteId,onWebsiteChange}
           {selected===site.id&&<div className="websiteDetail"><h3>Onboarding and settings</h3><ol><li>Draft registration: {site.status === 'draft' ? 'current' : 'recorded'}</li><li>Ownership verification: {site.verifiedAt ? 'recorded' : 'not verified'}</li><li>Connector health: unknown until a persisted check is available</li><li>Activation: unavailable from this workspace</li></ol><p>Platform: {site.platform}. Lifecycle: {site.status}. Configured monthly website budget: {site.monthlyBudgetMinor} minor units; currency and actual spend are unavailable.</p>
             <p>Automation: {site.automationEnabled?'enabled':'disabled'}. Auto-publish: {site.autoPublishEnabled?'enabled':'disabled'}. Activation and budget changes are unavailable. Safe lifecycle controls are available below.</p>
             <WebsiteSettingsPanel key={data.organization.id+site.id} organizationId={data.organization.id} websiteId={site.id} role={data.organization.role} disabled={pages.busy||mutating} onAccessDenied={()=>pager.failClosed()}/>
+            <IsolatedWorkflowPanel key={"workflow"+data.organization.id+site.id} organizationId={data.organization.id} site={site} role={data.organization.role} onAccessDenied={()=>pager.failClosed()}/>
             <LocalOnboardingProfile organizationId={data.organization.id} site={site} canEdit={['owner','admin','editor'].includes(data.organization.role)} profile={profiles[site.id]??emptyOnboardingProfile({organizationId:data.organization.id,websiteId:site.id,domain:site.domain})} onChange={next=>setProfiles(old=>({...old,[site.id]:next}))}/>
             {['owner','admin'].includes(data.organization.role)&&<div className="websiteControls">
               {site.automationEnabled&&<button type="button" disabled={pages.busy||mutating} onClick={()=>void disableFeature(site.id,'automation')}>Disable automation</button>}

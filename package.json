@@ -16,7 +16,8 @@
     "test:mutation-security:offline": "node scripts/test-mutation-security-mocked.cjs",
     "test:session:offline": "node scripts/test-mysql-session-mocked.cjs",
     "test:auth-and-session:offline": "npm run test:auth-cookies:offline && npm run test:session:offline",
-    "test:website-settings:mysql": "node scripts/run-website-settings-integration.mjs"
+    "test:website-settings:mysql": "node scripts/run-website-settings-integration.mjs",
+    "test:session02:mysql": "node scripts/run-session02-integration.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
