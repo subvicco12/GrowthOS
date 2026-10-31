@@ -1,0 +1,229 @@
+{
+  "mode": "STATIC_ONLY_NO_SQL_EXECUTED",
+  "proposals": {
+    "010": {
+      "file": "database/proposals/certification-010-016/010_content_persistence_candidate.sql",
+      "sha256": "bb10b32ec0186399ae10b1820541d4330aab500843cd0fcf2a82b4da515c2c5b",
+      "tables": [
+        "growth_content_records",
+        "growth_content_events",
+        "growth_connector_health",
+        "growth_publication_claims",
+        "growth_publication_observations"
+      ],
+      "references": [
+        "growth_websites",
+        "growth_content_records",
+        "growth_ai_reservations",
+        "growth_publication_claims"
+      ],
+      "alters": [
+        "growth_ai_reservations"
+      ],
+      "foreignKeys": 6,
+      "checks": 8
+    },
+    "011": {
+      "file": "database/proposals/011_authorization_trust_candidate.sql",
+      "sha256": "7b9f5b15d2797c13bc6c30d04a08d49b5112a2545f264b543e86ffd5b303362a",
+      "tables": [
+        "growth_publication_policy_revisions",
+        "growth_publication_destinations",
+        "growth_connector_issuer_state",
+        "growth_connector_evidence_history",
+        "growth_connector_attestations",
+        "growth_content_authorizations",
+        "growth_publication_authorization_events",
+        "growth_publication_authorization_uses"
+      ],
+      "references": [
+        "growth_websites",
+        "growth_content_policies",
+        "growth_publication_destinations",
+        "growth_connector_issuer_state",
+        "growth_connector_evidence_history",
+        "growth_content_records",
+        "growth_content_events",
+        "growth_ai_reservations",
+        "growth_users",
+        "growth_publication_claims",
+        "growth_content_authorizations"
+      ],
+      "alters": [],
+      "foreignKeys": 19,
+      "checks": 12
+    },
+    "012": {
+      "file": "database/proposals/certification-010-016/012_quota_v2_candidate.sql",
+      "sha256": "6d32ff6a950e9e90c40a4c5e5892c783914847c0f518faab980f08764bc310a6",
+      "tables": [
+        "growth_quota_reservations_v2",
+        "growth_quota_events_v2",
+        "growth_quota_postings_v2"
+      ],
+      "references": [
+        "growth_websites",
+        "growth_content_policies",
+        "growth_content_records",
+        "growth_quota_reservations_v2",
+        "growth_users",
+        "growth_quota_postings_v2"
+      ],
+      "alters": [],
+      "foreignKeys": 7,
+      "checks": 16
+    },
+    "013": {
+      "file": "database/proposals/publication-funding-v1/013_publication_funding_jobs_candidate.sql",
+      "sha256": "049f16c9c9eb9336c60b9d3ebf42d5f66763257146d4d99714b0f74e7aea481e",
+      "tables": [
+        "growth_publication_funding_bindings",
+        "growth_publication_jobs",
+        "growth_publication_job_events"
+      ],
+      "references": [
+        "growth_content_authorizations",
+        "growth_publication_claims",
+        "growth_quota_reservations_v2",
+        "growth_publication_destinations",
+        "growth_content_records",
+        "growth_publication_funding_bindings",
+        "growth_publication_jobs",
+        "growth_publication_observations"
+      ],
+      "alters": [
+        "growth_publication_claims",
+        "growth_content_authorizations",
+        "growth_quota_reservations_v2",
+        "growth_publication_observations"
+      ],
+      "foreignKeys": 9,
+      "checks": 13
+    },
+    "014": {
+      "file": "database/proposals/publication-observation-scope-v1/014_observation_scope_candidate.sql",
+      "sha256": "d341bb3bc004b332f7cbc8253c2e5eb5255a4b8120860ae5d453f87762ee71b8",
+      "tables": [],
+      "references": [
+        "growth_publication_jobs",
+        "growth_publication_observations"
+      ],
+      "alters": [
+        "growth_publication_observations",
+        "growth_publication_jobs",
+        "growth_publication_job_events"
+      ],
+      "foreignKeys": 2,
+      "checks": 1
+    },
+    "015": {
+      "file": "database/proposals/product-authority-v1/015_product_authority_candidate.sql",
+      "sha256": "50dc53b228a391bfe221cf92e7c855fedfb39c1ced1ed452da1aa56b96446551",
+      "tables": [
+        "growth_intelligence_evidence",
+        "growth_intelligence_evidence_events",
+        "growth_plan_assignments",
+        "growth_plan_assignment_events",
+        "growth_plan_usage",
+        "growth_plan_usage_events",
+        "growth_plan_usage_transitions"
+      ],
+      "references": [
+        "growth_websites",
+        "growth_users",
+        "growth_intelligence_evidence",
+        "growth_organizations",
+        "growth_plan_usage",
+        "growth_plan_usage_events"
+      ],
+      "alters": [],
+      "foreignKeys": 12,
+      "checks": 4
+    },
+    "016": {
+      "file": "database/proposals/recommendation-review-v1/016_recommendation_review_candidate.sql",
+      "sha256": "a2017e1daab3a27d37436ed8e45853e9bbb9ed5ec9d8ef0e480f1395f274377b",
+      "tables": [
+        "growth_recommendations",
+        "growth_recommendation_evidence",
+        "growth_recommendation_review_events"
+      ],
+      "references": [
+        "growth_websites",
+        "growth_recommendations",
+        "growth_intelligence_evidence",
+        "growth_users"
+      ],
+      "alters": [],
+      "foreignKeys": 5,
+      "checks": 5
+    },
+    "017": {
+      "file": "database/proposals/session02-isolated-workflows/017_session02_disposable_candidate.sql",
+      "sha256": "c0f60a081f197f67d4739a5a7debb7be88f31907b92b5955d98b946fe7492e58",
+      "tables": [
+        "growth_dev_contract",
+        "growth_dev_ownership",
+        "growth_dev_analysis_jobs",
+        "growth_dev_analysis_recommendations",
+        "growth_dev_workflow_events",
+        "growth_dev_connector_drafts"
+      ],
+      "references": [
+        "growth_websites",
+        "growth_users",
+        "growth_approval_queue",
+        "growth_dev_analysis_jobs"
+      ],
+      "alters": [],
+      "foreignKeys": 11,
+      "checks": 3
+    },
+    "018": {
+      "file": "database/proposals/session03-isolated-runtime/018_session03_disposable_candidate.sql",
+      "sha256": "33d15a4b5a627fd4dc86b4bc4a7a91657e12f6bd1c9cd5fce383df5748633744",
+      "tables": [
+        "growth_dev_s03_contract",
+        "growth_dev_ownership_grants",
+        "growth_dev_connector_enrollments",
+        "growth_dev_approval_revocations",
+        "growth_dev_worker_leases",
+        "growth_dev_worker_history",
+        "growth_dev_stop_fences"
+      ],
+      "references": [
+        "growth_dev_ownership",
+        "growth_websites",
+        "growth_approval_queue",
+        "growth_users",
+        "growth_dev_analysis_jobs"
+      ],
+      "alters": [],
+      "foreignKeys": 9,
+      "checks": 4
+    }
+  },
+  "nameCollisions": [],
+  "semanticOverlaps": [
+    {
+      "candidate": "010",
+      "isolated": "017/018",
+      "concern": "connector health; synthetic health must never be promoted as trusted live evidence"
+    },
+    {
+      "candidate": "013",
+      "isolated": "017/018",
+      "concern": "publication jobs versus manual analysis leases; execution authority and billing scopes differ"
+    },
+    {
+      "candidate": "015",
+      "isolated": "017",
+      "concern": "research evidence; manual input provenance is not verified issuer evidence"
+    },
+    {
+      "candidate": "016",
+      "isolated": "017/018",
+      "concern": "recommendation review and revocation; internal queue approval is not production authority"
+    }
+  ]
+}

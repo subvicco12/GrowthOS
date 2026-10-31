@@ -1,21 +1,20 @@
-# GrowthOS — Session 02 Progress
+# GrowthOS — Session 03 Progress
 
-Updated: 2026-10-31T20:56:08.473240+00:00
+Updated: 2026-10-31T21:31:12.970547+00:00
 
-Session 1 preserved in local checkpoint **`3fbcd17638c88cc0a64c2d415742fb4b9a5f478a`**. Session 2 implementation checkpoint: **`e29d3d6ac98a6b48d66f471b23c7c93e67ea9a9d`**. Required branch remains `feat/growthos-final-product-closure-20261024`; no push, merge or deployment.
+Prior checkpoints verified and preserved: Session 1 `3fbcd17`, Session 2 `e29d3d6`/`d7c7f0b`. New implementation checkpoint **`414b1156cbd50729c64034b4bdd6dd4ea1782ba2`** on `feat/growthos-final-product-closure-20261024`; reports saved in a following report-only checkpoint. No reset, push, merge or deployment.
 
-Implemented secure ownership challenges and bounded proof transport, persisted connector drafts, manual technical/SEO/competitor research records, prioritized recommendations with internal approval status, durable analysis jobs with scheduling/retry/cancellation, quotas, pause/shutdown enforcement, and immutable workflow history. Frontend controls use real authenticated APIs and persistence.
+Implemented expiring/revocable ownership authority; encrypted, authenticated synthetic read-only connector enrollment/health; recoverable leased workers with heartbeat, fencing, stop/approval checks and backoff; immutable attempt history; and paginated tenant-scoped operations/provenance views. Added separate static reconciliation review of 010–018 and an additive disposable-only proposal 018.
 
-New persistence is a separately reviewable **proposal 017**, enabled and tested **only in an explicit disposable local schema**. Normal deployment remains unavailable for these new paths. **Migrations 010–016 were not executed or changed.** No live connector, external automation or publisher was activated.
+## Actual results
 
-## Actual verification
+- Full suite: **630 total; 626 PASS, 0 FAIL, 4 SKIP; exit 0**. All four opt-in DB scenarios passed separately.
+- Typecheck, offline security, database guards, auth/session/mutation regressions and optimized build: **exit 0**.
+- MariaDB: ownership/enrollment, concurrent claims, actual child `SIGKILL`, recovery, stale-lease refusal, stop ABA, approval revocation, retry/backoff, bounded CLI worker, pagination and immutability passed.
+- Browser: **5 new + 11 prior scenarios PASS**, all three runners exit 0, using real local HTTPS APIs and disposable data.
+- 010–016 were not executed; 017 was not promoted or edited. Separate 018 was exercised only in an explicitly opted-in disposable schema. No paid service, GitHub Actions or external automation activation occurred.
+- Test services/container and private test credentials were cleaned up.
 
-- Full suite: **620 total; 617 PASS, 0 FAIL, 3 SKIP; exit 0**. All three opt-in DB scenarios passed separately.
-- Typecheck, offline security/DB guards/auth/session/mutation regressions and optimized build: **exit 0**.
-- MariaDB 11.8.9: approved 001–009 checks plus independent disposable proposal install, new workflow integration and prior approval/settings integrations: **exit 0**.
-- Real local HTTPS browser: **6 new scenarios + 5 Session 1 regressions PASS**, both scripts exit 0.
-- Session-owned database/app services and test credentials were cleaned up.
+**Production release remains HOLD.** Independent migration/grants/backup-restore review, real connector/ownership authority, fleet/service certification and external spending/publication controls remain blocked or unexecuted. All connector health is explicitly synthetic; research remains unverified manual input.
 
-**Release: HOLD.** Live ownership/network certification, trusted connector credentials/health, schema approval, full history pagination, background workers and external execution/spend authority remain incomplete. Research is explicitly unverified manual input; scheduling requires manual run. Proxy-only ownership requests fail closed rather than bypassing platform egress.
-
-Details and file inventory: [SESSION_02_IMPLEMENTATION.md](SESSION_02_IMPLEMENTATION.md). Exact evidence: [SESSION_02_TEST_RESULTS.json](SESSION_02_TEST_RESULTS.json). Session 1 reports remain preserved in their checkpoint and existing report files.
+[Implementation and blockers](SESSION_03_IMPLEMENTATION.md) · [Actual test evidence](SESSION_03_TEST_RESULTS.json) · [Static schema inventory](SESSION_03_SCHEMA_REVIEW.json).

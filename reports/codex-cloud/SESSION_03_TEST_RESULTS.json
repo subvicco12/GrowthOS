@@ -1,0 +1,192 @@
+{
+  "recordedAt": "2026-10-31T21:31:12.970547+00:00",
+  "startingHead": "d7c7f0b",
+  "implementationCheckpoint": "414b1156cbd50729c64034b4bdd6dd4ea1782ba2",
+  "branch": "feat/growthos-final-product-closure-20261024",
+  "node": "22.23.4",
+  "fullSuite": {
+    "command": "npm test",
+    "exit": 0,
+    "tests": 630,
+    "pass": 626,
+    "fail": 0,
+    "skip": 4,
+    "newUnitCases": 9,
+    "note": "All four opt-in DB scenarios separately executed successfully."
+  },
+  "typecheck": {
+    "exit": 0
+  },
+  "build": {
+    "exit": 0
+  },
+  "offline": [
+    {
+      "command": "npm run test:security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:security:offline\n> node scripts/validate-security-offline.cjs\n\nPASS: offline source checks. No database or network accessed.\n"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:db-guards:offline\n> node scripts/test-disposable-db-guards.cjs\n\nPASS: migration runner refuses remote host\nPASS: migration runner refuses production database name\nPASS: migration runner refuses non-test database name\nPASS: migration runner refuses missing disposable opt-in\nPASS: approval integration refuses remote host\nPASS: approval integration refuses production database name\nPASS: approval integration refuses non-test database name\nPASS: approval integration refuses missing disposable opt-in\nPASS: 8 offline database guard refusals. No connection attempts were authorized.\n"
+    },
+    {
+      "command": "npm run test:auth-and-session:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:auth-and-session:offline\n> npm run test:auth-cookies:offline && npm run test:session:offline\n\n\n> growthos@1.0.0 test:auth-cookies:offline\n> node scripts/test-auth-cookie-routes-mocked.cjs\n\nPASS login sets secure session and clears organization cookie\nPASS cross-origin login refused before authentication\nPASS malformed login credentials are not cached or authenticated\nPASS malformed JSON is non-cacheable and refused before authentication\nPASS oversized login body is non-cacheable and refused before authentication\nPASS invalid credentials, throttling and service failures never issue session cookies\nPASS duplicate session and organization cookies fail closed\nPASS organization context requires session, explicit choice, and verified membership\nPASS organization discovery rejects ambiguous session cookies\nPASS organization listing rejects anonymous access and returns non-cacheable scoped choices\nPASS logout revokes session and clears both cookies\nPASS logout service failure is generic and non-cacheable\nPASS cross-origin logout refused before revocation\nPASS forged Host logout refused before revocation\n\n> growthos@1.0.0 test:session:offline\n> node scripts/test-mysql-session-mocked.cjs\n\nPASS isolated session issuance, hashing, expiry, disabled-user refusal and revocation\n"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:mutation-security:offline\n> node scripts/test-mutation-security-mocked.cjs\n\nPASS auth/login/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS organizations/selection/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS websites/register/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approvals/decide/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS api/organization-websites/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approval unauthorized role refused before mutation\nPASS cross-tenant organization selection refused\nPASS forwarding headers cannot override canonical Host and Origin\nPASS missing/invalid canonical configuration and malformed length fail closed\nPASS malformed Content-Length, invalid UTF-8, stream failures, aborts and streaming size cap\nPASS 52 offline mutation security assertions\n"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exit": 0,
+      "output": "PASS enabled feature disabled and audited\nPASS repeated disable is idempotent\nPASS missing website rolls back\nPASS viewer denied\nPASS audit failure rolls back\nPASS malformed JSON refused before DB access\nPASS oversized actual body refused before DB access\nPASS oversized declared body refused before DB access\nPASS ordinary numeric Content-Length accepted\nPASS forged Host/Origin combinations refused before DB access\n"
+    },
+    {
+      "command": "node scripts/test-website-registration-scope-mocked.cjs",
+      "exit": 0,
+      "output": "PASS 11 mocked registration and registry assertions\n"
+    }
+  ],
+  "mariadb": {
+    "version": "11.8.9-MariaDB-ubu2404",
+    "inventory": {
+      "migrations": [
+        {
+          "migration_id": "001_core_schema.sql"
+        },
+        {
+          "migration_id": "002_budget_incidents.sql"
+        },
+        {
+          "migration_id": "003_sessions.sql"
+        },
+        {
+          "migration_id": "004_login_throttles.sql"
+        },
+        {
+          "migration_id": "005_installation_state.sql"
+        },
+        {
+          "migration_id": "006_approval_queue.sql"
+        },
+        {
+          "migration_id": "007_approval_audit.sql"
+        },
+        {
+          "migration_id": "008_approval_audit_guards.sql"
+        },
+        {
+          "migration_id": "009_website_feature_audit.sql"
+        }
+      ],
+      "tables": [
+        {
+          "name": "growth_dev_analysis_jobs"
+        },
+        {
+          "name": "growth_dev_analysis_recommendations"
+        },
+        {
+          "name": "growth_dev_approval_revocations"
+        },
+        {
+          "name": "growth_dev_connector_drafts"
+        },
+        {
+          "name": "growth_dev_connector_enrollments"
+        },
+        {
+          "name": "growth_dev_contract"
+        },
+        {
+          "name": "growth_dev_ownership"
+        },
+        {
+          "name": "growth_dev_ownership_grants"
+        },
+        {
+          "name": "growth_dev_s03_contract"
+        },
+        {
+          "name": "growth_dev_stop_fences"
+        },
+        {
+          "name": "growth_dev_worker_history"
+        },
+        {
+          "name": "growth_dev_worker_leases"
+        },
+        {
+          "name": "growth_dev_workflow_events"
+        }
+      ],
+      "version": [
+        {
+          "version": "11.8.9-MariaDB-ubu2404"
+        }
+      ]
+    },
+    "session03": {
+      "exit": 0,
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "output": "TAP version 13\n# Subtest: synthetic enrollment, expiring ownership, lease races, real crash recovery, stop fences, revocation, backoff and scoped pagination\nok 1 - synthetic enrollment, expiring ownership, lease races, real crash recovery, stop fences, revocation, backoff and scoped pagination\n  ---\n  duration_ms: 1186.684718\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 1653.409582\n"
+    },
+    "session02": {
+      "exit": 0,
+      "pass": 1,
+      "output": "TAP version 13\n# Subtest: real-session ownership, connector drafts, durable analysis lifecycle, quotas, approvals and immutable evidence history\nok 1 - real-session ownership, connector drafts, durable analysis lifecycle, quotas, approvals and immutable evidence history\n  ---\n  duration_ms: 401.914763\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 712.490688\n"
+    },
+    "session01": {
+      "exit": 0,
+      "pass": 1,
+      "output": "TAP version 13\n# Subtest: real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\nok 1 - real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\n  ---\n  duration_ms: 122.137472\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 419.118078\n"
+    },
+    "existingApproval": {
+      "exit": 0,
+      "pass": 1
+    },
+    "install017": {
+      "exit": 0,
+      "scope": "disposable-only unchanged proposal"
+    },
+    "install018": {
+      "exit": 0,
+      "output": "PASS: independent proposal 018 installed only in disposable schema; 010\u2013017 contracts unchanged.\n"
+    }
+  },
+  "browser": {
+    "session03": {
+      "exit": 0,
+      "scenarios": 5,
+      "output": "PASS browser: encrypted enrollment and authenticated explicitly synthetic read-only health\nPASS browser: leased worker completion and paginated job history\nPASS browser: research provenance, recommendations and immutable attempt history\nPASS browser: ownership revocation disables connector health authority\nPASS browser: mobile width and tenant viewer read-only monitoring\nPASS 5 Session 03 browser scenarios; synthetic adapters only\n"
+    },
+    "session02": {
+      "exit": 0,
+      "scenarios": 6,
+      "output": "PASS browser: persisted ownership challenge and explicit unavailable external proof\nPASS browser: persisted source, approval-gated local analysis and derived recommendations\nPASS browser: result and recommendation status survive full reload\nPASS browser: queued analysis cancellation is durable\nPASS browser: durable workflow panel fits 390px viewport\nPASS browser: viewer sees persisted records without mutation controls\nPASS 6 Session 02 browser scenarios; no external requests or live automation\n"
+    },
+    "session01": {
+      "exit": 0,
+      "scenarios": 5,
+      "output": "PASS browser: configuration persists after full reload\nPASS browser: stale edit refusal and reload recovery\nPASS browser: safe lifecycle controls persist with both switches disabled\nPASS browser: settings fit a 390px viewport\nPASS browser: viewer sees read-only settings\nPASS 5 browser scenarios with real local HTTPS API and MariaDB\n"
+    }
+  },
+  "crashRecovery": "Actual test child SIGKILL after a committed lease; recovery, backoff and stale-worker fencing passed in MariaDB.",
+  "schemaReview": "Static only, no SQL execution; no direct table-name collisions. Semantic authority overlaps remain production blockers.",
+  "safeRefusalExits": {
+    "installer": 2,
+    "integrationRunner": 2,
+    "workerCLI": 2
+  },
+  "migrations010Through016Executed": false,
+  "promoted017": false,
+  "productionRelease": "HOLD",
+  "cleanup": "Session-owned HTTPS app stopped, disposable container removed, local test DB/key/TLS files deleted."
+}
