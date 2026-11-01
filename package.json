@@ -20,7 +20,8 @@
     "test:session02:mysql": "node scripts/run-session02-integration.mjs",
     "test:session03:mysql": "node scripts/run-session03-integration.mjs",
     "worker:synthetic": "node --import=tsx scripts/run-session03-worker.cjs",
-    "schema:review:offline": "node scripts/review-development-schema.cjs"
+    "schema:review:offline": "node scripts/review-development-schema.cjs",
+    "test:session04:mysql": "node scripts/run-session04-integration.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

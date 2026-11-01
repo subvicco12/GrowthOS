@@ -3,6 +3,7 @@ import { useEffect,useRef,useState } from 'react';
 import { OrganizationSelector } from './organization-selector';
 import { OrganizationWebsiteRegistry } from './organization-website-registry';
 import { OrganizationApprovalInbox } from './organization-approval-inbox';
+import { PortfolioOperationsPanel } from './portfolio-operations-panel';
 import { OrganizationDashboard } from './organization-dashboard';
 import { OrganizationAutomationStatus } from './organization-automation-status';
 import { AuthPanel } from './auth-panel';
@@ -136,7 +137,7 @@ export default function Dashboard(){
           {websitePages.nextCursor&&!websitePages.error&&<button type="button" className="secondary" disabled={websitePages.busy} onClick={()=>void websitePager.loadMore()}>Load more websites</button>}
         </div>
       </div>
-      {section==='home'&&<><OrganizationDashboard/><section className="panel" aria-label="Growth workflow overview"><h2>Website growth journey</h2>
+      {section==='home'&&<><OrganizationDashboard/><PortfolioOperationsPanel/><section className="panel" aria-label="Growth workflow overview"><h2>Website growth journey</h2>
         {selectedWebsite&&websiteScope&&<div><p>Selected: {requireSelectedWebsite(websiteScope,selectedWebsite).domain}. Website-specific local previews remain unverified.</p>
           <ul>{onboardingReadiness(requireSelectedWebsite(websiteScope,selectedWebsite)).checks.map(c=><li key={c.name}>{c.name}: {c.state}</li>)}</ul></div>}
         <div className="journeyGrid">{journeySteps.map(step=><article key={step.id}><h3>{step.label}</h3><p>{step.boundary}</p>

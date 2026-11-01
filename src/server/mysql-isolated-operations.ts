@@ -1,3 +1,5 @@
+import { assertCompatibleDevelopmentSchema } from './schema-compatibility';
+import { assertSession04Execution } from './session04-safety';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { MySQLIsolatedWorkflows, type WorkScope } from './mysql-isolated-workflows';
@@ -16,6 +18,7 @@ export class MySQLIsolatedOperations extends MySQLIsolatedWorkflows {
   constructor(pool:Pick<Pool,'getConnection'>,ownership:OwnershipTransport,now:()=>number=Date.now,
     private readonly health:SyntheticHealthAdapter=localSyntheticHealthAdapter, private readonly master:()=>string=()=>process.env.GROWTHOS_DEV_CONNECTOR_KEY||'') {super(pool,ownership,now);}
   private async guard(c:PoolConnection,s:WorkScope,roles:readonly string[]=['owner','admin']){
+    if(process.env.GROWTHOS_SESSION04_DISPOSABLE==='YES')await assertCompatibleDevelopmentSchema(c);
     const site=await this.site(c,s,roles);
     const [version]=await c.execute<Row[]>('SELECT contract_version FROM growth_dev_s03_contract WHERE id=1');
     if(version[0]?.contract_version!=='session03-v1')throw Error('ISOLATED_SCHEMA_REQUIRED');
@@ -92,6 +95,7 @@ export class MySQLIsolatedOperations extends MySQLIsolatedWorkflows {
     if(!rows[0])throw Error('JOB_NOT_FOUND');return rows[0];
   }
   private async executionAuthority(c:PoolConnection,s:WorkScope,site:Row,job:Row){
+    if(process.env.GROWTHOS_SESSION04_DISPOSABLE==='YES')await assertSession04Execution(c,s.organizationId,this.now());
     if(['paused','archived'].includes(site.status))throw Error('WEBSITE_STOPPED');
     await assertApprovalNotRevoked(c,s,job.approval_id);if(job.approval_status!=='approved')throw Error('APPROVAL_REQUIRED');
     const [shutdowns]=await c.execute<Row[]>('SELECT id FROM growth_website_feature_audit WHERE organization_id=? AND website_id=? FOR UPDATE',params(s));
