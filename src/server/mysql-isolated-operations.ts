@@ -41,6 +41,7 @@ export class MySQLIsolatedOperations extends MySQLIsolatedWorkflows {
     await bumpStopFence(c,s);
     await c.execute('UPDATE growth_websites SET verified_at=NULL,automation_enabled=FALSE,auto_publish_enabled=FALSE WHERE organization_id=? AND id=?',params(s));
     await c.execute("UPDATE growth_dev_connector_enrollments SET state='revoked',health_state='unknown' WHERE organization_id=? AND website_id=?",params(s));
+    if(process.env.GROWTHOS_SESSION04_DISPOSABLE==='YES')await c.execute("UPDATE growth_dev_wordpress_fixtures SET state='revoked',health_state='unknown' WHERE organization_id=? AND website_id=?",params(s));
     await c.execute("UPDATE growth_dev_connector_drafts SET state='revoked' WHERE organization_id=? AND website_id=?",params(s));
     await this.event(c,s,s.websiteId,onlyExpired?'ownership_expired':'ownership_revoked');return {changed:true,externalAction:false};
   });}
