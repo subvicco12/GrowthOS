@@ -1,0 +1,178 @@
+{
+  "recordedAt": "2026-11-01T16:03:17.606756+00:00",
+  "startingCheckpoint": "f7f8b7453de7bf4a7da6009fe3b4c3e4062b2c7f",
+  "developmentCheckpoint": "checkpoint/session04-start-f7f8b74",
+  "implementationCheckpoint": "311effe9a7831d904215a6eb4c2e3c4eab5633a4",
+  "endingImplementationCheckpoint": "b0834544ec426decc4c44e239ab119f5056fc6d1",
+  "branch": "feat/growthos-final-product-closure-20261024",
+  "remoteAudit": {
+    "remoteBranchCount": 79,
+    "requiredBranchRemote": "9d813e8f614c43bcba9e19d1bf34315c006a6e37",
+    "containing": {
+      "3fbcd17": [],
+      "e29d3d6": [],
+      "414b115": [],
+      "f7f8b74": []
+    }
+  },
+  "node": "22.23.4",
+  "unitSuite": {
+    "command": "npm test",
+    "exit": 0,
+    "total": 638,
+    "pass": 633,
+    "fail": 0,
+    "skip": 5,
+    "newUnitCases": 7,
+    "note": "Five opt-in integration scenarios executed separately; all passed."
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exit": 0
+  },
+  "build": {
+    "command": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+    "exit": 0
+  },
+  "offline": [
+    {
+      "command": "npm run test:security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:security:offline\n> node scripts/validate-security-offline.cjs\n\nPASS: offline source checks. No database or network accessed.\n"
+    },
+    {
+      "command": "npm run test:db-guards:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:db-guards:offline\n> node scripts/test-disposable-db-guards.cjs\n\nPASS: migration runner refuses remote host\nPASS: migration runner refuses production database name\nPASS: migration runner refuses non-test database name\nPASS: migration runner refuses missing disposable opt-in\nPASS: approval integration refuses remote host\nPASS: approval integration refuses production database name\nPASS: approval integration refuses non-test database name\nPASS: approval integration refuses missing disposable opt-in\nPASS: 8 offline database guard refusals. No connection attempts were authorized.\n"
+    },
+    {
+      "command": "npm run test:auth-and-session:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:auth-and-session:offline\n> npm run test:auth-cookies:offline && npm run test:session:offline\n\n\n> growthos@1.0.0 test:auth-cookies:offline\n> node scripts/test-auth-cookie-routes-mocked.cjs\n\nPASS login sets secure session and clears organization cookie\nPASS cross-origin login refused before authentication\nPASS malformed login credentials are not cached or authenticated\nPASS malformed JSON is non-cacheable and refused before authentication\nPASS oversized login body is non-cacheable and refused before authentication\nPASS invalid credentials, throttling and service failures never issue session cookies\nPASS duplicate session and organization cookies fail closed\nPASS organization context requires session, explicit choice, and verified membership\nPASS organization discovery rejects ambiguous session cookies\nPASS organization listing rejects anonymous access and returns non-cacheable scoped choices\nPASS logout revokes session and clears both cookies\nPASS logout service failure is generic and non-cacheable\nPASS cross-origin logout refused before revocation\nPASS forged Host logout refused before revocation\n\n> growthos@1.0.0 test:session:offline\n> node scripts/test-mysql-session-mocked.cjs\n\nPASS isolated session issuance, hashing, expiry, disabled-user refusal and revocation\n"
+    },
+    {
+      "command": "npm run test:mutation-security:offline",
+      "exit": 0,
+      "output": "\n> growthos@1.0.0 test:mutation-security:offline\n> node scripts/test-mutation-security-mocked.cjs\n\nPASS auth/login/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS organizations/selection/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS websites/register/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approvals/decide/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS api/organization-websites/route.ts forged origin/Host, forwarding headers, oversized and malformed JSON\nPASS approval unauthorized role refused before mutation\nPASS cross-tenant organization selection refused\nPASS forwarding headers cannot override canonical Host and Origin\nPASS missing/invalid canonical configuration and malformed length fail closed\nPASS malformed Content-Length, invalid UTF-8, stream failures, aborts and streaming size cap\nPASS 52 offline mutation security assertions\n"
+    },
+    {
+      "command": "node scripts/test-feature-route-mocked.cjs",
+      "exit": 0,
+      "output": "PASS enabled feature disabled and audited\nPASS repeated disable is idempotent\nPASS missing website rolls back\nPASS viewer denied\nPASS audit failure rolls back\nPASS malformed JSON refused before DB access\nPASS oversized actual body refused before DB access\nPASS oversized declared body refused before DB access\nPASS ordinary numeric Content-Length accepted\nPASS forged Host/Origin combinations refused before DB access\n"
+    },
+    {
+      "command": "node scripts/test-website-registration-scope-mocked.cjs",
+      "exit": 0,
+      "output": "PASS 11 mocked registration and registry assertions\n"
+    }
+  ],
+  "databaseCertification": {
+    "status": "PASS",
+    "version": "11.8.9-MariaDB-ubu2404",
+    "populatedTables": 35,
+    "rowCount": 147,
+    "backupBytes": 83541,
+    "backupSha256": "af7292be037e9212ec31b9487a0730101e50714cbe867265943012721605f923",
+    "restoredRowHashesEqual": true,
+    "indexesEqual": true,
+    "foreignKeysEqual": true,
+    "collationsEqual": true,
+    "triggersEqual": true,
+    "readOnlyGrantRefusals": 2,
+    "crossTenantConstraintRefused": true,
+    "populatedUpgradePreserved": true,
+    "partialDdlRefused": true,
+    "freshRecoveryEqual": true,
+    "canonicalMigrationsExecuted": false,
+    "productionReady": false
+  },
+  "platformIntegration": {
+    "command": "node scripts/run-session04-integration.mjs",
+    "exit": 0,
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "output": "TAP version 13\n# Subtest: populated compatibility, reversible quarantine, portfolio isolation, emergency fencing, clock skew, and actual local WordPress read-only health\nok 1 - populated compatibility, reversible quarantine, portfolio isolation, emergency fencing, clock skew, and actual local WordPress read-only health\n  ---\n  duration_ms: 790.975835\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 1280.068659\n"
+  },
+  "previousIntegrations": {
+    "run-session03-integration.mjs": {
+      "exit": 0,
+      "output": "TAP version 13\n# Subtest: synthetic enrollment, expiring ownership, lease races, real crash recovery, stop fences, revocation, backoff and scoped pagination\nok 1 - synthetic enrollment, expiring ownership, lease races, real crash recovery, stop fences, revocation, backoff and scoped pagination\n  ---\n  duration_ms: 1224.209997\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 1545.503157\n"
+    },
+    "run-session02-integration.mjs": {
+      "exit": 0,
+      "output": "TAP version 13\n# Subtest: real-session ownership, connector drafts, durable analysis lifecycle, quotas, approvals and immutable evidence history\nok 1 - real-session ownership, connector drafts, durable analysis lifecycle, quotas, approvals and immutable evidence history\n  ---\n  duration_ms: 446.751346\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 745.235192\n"
+    },
+    "run-website-settings-integration.mjs": {
+      "exit": 0,
+      "output": "TAP version 13\n# Subtest: real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\nok 1 - real session, tenant isolation, durable settings, concurrent stop, rollback, history pagination and immutability\n  ---\n  duration_ms: 174.53218\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 525.1605\n"
+    }
+  },
+  "existingApprovalIntegration": {
+    "exit": 0,
+    "pass": 1
+  },
+  "browser": {
+    "session04": {
+      "exit": 0,
+      "scenarios": 5,
+      "output": "PASS browser: tenant-wide stored summaries, filtering and 30-site pagination\nPASS browser: durable emergency stop and explicit zero-spend-only resume\nPASS browser: real local WordPress enrollment, signed health, rotation and revocation\nPASS browser: derived local artifact evidence and immutable incident history\nPASS browser: responsive portfolio and viewer read-only administration\nPASS 5 Session 04 browser scenarios; actual local WordPress fixture is not production evidence\n"
+    },
+    "test-session03-browser.cjs": {
+      "exit": 0,
+      "scenarios": 5,
+      "mode": "Session 03 backward compatibility; Session 04 flag unset",
+      "output": "PASS browser: encrypted enrollment and authenticated explicitly synthetic read-only health\nPASS browser: leased worker completion and paginated job history\nPASS browser: research provenance, recommendations and immutable attempt history\nPASS browser: ownership revocation disables connector health authority\nPASS browser: mobile width and tenant viewer read-only monitoring\nPASS 5 Session 03 browser scenarios; synthetic adapters only\n"
+    },
+    "test-session02-browser.cjs": {
+      "exit": 0,
+      "scenarios": 6,
+      "mode": "Session 03 backward compatibility; Session 04 flag unset",
+      "output": "PASS browser: persisted ownership challenge and explicit unavailable external proof\nPASS browser: persisted source, approval-gated local analysis and derived recommendations\nPASS browser: result and recommendation status survive full reload\nPASS browser: queued analysis cancellation is durable\nPASS browser: durable workflow panel fits 390px viewport\nPASS browser: viewer sees persisted records without mutation controls\nPASS 6 Session 02 browser scenarios; no external requests or live automation\n"
+    },
+    "test-website-settings-browser.cjs": {
+      "exit": 0,
+      "scenarios": 5,
+      "mode": "Session 03 backward compatibility; Session 04 flag unset",
+      "output": "PASS browser: configuration persists after full reload\nPASS browser: stale edit refusal and reload recovery\nPASS browser: safe lifecycle controls persist with both switches disabled\nPASS browser: settings fit a 390px viewport\nPASS browser: viewer sees read-only settings\nPASS 5 browser scenarios with real local HTTPS API and MariaDB\n"
+    }
+  },
+  "wordpressFixture": {
+    "version": "6.8.3",
+    "image": "wordpress:6.8.3-php8.3-fpm-alpine",
+    "phpLintExit": 0,
+    "enrollmentHealthRotationRevocation": "PASS against actual local WordPress REST routes",
+    "offlineLocalRevocation": "PASS",
+    "ownershipRevocationInvalidatesFixture": "PASS",
+    "productionTrusted": false,
+    "publicSiteConnectivityTested": false,
+    "apacheImageAttempt": "Failed: no space left on device; smaller Alpine image succeeded"
+  },
+  "installers": {
+    "02": {
+      "exit": 0,
+      "output": "PASS: proposal 017 installed ONLY in explicit disposable schema; 010\u2013016 untouched.\n"
+    },
+    "03": {
+      "exit": 0,
+      "output": "PASS: independent proposal 018 installed only in disposable schema; 010\u2013017 contracts unchanged.\n"
+    },
+    "04": {
+      "exit": 0,
+      "output": "PASS: independent proposal 019 installed only in disposable schema; 010\u2013017 contracts unchanged.\n"
+    }
+  },
+  "migrationRestrictions": {
+    "executedCanonical010Through016": false,
+    "promoted017or018": false,
+    "changedExistingMigrationContracts": false
+  },
+  "cleanup": {
+    "stoppedLocalHttps": true,
+    "removedWordPressContainerAndAnonymousVolume": true,
+    "removedMariaDBContainer": true,
+    "removedTestNetwork": true,
+    "deletedPrivateTestFiles": true
+  },
+  "releaseReadiness": "HOLD"
+}
